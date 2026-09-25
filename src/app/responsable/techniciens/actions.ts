@@ -120,6 +120,11 @@ const updateFicheSchema = z.object({
   typeContrat: z.string().optional(),
   adresseDomicile: z.string().optional(),
   statutRh: z.enum(STATUTS_RH).optional(),
+  poste: z.string().max(120).optional(),
+  specialites: z.string().max(500).optional(),
+  vehicule: z.string().max(80).optional(),
+  dateSortie: z.string().optional(),
+  motifSortie: z.string().max(200).optional(),
 });
 
 export async function updateTechnicienFiche(formData: FormData) {
@@ -138,6 +143,11 @@ export async function updateTechnicienFiche(formData: FormData) {
     typeContrat: formData.get("typeContrat") || undefined,
     adresseDomicile: formData.get("adresseDomicile") || undefined,
     statutRh: formData.get("statutRh") || undefined,
+    poste: formData.get("poste") || undefined,
+    specialites: formData.get("specialites") || undefined,
+    vehicule: formData.get("vehicule") || undefined,
+    dateSortie: formData.get("dateSortie") || undefined,
+    motifSortie: formData.get("motifSortie") || undefined,
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
 
@@ -160,9 +170,12 @@ export async function updateTechnicienFiche(formData: FormData) {
     throw new Error("Un utilisateur existe déjà avec cet email.");
   }
 
+  // Phase 13 : un technicien « sorti des effectifs » ne peut plus se
+  // connecter (compte désactivé) mais tout son historique reste consultable.
+  const sorti = parsed.data.statutRh === "sorti_effectifs";
   await db
     .update(users)
-    .set({ email: parsed.data.email, telephone: parsed.data.telephone ?? null })
+    .set({ email: parsed.data.email, telephone: parsed.data.telephone ?? null, actif: sorti ? 0 : 1 })
     .where(eq(users.id, parsed.data.technicienId));
 
   const [existingFiche] = await db
@@ -182,6 +195,11 @@ export async function updateTechnicienFiche(formData: FormData) {
     typeContrat: parsed.data.typeContrat ?? null,
     adresseDomicile: parsed.data.adresseDomicile ?? null,
     statutRh: parsed.data.statutRh ?? "actif",
+    poste: parsed.data.poste ?? null,
+    specialites: parsed.data.specialites ?? null,
+    vehicule: parsed.data.vehicule ?? null,
+    dateSortie: sorti ? (parsed.data.dateSortie ? new Date(parsed.data.dateSortie) : new Date()) : null,
+    motifSortie: sorti ? (parsed.data.motifSortie ?? null) : null,
   };
 
   if (existingFiche) {
@@ -196,11 +214,13 @@ export async function updateTechnicienFiche(formData: FormData) {
   await journaliser({
     entite: "technicien",
     entiteId: parsed.data.technicienId,
-    action: "modification_fiche",
+    action: sorti ? "sortie_effectifs" : "modification_fiche",
     utilisateurId: user.id,
+    details: sorti ? `Sortie${parsed.data.motifSortie ? ` — ${parsed.data.motifSortie}` : ""} (connexion désactivée)` : null,
   });
 
   revalidatePath(`/responsable/techniciens/${parsed.data.technicienId}`);
+  revalidatePath("/responsable/techniciens");
 }
 
 const PHOTO_TYPES: Record<string, string> = {

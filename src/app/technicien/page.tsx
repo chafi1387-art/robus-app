@@ -1,4 +1,4 @@
-import { Card, TypeInterventionPill, StatutInterventionPill } from "@/components/ui";
+import { TypeInterventionPill, StatutInterventionPill } from "@/components/ui";
 import { db } from "@/db";
 import { appareils, clients, interventions, projets } from "@/db/schema";
 import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
@@ -169,38 +169,50 @@ export default async function MesInterventionsPage({
         ? `Semaine du ${formatDate(periodeDebut)} au ${formatDate(addDays(periodeFin, -1))}`
         : refDate.toLocaleDateString("fr-BE", { month: "long", year: "numeric" });
 
+  const prenom = (user.name ?? "").split(" ")[0];
+  const libelleJour = new Date().toLocaleDateString("fr-BE", { weekday: "long", day: "numeric", month: "long" });
+
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-xl font-extrabold font-display">Mes interventions</h1>
-        <p className="text-sm text-ink-soft">
-          Aujourd&apos;hui : {ajourdhuiCount}
-          {enRetard.length > 0 ? ` · En retard : ${enRetard.length}` : ""}
-        </p>
+    <div className="flex flex-col gap-4">
+      <div className="-mx-4 -mt-4 px-5 pt-5 pb-5 bg-navy text-white rounded-b-3xl flex flex-col gap-4">
+        <div>
+          <div className="text-[12.5px] text-[#9fd3ee] capitalize">{libelleJour}</div>
+          <h1 className="font-display font-extrabold text-[21px]">Bonjour {prenom}</h1>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-white/10 px-3 py-2.5">
+            <div className="text-[11px] text-[#cfe3f5]">Aujourd&apos;hui</div>
+            <div className="font-display text-[21px] font-extrabold tabular">{ajourdhuiCount}</div>
+          </div>
+          <div className={`rounded-xl px-3 py-2.5 ${enRetard.length > 0 ? "bg-red-fill text-red-ink" : "bg-white/10"}`}>
+            <div className={`text-[11px] ${enRetard.length > 0 ? "" : "text-[#cfe3f5]"}`}>En retard</div>
+            <div className="font-display text-[21px] font-extrabold tabular">{enRetard.length}</div>
+          </div>
+          <div className="rounded-xl bg-white/10 px-3 py-2.5">
+            <div className="text-[11px] text-[#cfe3f5]">{vue === "jour" ? "Ce jour" : vue === "semaine" ? "Cette semaine" : "Ce mois"}</div>
+            <div className="font-display text-[21px] font-extrabold tabular">{periode.length}</div>
+          </div>
+        </div>
       </div>
 
       {enRetard.length > 0 && (
         <div>
-          <h2 className="text-xs font-bold uppercase tracking-wide text-red-ink mb-2">
-            ⚠️ En retard ({enRetard.length})
-          </h2>
+          <h2 className="text-xs font-bold uppercase tracking-wide text-red-ink mb-2">En retard ({enRetard.length})</h2>
           <div className="flex flex-col gap-3">
             {enRetard.map((i) => (
-              <InterventionCard key={i.id} i={i} />
+              <InterventionCard key={i.id} i={i} retard />
             ))}
           </div>
         </div>
       )}
 
       <div>
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex rounded-xl bg-[#e9eef4] p-1 mb-3">
           {VUES.map((v) => (
             <Link
               key={v}
               href={hrefVue(v, refDate)}
-              className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-                vue === v ? "bg-blue text-white" : "bg-blue-pale text-blue"
-              }`}
+              className={`flex-1 text-center text-[13px] font-semibold py-2 rounded-lg ${vue === v ? "bg-white text-navy shadow-sm" : "text-ink-soft"}`}
             >
               {VUE_LABEL[v]}
             </Link>
@@ -209,18 +221,18 @@ export default async function MesInterventionsPage({
 
         <div className="flex items-center justify-between gap-2 mb-3">
           {precedentBloque ? (
-            <span className="text-xs font-semibold text-ink-soft/50 px-2 py-1">◀ Précédent</span>
+            <span className="text-[13px] font-semibold text-ink-soft/50 px-2 py-2">‹ Préc.</span>
           ) : (
-            <Link href={hrefVue(vue, datePrecedent)} className="text-xs font-bold text-blue px-2 py-1">
-              ◀ Précédent
+            <Link href={hrefVue(vue, datePrecedent)} className="text-[13px] font-bold text-blue px-2 py-2">
+              ‹ Préc.
             </Link>
           )}
           <div className="text-sm font-semibold text-center capitalize">{titrePeriode}</div>
-          <Link href={hrefVue(vue, aujourdhui)} className="text-xs font-bold text-blue px-2 py-1">
-            Aujourd&apos;hui
+          <Link href={hrefVue(vue, aujourdhui)} className="text-[13px] font-bold text-blue px-2 py-2">
+            Auj.
           </Link>
-          <Link href={hrefVue(vue, dateSuivant)} className="text-xs font-bold text-blue px-2 py-1">
-            Suivant ▶
+          <Link href={hrefVue(vue, dateSuivant)} className="text-[13px] font-bold text-blue px-2 py-2">
+            Suiv. ›
           </Link>
         </div>
 
@@ -255,25 +267,36 @@ function Section({ rows, empty }: { rows: Row[]; empty: string }) {
   );
 }
 
-function InterventionCard({ i }: { i: Row }) {
+function InterventionCard({ i, retard = false }: { i: Row; retard?: boolean }) {
+  const heure = formatDateTime(i.dateProgrammee).split(" ")[1] ?? "—";
+  const itineraire = i.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(i.adresse)}` : null;
+  const action = i.statut === "en_cours" ? "Continuer le rapport" : ["terminee", "validee", "cloturee"].includes(i.statut) ? "Voir la mission" : "Ouvrir la mission";
   return (
-    <Link href={`/technicien/interventions/${i.id}`}>
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <TypeInterventionPill type={i.type} />
-          <span className="text-xs font-bold text-blue tabular">
-            {formatDateTime(i.dateProgrammee).split(" ")[1]}
-          </span>
-        </div>
-        <div className="font-display font-bold text-sm">{i.numeroInterne}</div>
-        <div className="text-xs text-ink-soft">
-          {i.raisonSociale && i.adresse ? `${i.raisonSociale} — ${i.adresse}` : "Projet non renseigné"}
-        </div>
-        {i.description && <div className="text-xs text-ink-soft mt-1">{i.description}</div>}
-        <div className="mt-2">
-          <StatutInterventionPill statut={i.statut} />
-        </div>
-      </Card>
-    </Link>
+    <div className={`bg-surface rounded-2xl p-4 flex flex-col gap-2 shadow-[0_1px_2px_rgba(16,24,40,0.05)] ${retard ? "border-[1.5px] border-[#f3b8b0]" : "border border-line"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`font-display font-extrabold text-[17px] tabular ${retard ? "text-red-ink" : "text-navy"}`}>
+          {retard ? `${formatDate(i.dateProgrammee)} · ${heure}` : heure}
+        </span>
+        <StatutInterventionPill statut={i.statut} />
+      </div>
+      <div className="flex items-center gap-2">
+        <TypeInterventionPill type={i.type} />
+        <span className="font-display font-bold text-[15px]">{i.numeroInterne}</span>
+      </div>
+      <div className="text-[13px] text-ink-soft">
+        {i.raisonSociale && i.adresse ? `${i.raisonSociale} — ${i.adresse}` : "Projet non renseigné"}
+      </div>
+      {i.description && <div className="text-[13px]">{i.description}</div>}
+      <div className="flex gap-2 mt-1">
+        <Link href={`/technicien/interventions/${i.id}`} className="flex-1 min-h-11 rounded-xl bg-blue text-white font-bold text-[14px] flex items-center justify-center">
+          {action}
+        </Link>
+        {itineraire && (
+          <a href={itineraire} target="_blank" rel="noreferrer" className="min-h-11 px-4 rounded-xl border border-[#cfd8e3] bg-white font-semibold text-[13.5px] flex items-center justify-center">
+            Itinéraire
+          </a>
+        )}
+      </div>
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   appareils,
   clients,
   documentsFormations,
+  journalActivite,
   garanties,
   garantieFormules,
   interventions,
@@ -43,6 +44,8 @@ import {
   updateProjetInfos,
 } from "../actions";
 import { createDocument } from "../../documents/actions";
+import { createIntervention } from "../../actions";
+import { CalendarDays, FileDown, HardHat, Plus, ArrowUpDown, ShieldCheck } from "lucide-react";
 import { FICHIER_MAX_BYTES, FICHIER_TYPES } from "@/lib/document-file-rules";
 
 function truncate(texte: string | null | undefined, n: number) {
@@ -103,6 +106,24 @@ const CATEGORIES_DOC = [
 ] as const;
 type CategorieDoc = (typeof CATEGORIES_DOC)[number];
 
+const ONGLETS = [
+  { id: "apercu", label: "Vue d'ensemble" },
+  { id: "missions", label: "Missions" },
+  { id: "appareils", label: "Appareils" },
+  { id: "equipe", label: "Équipe" },
+  { id: "garantie", label: "Garantie & prestations" },
+  { id: "documents", label: "Documents" },
+  { id: "historique", label: "Historique" },
+] as const;
+
+const TYPE_PROJET_LABEL: Record<string, string> = {
+  installation: "Installation",
+  maintenance: "Maintenance",
+  modernisation: "Modernisation",
+  reparation: "Réparation",
+};
+const STATUTS_MISSION_FINIS = new Set(["terminee", "validee", "cloturee"]);
+
 const EXTENSIONS_IMAGE = ["jpg", "jpeg", "png", "gif", "webp", "svg"];
 
 // Badge visuel de la carte Documentation : vraie vignette pour une image,
@@ -118,6 +139,7 @@ function getDocVisual(d: { typeContenu: string; urlFichier: string | null }) {
 
 function buildDocQuery(categorie: string | undefined, tri: "asc" | "desc") {
   const params = new URLSearchParams();
+  params.set("tab", "documents");
   if (categorie) params.set("docCategorie", categorie);
   if (tri !== "desc") params.set("docTri", tri);
   const qs = params.toString();
@@ -129,11 +151,12 @@ export default async function ProjetDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ docCategorie?: string; docTri?: string }>;
+  searchParams: Promise<{ docCategorie?: string; docTri?: string; tab?: string; cree?: string }>;
 }) {
   const user = await requireUser(ROLES_BUREAU);
   const { id } = await params;
-  const { docCategorie, docTri } = await searchParams;
+  const { docCategorie, docTri, tab: tabParam, cree } = await searchParams;
+  const tab = (ONGLETS.map((o) => o.id) as string[]).includes(tabParam ?? "") ? (tabParam as string) : "apercu";
   const docCategorieValide = (CATEGORIES_DOC as readonly string[]).includes(docCategorie ?? "")
     ? (docCategorie as CategorieDoc)
     : undefined;
@@ -293,23 +316,113 @@ export default async function ProjetDetailPage({
     (t) => !techniciensDejaAffectesIds.has(t.id)
   );
 
+  const journalProjet =
+    tab === "historique"
+      ? await db
+          .select({ id: journalActivite.id, action: journalActivite.action, details: journalActivite.details, createdAt: journalActivite.createdAt, auteur: users.nom })
+          .from(journalActivite)
+          .leftJoin(users, eq(journalActivite.utilisateurId, users.id))
+          .where(eq(journalActivite.entiteId, id))
+          .orderBy(desc(journalActivite.createdAt))
+          .limit(200)
+      : [];
+  const maintenant = Date.now();
+  const missionsActives = interventionsListe.filter((i) => !STATUTS_MISSION_FINIS.has(i.statut));
+  const missionsEnRetard = missionsActives.filter((i) => i.dateProgrammee && i.dateProgrammee.getTime() < maintenant);
+  const ongletHref = (o: string) => `/responsable/projets/${projet.id}?tab=${o}`;
+  const STATUT_BADGE: Record<string, string> = {
+    cree: "bg-[#eef2f6] text-ink-soft",
+    planifie: "bg-blue-pale text-blue",
+    en_cours: "bg-orange-fill text-orange-ink",
+    termine: "bg-green-fill text-green-ink",
+    valide_iso: "bg-green-fill text-green-ink",
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <div className="text-xs text-ink-soft">
-          <Link href={`/responsable/clients/${client.id}`} className="text-blue font-semibold">
-            {client.raisonSociale}
-          </Link>
+      {cree && (
+        <div className="rounded-xl bg-green-fill text-green-ink px-4 py-3 text-sm font-semibold">
+          ✓ Projet créé. Ajoutez maintenant ses missions ci-dessous.
         </div>
-        <div className="flex items-center gap-3 mt-1 flex-wrap">
-          <h1 className="text-2xl font-extrabold font-display">
-            {projet.reference} — {projet.titre}
-          </h1>
-          {garantie && <Pill tone="ok">Sous garantie</Pill>}
+      )}
+      <div className="bg-white border border-line rounded-2xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+        <div className="px-7 pt-6 pb-0 flex flex-col gap-5">
+          <div className="flex items-start gap-4 flex-wrap">
+            <div className="flex-1 min-w-[280px] flex flex-col gap-1.5">
+              <div className="text-[13px] text-ink-soft">
+                <Link href="/responsable/projets" className="hover:text-blue">Projets</Link> <span className="text-[#9aa4b1]">/</span> {projet.reference}
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-[26px] font-extrabold font-display text-[#0b2545] leading-tight">{projet.titre}</h1>
+                <span className={`text-xs font-bold rounded-full px-3 py-1 ${STATUT_BADGE[projet.statut] ?? ""}`}>{ETAPE_LABEL[projet.statut]}</span>
+              </div>
+              <div className="text-[13.5px] text-ink-soft">
+                <Link href={`/responsable/clients/${client.id}`} className="text-blue font-semibold hover:underline">{client.raisonSociale}</Link>
+                {projet.typeProjet ? ` · ${TYPE_PROJET_LABEL[projet.typeProjet] ?? projet.typeProjet}` : ""}
+                {projet.dateDebutPrevue || projet.dateFinPrevue ? ` · ${formatDate(projet.dateDebutPrevue)} → ${formatDate(projet.dateFinPrevue)}` : ""}
+                {garantie?.formule ? ` · ${garantie.formule.nom}` : ""}
+              </div>
+              {projet.description && <p className="text-sm text-ink-soft">{projet.description}</p>}
+            </div>
+            <a
+              href={`/api/rapports/pdf?type=projet&entityId=${projet.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl border border-[#cfd8e3] bg-white px-4 py-2.5 text-[13.5px] font-semibold hover:bg-bg"
+            >
+              <FileDown className="w-4 h-4" /> Dossier PDF
+            </a>
+            <Link
+              href={`/responsable/projets/${projet.id}?tab=missions#nouvelle-mission`}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue hover:bg-blue-light text-white px-4 py-2.5 text-[13.5px] font-bold"
+            >
+              <Plus className="w-4 h-4" /> Nouvelle mission
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="rounded-xl bg-bg px-4 py-3">
+              <div className="text-xs text-ink-soft flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5" /> Missions actives</div>
+              <div className="font-display text-[22px] font-extrabold tabular">
+                {missionsActives.length}
+                {missionsEnRetard.length > 0 && <span className="ml-2 text-xs font-bold rounded-full px-2 py-0.5 bg-red-fill text-red-ink align-middle">{missionsEnRetard.length} en retard</span>}
+              </div>
+            </div>
+            <div className="rounded-xl bg-bg px-4 py-3">
+              <div className="text-xs text-ink-soft flex items-center gap-1.5"><ArrowUpDown className="w-3.5 h-3.5" /> Appareils</div>
+              <div className="font-display text-[22px] font-extrabold tabular">{appareilsAttaches.length}</div>
+            </div>
+            <div className="rounded-xl bg-bg px-4 py-3">
+              <div className="text-xs text-ink-soft flex items-center gap-1.5"><HardHat className="w-3.5 h-3.5" /> Équipe</div>
+              <div className="font-display text-[22px] font-extrabold tabular">{techniciensAffectes.length}</div>
+            </div>
+            <div className="rounded-xl bg-bg px-4 py-3">
+              <div className="text-xs text-ink-soft flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Visites garantie</div>
+              <div className="font-display text-[22px] font-extrabold tabular">
+                {garantie ? `${garantie.garantie.interventionsIncluses - garantie.garantie.interventionsRestantes} / ${garantie.garantie.interventionsIncluses}` : "—"}
+              </div>
+            </div>
+          </div>
+          <nav className="flex gap-1 overflow-x-auto -mb-px">
+            {ONGLETS.map((o) => (
+              <Link
+                key={o.id}
+                href={ongletHref(o.id)}
+                className={`px-4 py-3 text-[14px] whitespace-nowrap border-b-[3px] transition-colors ${
+                  tab === o.id ? "border-blue text-navy font-bold" : "border-transparent text-ink-soft hover:text-ink font-medium"
+                }`}
+              >
+                {o.label}
+                {o.id === "missions" && missionsActives.length > 0 && (
+                  <span className="ml-1.5 text-[11px] font-bold rounded-full px-1.5 py-0.5 bg-blue-pale text-blue">{missionsActives.length}</span>
+                )}
+              </Link>
+            ))}
+          </nav>
         </div>
-        {projet.description && <p className="text-sm text-ink-soft mt-1">{projet.description}</p>}
       </div>
 
+      {tab === "apercu" && (
+        <>
       {/* Suivi ISO */}
       <Card className="p-5">
         <h2 className="font-display font-bold text-sm mb-3">Suivi ISO 9001</h2>
@@ -402,8 +515,144 @@ export default async function ProjetDetailPage({
           </details>
         </div>
       </Card>
+        </>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {tab === "missions" && (
+        <>
+          <Card className="p-5" >
+            <details id="nouvelle-mission" open={interventionsListe.length === 0 || undefined}>
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
+                <span className="font-display font-bold text-[15px] flex items-center gap-2"><Plus className="w-4 h-4" /> Nouvelle mission</span>
+                <span className="text-xs text-ink-soft">Client, adresse et contact repris du projet</span>
+              </summary>
+              {appareilsAttaches.length === 0 ? (
+                <p className="text-sm text-ink-soft mt-3">
+                  Ajoutez d&apos;abord un appareil au projet (onglet <Link className="text-blue font-semibold" href={ongletHref("appareils")}>Appareils</Link>).
+                </p>
+              ) : (
+                <form action={createIntervention} className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  <input type="hidden" name="projetId" value={projet.id} />
+                  <input type="hidden" name="retour" value={`/responsable/projets/${projet.id}?tab=missions`} />
+                  <Field label="Appareil">
+                    <select name="appareilId" required className={inputClass}>
+                      {appareilsAttaches.map((a) => (
+                        <option key={a.id} value={a.id}>{a.numeroInterne}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Type de mission">
+                    <select name="type" className={inputClass} defaultValue="preventive">
+                      <option value="preventive">Maintenance préventive</option>
+                      <option value="corrective">Dépannage / corrective</option>
+                      <option value="systematique">Systématique / contrôle</option>
+                    </select>
+                  </Field>
+                  <Field label="Priorité">
+                    <select name="priorite" className={inputClass} defaultValue="normale">
+                      <option value="basse">Basse</option>
+                      <option value="normale">Normale</option>
+                      <option value="haute">Haute</option>
+                      <option value="critique">Critique</option>
+                    </select>
+                  </Field>
+                  <Field label="Date et heure">
+                    <input type="datetime-local" name="dateProgrammee" className={inputClass} />
+                  </Field>
+                  <Field label="Technicien">
+                    <select name="technicienId" className={inputClass} defaultValue={techniciensAffectes[0]?.id ?? ""}>
+                      <option value="">À affecter plus tard</option>
+                      {techniciensAffectes.length > 0 && (
+                        <optgroup label="Équipe du projet">
+                          {techniciensAffectes.map((t) => (
+                            <option key={t.id} value={t.id}>{t.nom}{t.role ? ` — ${t.role}` : ""}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Autres techniciens">
+                        {techniciensDisponibles.map((t) => (
+                          <option key={t.id} value={t.id}>{t.nom}</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </Field>
+                  <Field label="Consignes">
+                    <input name="description" className={inputClass} placeholder="Ce que le technicien doit faire…" />
+                  </Field>
+                  <div className="md:col-span-2 xl:col-span-3 flex items-center justify-between gap-3 flex-wrap">
+                    <span className="text-xs text-ink-soft">Si un technicien est choisi, son ordre de mission part par email immédiatement.</span>
+                    <Btn>Créer la mission</Btn>
+                  </div>
+                </form>
+              )}
+            </details>
+          </Card>
+
+      {/* Interventions & rapports (Phase 7) */}
+      <Card className="p-5">
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <h2 className="font-display font-bold text-sm">
+            Missions &amp; rapports ({interventionsListe.length})
+          </h2>
+<span className="text-xs text-ink-soft">Rapports, photos et checklists remontés par les techniciens</span>
+        </div>
+        <div className="flex flex-col divide-y divide-line">
+          {interventionsListe.map((i) => {
+            const photos = i.rapportId ? photosParRapport.get(i.rapportId) ?? [] : [];
+            return (
+              <div key={i.id} className="py-3 flex flex-col gap-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <TypeInterventionPill type={i.type} />
+                  <div className="flex-1 min-w-0 text-sm">
+                    {i.numeroInterne} · {formatDateTime(i.dateProgrammee)} · {i.technicien ?? "Non affecté"}
+                  </div>
+                  <StatutInterventionPill statut={i.statut} />
+                </div>
+                <div className="flex items-center gap-3 flex-wrap text-xs text-ink-soft">
+                  <span className="flex-1 min-w-[10rem]">{truncate(i.travauxRealises, 100)}</span>
+                  {i.tempsPasseMinutes != null && <span className="whitespace-nowrap">{i.tempsPasseMinutes} min</span>}
+                  <a
+                    href={`/api/rapports/pdf/intervention/${i.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue font-semibold hover:underline whitespace-nowrap"
+                  >
+                    Voir le rapport complet
+                  </a>
+                </div>
+                {photos.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    {photos.slice(0, 3).map((p) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={p.id}
+                        src={p.url}
+                        alt="Photo du rapport"
+                        className="w-12 h-12 rounded-lg object-cover bg-blue-pale"
+                      />
+                    ))}
+                    {photos.length > 3 && (
+                      <span className="w-12 h-12 rounded-lg bg-blue-pale flex items-center justify-center text-xs font-bold text-blue">
+                        +{photos.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {interventionsListe.length === 0 && (
+            <p className="text-sm text-ink-soft py-2">
+              Aucune mission pour l&apos;instant — créez la première avec « Nouvelle mission » ci-dessus.
+            </p>
+          )}
+        </div>
+      </Card>
+        </>
+      )}
+
+      {tab === "appareils" && (
+        <>
         {/* Appareils */}
         <Card className="p-5">
           <h2 className="font-display font-bold text-sm mb-3">
@@ -449,7 +698,11 @@ export default async function ProjetDetailPage({
             </form>
           )}
         </Card>
+        </>
+      )}
 
+      {tab === "equipe" && (
+        <>
         {/* Techniciens */}
         <Card className="p-5">
           <h2 className="font-display font-bold text-sm mb-3">
@@ -613,7 +866,11 @@ export default async function ProjetDetailPage({
             </div>
           </div>
         </Card>
+        </>
+      )}
 
+      {tab === "garantie" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Prestations */}
         <Card className="p-5">
           <h2 className="font-display font-bold text-sm mb-3">
@@ -772,77 +1029,11 @@ export default async function ProjetDetailPage({
             </p>
           )}
         </Card>
-      </div>
-
-      {/* Interventions & rapports (Phase 7) */}
-      <Card className="p-5">
-        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-          <h2 className="font-display font-bold text-sm">
-            Interventions &amp; rapports ({interventionsListe.length})
-          </h2>
-          <a
-            href={`/api/rapports/pdf?type=projet&entityId=${projet.id}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-bold text-blue hover:underline whitespace-nowrap"
-          >
-            📄 Générer le dossier PDF complet
-          </a>
         </div>
-        <div className="flex flex-col divide-y divide-line">
-          {interventionsListe.map((i) => {
-            const photos = i.rapportId ? photosParRapport.get(i.rapportId) ?? [] : [];
-            return (
-              <div key={i.id} className="py-3 flex flex-col gap-2">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <TypeInterventionPill type={i.type} />
-                  <div className="flex-1 min-w-0 text-sm">
-                    {i.numeroInterne} · {formatDateTime(i.dateProgrammee)} · {i.technicien ?? "Non affecté"}
-                  </div>
-                  <StatutInterventionPill statut={i.statut} />
-                </div>
-                <div className="flex items-center gap-3 flex-wrap text-xs text-ink-soft">
-                  <span className="flex-1 min-w-[10rem]">{truncate(i.travauxRealises, 100)}</span>
-                  {i.tempsPasseMinutes != null && <span className="whitespace-nowrap">{i.tempsPasseMinutes} min</span>}
-                  <a
-                    href={`/api/rapports/pdf/intervention/${i.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue font-semibold hover:underline whitespace-nowrap"
-                  >
-                    Voir le rapport complet
-                  </a>
-                </div>
-                {photos.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    {photos.slice(0, 3).map((p) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={p.id}
-                        src={p.url}
-                        alt="Photo du rapport"
-                        className="w-12 h-12 rounded-lg object-cover bg-blue-pale"
-                      />
-                    ))}
-                    {photos.length > 3 && (
-                      <span className="w-12 h-12 rounded-lg bg-blue-pale flex items-center justify-center text-xs font-bold text-blue">
-                        +{photos.length - 3}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {interventionsListe.length === 0 && (
-            <p className="text-sm text-ink-soft py-2">
-              Aucune intervention pour l&apos;instant — créez-en une depuis la fiche d&apos;un
-              appareil attaché ci-dessus.
-            </p>
-          )}
-        </div>
-      </Card>
+      )}
 
+      {tab === "documents" && (
+        <>
       {/* Documentation (Phase 6) */}
       <Card className="p-5">
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
@@ -986,6 +1177,30 @@ export default async function ProjetDetailPage({
           </form>
         </details>
       </Card>
+        </>
+      )}
+
+      {tab === "historique" && (
+          <Card className="p-5">
+            <h2 className="font-display font-bold text-sm mb-3">Historique du projet</h2>
+            {journalProjet.length === 0 ? (
+              <p className="text-sm text-ink-soft">Aucun événement enregistré pour ce projet.</p>
+            ) : (
+              <ol className="flex flex-col">
+                {journalProjet.map((j) => (
+                  <li key={j.id} className="flex gap-4 py-2.5 border-b border-line last:border-0 text-sm">
+                    <span className="w-36 shrink-0 text-ink-soft tabular">{formatDateTime(j.createdAt)}</span>
+                    <span className="flex-1">
+                      <span className="font-semibold">{j.action.replaceAll("_", " ")}</span>
+                      {j.details ? <span className="text-ink-soft"> — {j.details}</span> : null}
+                    </span>
+                    <span className="text-ink-soft">{j.auteur ?? "—"}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Card>
+      )}
     </div>
   );
 }

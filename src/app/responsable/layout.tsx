@@ -5,6 +5,8 @@ import { interventions, appareils } from "@/db/schema";
 import { and, eq, count, ne, isNull } from "drizzle-orm";
 import { signOut } from "@/auth";
 import { getNotifications } from "@/lib/notifications";
+import { NavBureau } from "@/components/nav-bureau";
+import { Bell, FileText } from "lucide-react";
 
 async function getBadgeCounts() {
   const [[{ n: retard }], [{ n: nonAffectees }]] = await Promise.all([
@@ -20,53 +22,6 @@ async function getBadgeCounts() {
   return { retard: Number(retard), nonAffectees: Number(nonAffectees) };
 }
 
-const NAV_GROUPS: {
-  title: string;
-  items: { href: string; label: string; icon: string; adminOnly?: boolean }[];
-}[] = [
-  {
-    title: "Exploitation",
-    items: [
-      { href: "/responsable", label: "Tableau de bord", icon: "📊" },
-      { href: "/responsable/projets", label: "Projets", icon: "🗂️" },
-      { href: "/responsable/clients", label: "Clients", icon: "🏢" },
-      { href: "/responsable/sites", label: "Sites", icon: "📍" },
-      { href: "/responsable/appareils", label: "Appareils", icon: "🛗" },
-      { href: "/responsable/interventions", label: "Interventions", icon: "🔧" },
-      { href: "/responsable/sous-traitance", label: "Sous-traitance", icon: "⏱️" },
-      { href: "/responsable/planification", label: "Planning automatique", icon: "🗓️" },
-      { href: "/responsable/non-conformites", label: "Non-conformités", icon: "🚫" },
-    ],
-  },
-  {
-    title: "Qualité ISO 9001",
-    items: [
-      { href: "/responsable/score-iso", label: "Score ISO 9001", icon: "🎯" },
-      { href: "/responsable/checklists", label: "Checklists", icon: "✅" },
-      { href: "/responsable/audits", label: "Audits", icon: "🔍" },
-      { href: "/responsable/auditeurs", label: "Auditeurs", icon: "🕵️" },
-      { href: "/responsable/risques", label: "Risques & opportunités", icon: "⚠️" },
-      { href: "/responsable/etalonnage", label: "Étalonnage", icon: "📏" },
-      { href: "/responsable/revues-direction", label: "Revue de direction", icon: "🗂️" },
-      { href: "/responsable/satisfaction", label: "Satisfaction client", icon: "😊" },
-    ],
-  },
-  {
-    title: "Ressources",
-    items: [
-      { href: "/responsable/techniciens", label: "Techniciens", icon: "🧑‍🔧" },
-      { href: "/responsable/prestations", label: "Prestations", icon: "🧾" },
-      { href: "/responsable/prestations-catalogue", label: "Catalogue prestations", icon: "📋" },
-      { href: "/responsable/garanties", label: "Garanties", icon: "🛡️" },
-      { href: "/responsable/documents", label: "Documents & formations", icon: "📚" },
-      { href: "/responsable/stock", label: "Stock", icon: "📦" },
-      { href: "/responsable/devis", label: "Devis", icon: "📄" },
-      { href: "/responsable/utilisateurs", label: "Utilisateurs", icon: "👤", adminOnly: true },
-      { href: "/responsable/journal", label: "Journal d'activité", icon: "🗒️", adminOnly: true },
-    ],
-  },
-];
-
 export default async function ResponsableLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser(ROLES_BUREAU);
   const [badges, notifications] = await Promise.all([getBadgeCounts(), getNotifications()]);
@@ -74,7 +29,7 @@ export default async function ResponsableLayout({ children }: { children: React.
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-[270px] shrink-0 bg-navy text-blue-pale flex flex-col">
+      <aside className="w-[264px] shrink-0 bg-navy text-blue-pale flex flex-col sticky top-0 h-screen">
         <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-robus.png" alt="ROBUS" className="h-9 w-auto object-contain" />
@@ -86,59 +41,27 @@ export default async function ResponsableLayout({ children }: { children: React.
           </div>
         </div>
 
-        <nav className="px-2.5 py-4 flex flex-col gap-3.5 overflow-y-auto">
-          {NAV_GROUPS.map((group) => {
-            const items = group.items.filter((item) => !item.adminOnly || user.role === "administrateur");
-            if (items.length === 0) return null;
-            return (
-              <div key={group.title} className="flex flex-col gap-0.5">
-                <div className="px-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-blue-accent/60">
-                  {group.title}
-                </div>
-                {items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors"
-                  >
-                    <span className="w-5 text-center">{item.icon}</span>
-                    <span className="flex-1">{item.label}</span>
-                    {item.href === "/responsable/appareils" && badges.retard > 0 && (
-                      <span className="min-w-5 h-5 px-1.5 rounded-full bg-red text-white text-[11px] font-bold flex items-center justify-center">
-                        {badges.retard}
-                      </span>
-                    )}
-                    {item.href === "/responsable/interventions" && badges.nonAffectees > 0 && (
-                      <span className="min-w-5 h-5 px-1.5 rounded-full bg-orange text-white text-[11px] font-bold flex items-center justify-center">
-                        {badges.nonAffectees}
-                      </span>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            );
-          })}
-        </nav>
+        <NavBureau role={user.role} badges={{ panne: badges.retard, nonAffectees: badges.nonAffectees }} />
 
         <div className="mt-auto px-5 py-4 border-t border-white/10 text-xs text-blue-accent/80">
-          Version complète — Phases 1 à 5
+          ROBUS · Pilotage ISO 9001
         </div>
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-20 bg-surface border-b border-line flex items-center gap-4 px-6 py-3">
+        <header className="sticky top-0 z-20 bg-surface/95 backdrop-blur border-b border-line flex items-center gap-4 px-8 h-16">
           <div className="flex-1" />
 
           <Link
             href="/responsable/rapports"
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold font-display bg-blue hover:bg-blue-light text-white transition-colors"
           >
-            📄 Générer un rapport
+            <FileText className="w-4 h-4" /> Générer un rapport
           </Link>
 
           <details className="relative">
             <summary className="list-none cursor-pointer w-9 h-9 rounded-full border border-line flex items-center justify-center relative hover:bg-blue-pale">
-              <span aria-hidden>🔔</span>
+              <Bell className="w-[18px] h-[18px] text-ink-soft" aria-label="Notifications" />
               {notifications.length > 0 && (
                 <span
                   className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${
@@ -206,7 +129,7 @@ export default async function ResponsableLayout({ children }: { children: React.
             </div>
           </form>
         </header>
-        <main className="flex-1 px-6 py-6 max-w-[1280px] w-full mx-auto">{children}</main>
+        <main className="flex-1 px-8 py-8 max-w-[1360px] w-full mx-auto">{children}</main>
       </div>
     </div>
   );

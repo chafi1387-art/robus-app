@@ -9,9 +9,9 @@
   --blue-pale: #e8f4fc;
   --bg: #f5f7fa;
   --surface: #ffffff;
-  --ink: #333333;
-  --ink-soft: #6b7482;
-  --line: #e2e8f0;
+  --ink: #1f2a37;
+  --ink-soft: #5b6675;
+  --line: #e3e8ef;
   --orange: #e67e22;
   --orange-ink: #9c5210;
   --orange-fill: #fdeedd;
@@ -44,8 +44,8 @@
   --color-green: var(--green);
   --color-green-ink: var(--green-ink);
   --color-green-fill: var(--green-fill);
-  --font-display: "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-body: "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Manrope Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
@@ -61,3 +61,13 @@ h1, h2, h3, .font-display {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- Refonte premium (Phase 13) ---------- */
+h1, h2, h3 { letter-spacing: -0.01em; }
+.font-display { letter-spacing: -0.005em; }
+.tabular { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid var(--blue-light); outline-offset: 2px; }
+details > summary::-webkit-details-marker { display: none; }
+input, select, textarea { font-family: inherit; }
+::selection { background: var(--blue-pale); }
+html { font-size: 17px; }

@@ -86,12 +86,17 @@ export default async function InterventionsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold font-display">Interventions</h1>
-          <p className="text-sm text-ink-soft">{rows.length} intervention(s)</p>
+          <h1 className="text-2xl font-extrabold font-display">Planning des missions</h1>
+          <p className="text-sm text-ink-soft">
+            {rows.length} mission(s), tous projets confondus. Pour créer une mission, ouvrez son projet.
+          </p>
         </div>
-        <Btn href="/api/export/interventions" variant="ghost">
-          Exporter CSV
-        </Btn>
+        <div className="flex items-center gap-2">
+          <Btn href="/api/export/interventions" variant="ghost">
+            Exporter CSV
+          </Btn>
+          <Btn href="/responsable/projets">Ouvrir un projet</Btn>
+        </div>
       </div>
 
       {demandesAide.length > 0 && (
@@ -123,7 +128,7 @@ export default async function InterventionsPage() {
 
       {rows.length === 0 && (
         <Card className="p-5">
-          <p className="text-sm text-ink-soft">Aucune intervention pour l&apos;instant.</p>
+          <p className="text-sm text-ink-soft">Aucune mission pour l&apos;instant.</p>
         </Card>
       )}
 

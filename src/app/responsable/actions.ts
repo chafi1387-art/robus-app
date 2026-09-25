@@ -314,6 +314,9 @@ export async function createIntervention(formData: FormData) {
   revalidatePath(`/responsable/appareils/${parsed.data.appareilId}`);
   revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
   revalidatePath("/responsable/interventions");
+  // Phase 13 : création depuis l'onglet Missions d'un Projet -> on y revient.
+  const retour = String(formData.get("retour") ?? "");
+  if (retour.startsWith(`/responsable/projets/${parsed.data.projetId}`)) redirect(retour);
   redirect(`/responsable/appareils/${parsed.data.appareilId}`);
 }
 

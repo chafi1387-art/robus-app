@@ -1,20 +1,13 @@
-import Link from "next/link";
+import { NavTechnicien } from "@/components/nav-technicien";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { signOut } from "@/auth";
-
-const TABS = [
-  { href: "/technicien", label: "Interventions", icon: "🔧" },
-  { href: "/technicien/heures", label: "Heures", icon: "⏱️" },
-  { href: "/technicien/formations", label: "Formations", icon: "📄" },
-  { href: "/technicien/profil", label: "Mon profil", icon: "👤" },
-];
 
 export default async function TechnicienLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser(ROLES_TECHNICIEN);
 
   return (
     <div className="min-h-screen flex flex-col bg-bg">
-      <header className="sticky top-0 z-20 bg-navy text-white px-4 py-3 flex items-center gap-3">
+      <header className="sticky top-0 z-20 bg-navy text-white px-4 py-3 flex items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-robus.png" alt="ROBUS" className="h-8 w-auto object-contain" />
 
@@ -37,20 +30,9 @@ export default async function TechnicienLayout({ children }: { children: React.R
         </form>
       </header>
 
-      <main className="flex-1 max-w-lg w-full mx-auto px-4 py-4 pb-24">{children}</main>
+      <main className="flex-1 max-w-lg w-full mx-auto px-4 py-4 pb-28">{children}</main>
 
-      <nav className="fixed bottom-0 inset-x-0 bg-surface border-t border-line flex z-20">
-        {TABS.map((t) => (
-          <Link
-            key={t.href}
-            href={t.href}
-            className="flex-1 flex flex-col items-center gap-1 py-2.5 text-ink-soft hover:text-blue"
-          >
-            <span className="text-lg leading-none">{t.icon}</span>
-            <span className="text-[11px] font-semibold">{t.label}</span>
-          </Link>
-        ))}
-      </nav>
+      <NavTechnicien />
     </div>
   );
 }

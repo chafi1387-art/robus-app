@@ -17,12 +17,12 @@ import {
   projetAppareils,
   projets,
   projetTechniciens,
-  reglesPlanification,
   users,
 } from "@/db/schema";
 import { requireUser, Role, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { envoyerOrdreDeMission } from "@/lib/mail";
+import { appliquerGarantie } from "@/lib/projet-garantie";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -200,6 +200,9 @@ export async function envoyerEtJournaliserOrdreMission(params: {
   documentsIds?: string[];
   envoyeParId: string;
 }) {
+  // Phase 13 : fonction exportée d'un fichier "use server" = appelable
+  // directement depuis le navigateur -> on vérifie la session ici aussi.
+  await requireUser(ROLES_BUREAU);
   // Phase 6 : l'adresse d'intervention est désormais celle portée par le
   // Projet lui-même (l'Appareil n'étant plus nécessairement rattaché à un
   // Site).
@@ -549,57 +552,7 @@ export async function choisirGarantieProjet(formData: FormData) {
     .limit(1);
   if (dejaGarantie) throw new Error("Ce projet a déjà une garantie.");
 
-  const [formule] = await db
-    .select()
-    .from(garantieFormules)
-    .where(eq(garantieFormules.id, parsed.data.formuleId))
-    .limit(1);
-  if (!formule) throw new Error("Formule de garantie introuvable.");
-
-  const dateDebut = new Date();
-  const dateFin = new Date(dateDebut);
-  dateFin.setMonth(dateFin.getMonth() + formule.dureeMois);
-
-  const [garantieCreee] = await db
-    .insert(garanties)
-    .values({
-      projetId: parsed.data.projetId,
-      formuleId: formule.id,
-      dateDebut,
-      dateFin,
-      interventionsIncluses: formule.nombreInterventionsInclues,
-      interventionsRestantes: formule.nombreInterventionsInclues,
-    })
-    .returning();
-
-  // Planning automatique : une règle de planification est créée pour
-  // répartir les visites incluses sur toute la durée de la garantie. On
-  // s'appuie sur le premier appareil attaché au projet (le mécanisme
-  // existant `regles_planification` est par appareil) — s'il n'y en a pas
-  // encore, la règle sera à créer manuellement une fois l'appareil ajouté.
-  const [premierAppareil] = await db
-    .select({ appareilId: projetAppareils.appareilId })
-    .from(projetAppareils)
-    .where(eq(projetAppareils.projetId, parsed.data.projetId))
-    .limit(1);
-
-  if (premierAppareil && formule.nombreInterventionsInclues > 0) {
-    const periodiciteMois = Math.max(
-      1,
-      Math.round(formule.dureeMois / formule.nombreInterventionsInclues)
-    );
-    await db.insert(reglesPlanification).values({
-      appareilId: premierAppareil.appareilId,
-      type: "preventive",
-      periodiciteMois,
-      prochaineDate: (() => {
-        const d = new Date(dateDebut);
-        d.setMonth(d.getMonth() + periodiciteMois);
-        return d;
-      })(),
-      garantieId: garantieCreee.id,
-    });
-  }
+  await appliquerGarantie(parsed.data.projetId, parsed.data.formuleId);
 
   revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
 }

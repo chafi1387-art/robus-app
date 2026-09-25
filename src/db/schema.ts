@@ -622,6 +622,12 @@ export const technicienFiches = pgTable(
     typeContrat: varchar("type_contrat", { length: 80 }),
     adresseDomicile: text("adresse_domicile"),
     statutRh: statutRhTechnicienEnum("statut_rh").default("actif"),
+    // ---------- Phase 13 : profil complet ----------
+    poste: varchar("poste", { length: 120 }),
+    specialites: text("specialites"),
+    vehicule: varchar("vehicule", { length: 80 }),
+    dateSortie: timestamp("date_sortie"),
+    motifSortie: varchar("motif_sortie", { length: 200 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("technicien_fiches_technicien_idx").on(t.technicienId)]
@@ -662,6 +668,8 @@ export const projets = pgTable(
     instructionsAcces: text("instructions_acces"),
     contactNom: varchar("contact_nom", { length: 150 }),
     contactTelephone: varchar("contact_telephone", { length: 40 }),
+    // Phase 13 : nature du projet (installation, maintenance, modernisation, réparation)
+    typeProjet: varchar("type_projet", { length: 40 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("projets_reference_idx").on(t.reference)]
