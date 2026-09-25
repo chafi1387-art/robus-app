@@ -1,0 +1,296 @@
+
+########## SYSTEME
+ 16:33:02 up 25 days, 19:01,  2 users,  load average: 0.06, 0.03, 0.04
+               total        used        free      shared  buff/cache   available
+Mem:            3915         582        1519          16        2112        3332
+Swap:              0           0           0
+/dev/sda1        48G  2.8G   45G   6% /
+1
+
+########## PM2
+robus-dashboard restarts 32 mem 59 MB
+
+########## OOM / processus tues (7 j)
+
+########## PM2 erreurs (200 dernieres lignes)
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+Error: The Server Reference ID did not match the expected format. Received "x".
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+    at j (.next/server/chunks/ssr/[root-of-the-server]__0nhhui-._.js:11:237)
+    at Object.get (.next/server/chunks/ssr/[root-of-the-server]__0nhhui-._.js:12:2876)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+    at /var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43566
+    at rg (/var/www/robus-app/.next/server/chunks/_00z_724._.js:1:43655)
+    at aQ (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:51455)
+    at t (/var/www/robus-app/.next/server/chunks/_00z_724._.js:404:61798)
+    at AsyncLocalStorage.run (node:async_hooks:335:14)
+    at rV.do (/var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:23435)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30688
+    at NextTracerImpl.trace (/var/www/robus-app/node_modules/next/dist/server/lib/trace/tracer.js:180:72)
+    at /var/www/robus-app/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js:5:30577
+    at AsyncLocalStorage.run (node:async_hooks:346:14)
+
+########## PM2 erreurs : types les plus frequents
+     91 untrustedhost
+     91 UntrustedHost
+     16 Error: Could not find a production build in the 
+     14 Error: aborted
+     12 Error: The Server Reference ID did not match the expected format
+      8 Error: Failed to find Server Action
+      5 permission denied for table users
+      5 Error: Failed query
+      1 Error: Un utilisateur existe d
+
+########## NGINX /connexion par code HTTP
+   1146 200
+      3 499
+
+########## NGINX POST /connexion non-303 (50 derniers)
+86.218.96.95 - - [22/Sep/2026:22:51:06 +0000] "POST /connexion?next=%2Ftechnicien HTTP/1.1" 200 3024 "https://robuswork.tech/connexion?next=%2Ftechnicien" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1 Brave"
+86.218.96.95 - - [22/Sep/2026:22:51:54 +0000] "POST /connexion?erreur=1&next=%2Ftechnicien HTTP/1.1" 200 3052 "https://robuswork.tech/connexion?erreur=1&next=%2Ftechnicien" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1 Brave"
+1.2.189.66 - - [17/Sep/2026:06:56:15 +0000] "POST /connexion?next=%2Fxmlrpc.php HTTP/1.1" 200 12887 "-" "Mozilla/5.0 (Linux; Android 10; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/100.0.0.0 Safari/537.36"
+27.79.167.211 - - [17/Sep/2026:11:22:18 +0000] "POST /connexion?next=%2Fxmlrpc.php HTTP/1.1" 200 12887 "-" "Jetpack by WordPress.com"
+
+########## NGINX codes 4xx/5xx par jour
+  13875 11/Sep/2026 404
+  20080 12/Sep/2026 404
+  12259 13/Sep/2026 404
+      7 14/Sep/2026 400
+  11130 14/Sep/2026 404
+  12469 15/Sep/2026 404
+   9148 16/Sep/2026 404
+      1 16/Sep/2026 499
+      9 17/Sep/2026 400
+  24044 17/Sep/2026 404
+      1 17/Sep/2026 502
+      7 18/Sep/2026 400
+  15721 18/Sep/2026 404
+      1 18/Sep/2026 499
+  14345 19/Sep/2026 404
+  20096 20/Sep/2026 404
+     10 21/Sep/2026 400
+  26835 21/Sep/2026 404
+      1 21/Sep/2026 502
+      1 22/Sep/2026 400
+  24435 22/Sep/2026 404
+      6 23/Sep/2026 400
+  22552 23/Sep/2026 404
+      1 24/Sep/2026 400
+  21975 24/Sep/2026 404
+      1 24/Sep/2026 499
+      7 25/Sep/2026 400
+  12687 25/Sep/2026 404
+
+########## NGINX codes 429/444/503 recents
+69.48.228.101 - - [21/Sep/2026:22:12:28 +0000] "GET / HTTP/1.1" 502 166 "-" "-"
+162.33.179.42 - - [17/Sep/2026:19:33:23 +0000] "GET / HTTP/1.1" 502 166 "-" "-"
+
+########## NGINX error.log
+
+########## NGINX config (limites)
+/etc/nginx/sites-available/robuswork.tech:6:    client_max_body_size 260M;
+/etc/nginx/sites-available/default:65:	# deny access to .htaccess files, if Apache's document root
+/etc/nginx/sites-available/default:69:	#	deny all;
+
+########## Pare-feu / fail2ban
+Status: inactive
+-P INPUT ACCEPT
+-P FORWARD ACCEPT
+-P OUTPUT ACCEPT
+
+########## POSTGRES erreurs
+
+########## AUTH env (noms seulement)
+DATABASE_URL
+AUTH_SECRET
+NEXTAUTH_URL
+SMTP_HOST
+SMTP_PORT
+SMTP_USER
+SMTP_PASSWORD
+MAIL_FROM
+(code retour 0, 2026-09-25 16:33:05)
