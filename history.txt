@@ -142,3 +142,5 @@ ALTER TABLE
 STATUT: OK 206a596
 === 2026-09-25 17:50:02 : aa02dce (ops seulement, pas de build)
 STATUT: OK aa02dce
+=== 2026-09-25 18:07:02 : 3efc7f0 (ops seulement, pas de build)
+STATUT: OK 3efc7f0

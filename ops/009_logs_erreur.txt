@@ -1,0 +1,70 @@
+== pm2 erreurs récentes (hors bots)
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Error: The Server Reference ID did not match the expected format. Received "x".
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Error: The Server Reference ID did not match the expected format. Received "5f753924dd69b2de995112bd85b8ea15f07f66b3".
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+⨯ Error: Failed to find Server Action. This request might be from an older or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+⨯ Error: Failed to find Server Action. This request might be from an older or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+⨯ Error: Failed to find Server Action. This request might be from an older or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+⨯ Error: Failed to find Server Action. This request might be from an older or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+⨯ Error: Failed to find Server Action. This request might be from an older or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+⨯ Error: Failed to find Server Action. This request might be from an older or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+⨯ Error: Failed to find Server Action. This request might be from an older or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+⨯ Error: Failed to find Server Action. This request might be from an older or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Error: The Server Reference ID did not match the expected format. Received "b18c4f5a8f739057374a4890da67b36945e19825".
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Error: aborted
+  code: 'ECONNRESET'
+}
+⨯ uncaughtException:  Error: aborted
+  code: 'ECONNRESET'
+}
+Error: aborted
+  code: 'ECONNRESET'
+}
+⨯ uncaughtException:  Error: aborted
+  code: 'ECONNRESET'
+}
+Error: aborted
+  code: 'ECONNRESET'
+}
+⨯ uncaughtException:  Error: aborted
+  code: 'ECONNRESET'
+}
+Error: aborted
+  code: 'ECONNRESET'
+}
+⨯ uncaughtException:  Error: aborted
+  code: 'ECONNRESET'
+}
+Error: The Server Reference ID did not match the expected format. Received "x".
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Error: The Server Reference ID did not match the expected format. Received "x".
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+⨯ Error: Un utilisateur existe déjà avec cet email.
+  digest: '833388311'
+}
+⨯ Error: Un utilisateur existe déjà avec cet email.
+  digest: '833388311'
+}
+⨯ Error: Un utilisateur existe déjà avec cet email.
+  digest: '833388311'
+}
+== nginx POST 500 récents
+2a01:cb08:3c8:f00:4552:fe5c:25bc:2fd0 - - [25/Sep/2026:18:02:50 +0000] "POST /responsable/techniciens?nouveau=1 HTTP/1.1" 500 148 "https://robuswork.tech/responsable/techniciens?nouveau=1" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+2a01:cb08:3c8:f00:4552:fe5c:25bc:2fd0 - - [25/Sep/2026:18:03:11 +0000] "POST /responsable/techniciens?nouveau=1 HTTP/1.1" 500 148 "https://robuswork.tech/responsable/techniciens?nouveau=1" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+2a01:cb08:3c8:f00:4552:fe5c:25bc:2fd0 - - [25/Sep/2026:18:03:42 +0000] "POST /responsable/techniciens?nouveau=1 HTTP/1.1" 500 142 "https://robuswork.tech/responsable/techniciens?nouveau=1" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+69.48.228.101 - - [21/Sep/2026:22:12:28 +0000] "GET / HTTP/1.1" 502 166 "-" "-"
+162.33.179.42 - - [17/Sep/2026:19:33:23 +0000] "GET / HTTP/1.1" 502 166 "-" "-"
+== date serveur
+Fri Sep 25 18:07:03 UTC 2026
+(code retour 0, 2026-09-25 18:07:03)
