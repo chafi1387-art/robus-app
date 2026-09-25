@@ -1,0 +1,7 @@
+Acces role applicatif :
+0
+copropriete entreprise particulier syndicat sous_traitance 
+/technicien/heures 307
+/responsable/sous-traitance 307
+/api/export/sous-traitance 307
+(code retour 0, 2026-09-25 17:07:02)

@@ -101,3 +101,5 @@ CREATE INDEX
 
 --- curl /responsable/projets : 307
 STATUT: OK 4b6d713
+=== 2026-09-25 17:07:02 : 590d589 (ops seulement, pas de build)
+STATUT: OK 590d589
