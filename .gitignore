@@ -51,3 +51,15 @@ envoi_*.txt
 fix_connexion_page.txt
 robus_setup_neon.sql
 .next.bak/
+
+# --- robus deploy ---
+.env
+.env.local
+.env.*.local
+.env.production
+/public/uploads/
+*.tsbuildinfo
+envoi_*.txt
+fix_connexion_page.txt
+robus_setup_neon.sql
+.next.bak/
