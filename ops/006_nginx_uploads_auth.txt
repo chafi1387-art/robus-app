@@ -1,0 +1,31 @@
+auth-check sans session: 401
+http_auth_request_module
+auth-check avec session: 204
+3a4,15
+>     location = /_robus_auth {
+>         internal;
+>         proxy_pass http://localhost:3000/api/auth-check;
+>         proxy_pass_request_body off;
+>         proxy_set_header Content-Length "";
+>         proxy_set_header Host $host;
+>         proxy_set_header X-Forwarded-Proto $scheme;
+>         proxy_set_header Cookie $http_cookie;
+>     }
+>     location @robus_login {
+>         return 302 /connexion;
+>     }
+4a17,19
+>         auth_request /_robus_auth;
+>         error_page 401 = @robus_login;
+>         add_header Cache-Control "private";
+7d21
+<         expires 7d;
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+photo SANS connexion: 302 https://robuswork.tech/connexion
+photo AVEC connexion: 200
+photo AVEC connexion (IPv6): 200
+inexistant connecte: 404
+page connexion: 200
+RESULTAT: OK
+(code retour 0, 2026-09-25 16:46:47)

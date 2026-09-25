@@ -1,2 +1,29 @@
-=== 2026-09-25 16:38:02 : 0c5e9fe (ops seulement, pas de build)
-STATUT: OK 0c5e9fe
+=== Deploiement 2026-09-25 16:46:02 : 0c5e9fe -> a288e5d
+--- build
+├ ƒ /responsable/projets
+├ ƒ /responsable/projets/[id]
+├ ƒ /responsable/rapports
+├ ƒ /responsable/revues-direction
+├ ƒ /responsable/risques
+├ ƒ /responsable/satisfaction
+├ ƒ /responsable/score-iso
+├ ƒ /responsable/sites
+├ ƒ /responsable/sites/[id]
+├ ƒ /responsable/stock
+├ ƒ /responsable/stock/pieces/[id]
+├ ƒ /responsable/techniciens
+├ ƒ /responsable/techniciens/[id]
+├ ƒ /responsable/utilisateurs
+├ ƒ /technicien
+├ ƒ /technicien/formations
+├ ƒ /technicien/interventions/[id]
+└ ƒ /technicien/profil
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+--- curl /responsable/projets : 307
+STATUT: OK a288e5d
