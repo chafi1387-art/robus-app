@@ -140,3 +140,5 @@ ALTER TABLE
 
 --- curl /responsable/projets : 307
 STATUT: OK 206a596
+=== 2026-09-25 17:50:02 : aa02dce (ops seulement, pas de build)
+STATUT: OK aa02dce
