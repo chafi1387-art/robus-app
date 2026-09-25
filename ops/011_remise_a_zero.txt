@@ -1,0 +1,13 @@
+drwx------ 10 root root    4096 Sep 25 18:42 ..
+-rw-r--r--  1 root root   11296 Sep 25 18:42 avant-remise-a-zero-20260925-184202.sql.gz
+-rw-r--r--  1 root root 7750212 Sep 25 18:42 uploads-avant-remise-a-zero-20260925-184202.tgz
+BEGIN
+TRUNCATE TABLE
+DELETE 2
+COMMIT
+== Après remise à zéro
+chafi.amine@outlook.com|administrateur
+users 1
+fichiers uploads: 0
+connexion: 200
+(code retour 0, 2026-09-25 18:42:05)
