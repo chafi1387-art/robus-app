@@ -1,7 +1,11 @@
-=== Deploiement 2026-09-25 16:46:02 : 0c5e9fe -> a288e5d
+=== Deploiement 2026-09-25 17:05:02 : a288e5d -> 4b6d713
+--- migration 0010_sous_traitance.sql
+ALTER TYPE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
 --- build
-├ ƒ /responsable/projets
-├ ƒ /responsable/projets/[id]
 ├ ƒ /responsable/rapports
 ├ ƒ /responsable/revues-direction
 ├ ƒ /responsable/risques
@@ -9,6 +13,7 @@
 ├ ƒ /responsable/score-iso
 ├ ƒ /responsable/sites
 ├ ƒ /responsable/sites/[id]
+├ ƒ /responsable/sous-traitance
 ├ ƒ /responsable/stock
 ├ ƒ /responsable/stock/pieces/[id]
 ├ ƒ /responsable/techniciens
@@ -16,6 +21,7 @@
 ├ ƒ /responsable/utilisateurs
 ├ ƒ /technicien
 ├ ƒ /technicien/formations
+├ ƒ /technicien/heures
 ├ ƒ /technicien/interventions/[id]
 └ ƒ /technicien/profil
 
@@ -26,4 +32,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK a288e5d
+STATUT: OK 4b6d713
