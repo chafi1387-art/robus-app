@@ -1,0 +1,47 @@
+== Comptes utilisateurs
+chafi.amine@outlook.com|administrateur|amine|1
+chafi.amirne@outlook.com|technicien|mohammed el amine chafi|1
+chafi1387@gmail.com|technicien|chafi|1
+== Lignes par table (non vides)
+appareils|2
+clients|2
+devis|1
+heures_sous_traitance|1
+interventions|3
+journal_activite|19
+ordres_mission_envois|5
+pieces|1
+prestations|3
+prestations_catalogue|1
+projet_appareils|3
+projet_techniciens|3
+projets|3
+rapport_photos|2
+rapports|2
+sites|1
+technicien_fiches|2
+users|3
+appareils 2
+clients 2
+devis 1
+heures_sous_traitance 1
+interventions 3
+journal_activite 19
+ordres_mission_envois 5
+pieces 1
+prestations 3
+prestations_catalogue 1
+projet_appareils 3
+projet_techniciens 3
+projets 3
+rapport_photos 2
+rapports 2
+sites 1
+technicien_fiches 2
+users 3
+== Fichiers uploads
+7
+7.6M	/var/www/robus-app/public/uploads
+== Espace disque
+/dev/sda1        48G  3.0G   45G   7% /
+(code retour 0, 2026-09-25 18:41:04)

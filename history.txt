@@ -173,3 +173,5 @@ STATUT: OK 3efc7f0
 
 --- curl /responsable/projets : 307
 STATUT: OK 9a30018
+=== 2026-09-25 18:41:01 : 64b3e98 (ops seulement, pas de build)
+STATUT: OK 64b3e98
