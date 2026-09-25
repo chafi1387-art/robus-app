@@ -1,0 +1,335 @@
+
+########## Config nginx robuswork.tech
+server {
+    server_name robuswork.tech www.robuswork.tech;
+    location / {
+        proxy_pass http://localhost:3000;
+    client_max_body_size 260M;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/robuswork.tech/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/robuswork.tech/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+server {
+    if ($host = www.robuswork.tech) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+    if ($host = robuswork.tech) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+    listen 80;
+    server_name robuswork.tech www.robuswork.tech;
+    return 404; # managed by Certbot
+}
+
+########## Ports ecoutes
+LISTEN 0      511          0.0.0.0:80        0.0.0.0:*    users:(("nginx",pid=179150,fd=6),("nginx",pid=179147,fd=6))
+LISTEN 0      511          0.0.0.0:443       0.0.0.0:*    users:(("nginx",pid=179150,fd=5),("nginx",pid=179147,fd=5))
+LISTEN 0      511                *:3000            *:*    users:(("next-server (v1",pid=290629,fd=18))               
+
+########## Adresses IP du serveur
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+eth0             UP             76.13.10.115/24 2a02:4780:41:787a::1/48 fe80::1ee8:d4ff:fec2:b457/64 
+
+########## Test IPv4 / IPv6 depuis le serveur
+IPv4 200
+IPv6 000
+
+########## Clients IPv6 dans les logs
+
+########## Toutes les requetes iPhone/Android vers /connexion ou /technicien (hors IP bureau), 14 j
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:48 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:22 86.218.96.95 "GET /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:22 86.218.96.95 "GET /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:22 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:58:27 86.218.96.95 "GET /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77?_rsc=YcAIgves_TknW8lN 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien/formations?_rsc=mZVfJEz4-Nfpz5bx 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien/formations?_rsc=wei0Ma3XDA49Lj31 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien/profil?_rsc=mZVfJEz4-Nfpz5bx 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien/profil?_rsc=wei0Ma3XDA49Lj31 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien?_rsc=mZVfJEz4-Nfpz5bx 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien?_rsc=wei0Ma3XDA49Lj31 200
+[22/Sep/2026:22:58:39 86.218.96.95 "POST /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77 200
+[22/Sep/2026:22:59:16 86.218.96.95 "GET /technicien/formations?_rsc=Is2h65YcqDRLZ5Nk 200
+[22/Sep/2026:22:59:16 86.218.96.95 "GET /technicien/formations?_rsc=tkZuOYZBaTlzH11U 200
+[22/Sep/2026:22:59:17 86.218.96.95 "GET /technicien?_rsc=qxQCrgTobj3pEyQQ 200
+[22/Sep/2026:22:59:19 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:59:20 86.218.96.95 "GET /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77?_rsc=YcAIgves_TknW8lN 200
+[23/Sep/2026:01:35:56 169.58.45.73 "GET /connexion?next=%2F.bashrc 200
+[23/Sep/2026:08:47:33 34.116.210.60 "GET /connexion?next=%2F 200
+[23/Sep/2026:08:47:34 34.116.210.60 "GET /connexion?next=%2Flogo-robus.png 200
+[23/Sep/2026:08:53:05 34.118.115.180 "GET /connexion?next=%2F 200
+[23/Sep/2026:08:53:06 34.118.115.180 "GET /connexion?next=%2Flogo-robus.png 200
+[24/Sep/2026:05:03:12 8.208.71.132 "GET /connexion?next=%2F 200
+[24/Sep/2026:09:44:06 34.116.143.6 "GET /connexion?next=%2F 200
+[24/Sep/2026:09:44:07 34.116.143.6 "GET /connexion?next=%2Flogo-robus.png 200
+[24/Sep/2026:17:55:26 185.139.155.112 "GET /connexion?next=%2Fllms.txt 200
+[24/Sep/2026:17:55:26 192.36.137.63 "GET /connexion?next=%2Frobots.txt 200
+[24/Sep/2026:17:55:26 192.71.126.183 "GET /connexion?next=%2F 200
+[25/Sep/2026:00:46:16 169.58.45.73 "GET /connexion?next=%2F 200
+[25/Sep/2026:11:21:50 8.208.71.132 "GET /connexion?next=%2F 200
+[25/Sep/2026:11:43:45 34.118.34.133 "GET /connexion?next=%2F 200
+[25/Sep/2026:11:43:46 34.118.34.133 "GET /connexion?next=%2Flogo-robus.png 200
+
+########## Chronologie 22/09 22:45-23:10
+[22/Sep/2026:22:21:08 172.70.92.198 "GET / 404
+[22/Sep/2026:22:28:26 104.23.170.139 "GET / 404
+[22/Sep/2026:22:42:35 86.218.96.95 "GET /connexion?next=%2Ftechnicien 200
+[22/Sep/2026:22:42:35 86.218.96.95 "GET /technicien 307
+[22/Sep/2026:22:48:10 108.162.226.178 "GET / 404
+[22/Sep/2026:22:51:06 86.218.96.95 "POST /connexion?next=%2Ftechnicien 200
+[22/Sep/2026:22:51:54 86.218.96.95 "POST /connexion?erreur=1&next=%2Ftechnicien 200
+[22/Sep/2026:22:51:55 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:51:55 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:51:55 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:51:55 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:51:55 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:51:55 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:51:55 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:51:55 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:52:29 86.218.96.95 "GET /technicien?_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:52:30 86.218.96.95 "GET /technicien?_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:52:32 86.218.96.95 "GET /technicien/formations?_rsc=UIZ7Jseuvuk-ESIi 200
+[22/Sep/2026:22:52:43 86.218.96.95 "GET /technicien?_rsc=qxQCrgTobj3pEyQQ 200
+[22/Sep/2026:22:52:44 86.218.96.95 "GET /technicien/profil?_rsc=Rg2nbQoTg53TBbgq 200
+[22/Sep/2026:22:52:51 86.218.96.95 "GET /technicien?_rsc=BX6KoRTlXxW33_5e 200
+[22/Sep/2026:22:52:52 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:52:53 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:52:53 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:52:53 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:52:53 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:52:53 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:52:56 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=92f-xr_ecdzhU8h5 200
+[22/Sep/2026:22:52:56 86.218.96.95 "GET /uploads/rapports/28dda13b-1fa9-452c-8e23-8ef5f99ce64e-1788518929509-188676.jpg 404
+[22/Sep/2026:22:53:03 172.71.155.22 "GET / 404
+[22/Sep/2026:22:53:12 86.218.96.95 "GET /technicien?_rsc=VlElOu6tPJ80UbhO 200
+[22/Sep/2026:22:54:46 86.218.96.95 "GET /technicien 200
+[22/Sep/2026:22:54:46 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:54:46 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:54:46 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:54:47 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:54:47 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:54:47 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:54:47 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:54:48 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:54:49 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:54:49 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:54:49 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:54:49 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:54:49 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:54:52 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=92f-xr_ecdzhU8h5 200
+[22/Sep/2026:22:54:52 86.218.96.95 "GET /uploads/rapports/28dda13b-1fa9-452c-8e23-8ef5f99ce64e-1788518929509-188676.jpg 404
+[22/Sep/2026:22:56:24 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:56:25 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:25 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:25 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:25 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:25 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:25 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:56:25 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:25 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:25 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:26 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:26 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:26 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:26 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:26 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:26 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:56:26 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:26 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:26 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:28 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:28 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:28 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:28 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:28 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:28 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:56:28 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:28 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:28 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:29 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:29 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:29 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:29 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:29 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:29 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:56:29 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:29 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:29 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:30 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:56:32 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:32 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:32 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:32 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:32 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien?vue=mois&date=2026-08-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:56:37 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:40 86.218.96.95 "GET /technicien?_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:57:41 86.218.96.95 "GET /technicien 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:42 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:43 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:43 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:43 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:43 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:57:44 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:44 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:44 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:44 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:44 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien?vue=mois&date=2026-08-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:45 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien?vue=mois&date=2026-08-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:46 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien/interventions/59f8bac9-643d-4ebe-a1ab-7ea63cc5e491?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien/interventions/993fa78a-290d-44f3-b67d-3c82cf9a230e?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien?vue=mois&date=2026-08-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:47 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:48 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:57:49 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:20 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien/formations?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien/formations?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien/profil?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien/profil?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-21&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=jour&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=mois&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:21 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:22 86.218.96.95 "GET /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77?_rsc=04TZEhMbIxmu_oJY 200
+[22/Sep/2026:22:58:22 86.218.96.95 "GET /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77?_rsc=xhKp4ewkcVSx4VKw 200
+[22/Sep/2026:22:58:22 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:58:27 86.218.96.95 "GET /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77?_rsc=YcAIgves_TknW8lN 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien/formations?_rsc=mZVfJEz4-Nfpz5bx 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien/formations?_rsc=wei0Ma3XDA49Lj31 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien/profil?_rsc=mZVfJEz4-Nfpz5bx 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien/profil?_rsc=wei0Ma3XDA49Lj31 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien?_rsc=mZVfJEz4-Nfpz5bx 200
+[22/Sep/2026:22:58:39 86.218.96.95 "GET /technicien?_rsc=wei0Ma3XDA49Lj31 200
+[22/Sep/2026:22:58:39 86.218.96.95 "POST /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77 200
+[22/Sep/2026:22:59:16 86.218.96.95 "GET /technicien/formations?_rsc=Is2h65YcqDRLZ5Nk 200
+[22/Sep/2026:22:59:16 86.218.96.95 "GET /technicien/formations?_rsc=tkZuOYZBaTlzH11U 200
+[22/Sep/2026:22:59:17 86.218.96.95 "GET /technicien?_rsc=qxQCrgTobj3pEyQQ 200
+[22/Sep/2026:22:59:19 86.218.96.95 "GET /technicien?vue=semaine&date=2026-09-22&_rsc=iikw4py9U_qfjUvH 200
+[22/Sep/2026:22:59:20 86.218.96.95 "GET /technicien/interventions/1a1bc17a-db73-41b6-8c9e-5b090dc2ea77?_rsc=YcAIgves_TknW8lN 200
+[22/Sep/2026:23:00:42 172.69.134.230 "GET / 404
+[22/Sep/2026:23:01:50 172.71.102.7 "GET / 404
+[22/Sep/2026:23:02:47 172.71.154.85 "GET / 404
+[22/Sep/2026:23:11:25 172.69.134.190 "GET / 404
+[22/Sep/2026:23:11:40 104.22.93.76 "GET / 404
+[22/Sep/2026:23:11:58 172.70.142.161 "GET / 404
+[22/Sep/2026:23:37:25 162.159.113.107 "GET / 404
+[22/Sep/2026:23:51:19 172.71.102.16 "GET / 404
+[22/Sep/2026:23:54:50 104.22.21.4 "GET / 404
+[22/Sep/2026:23:58:06 172.71.110.61 "GET / 404
+
+########## Server names / default
+(code retour 1, 2026-09-25 16:35:03)
