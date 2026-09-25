@@ -39,6 +39,7 @@ import {
   getPiecesForSelect,
   getPrestationsCatalogueActives,
   modifierRoleTechnicienProjet,
+  remplacerTechnicienProjet,
   retirerTechnicienProjet,
   supprimerDocument,
   updateProjetInfos,
@@ -227,6 +228,7 @@ export default async function ProjetDetailPage({
         dateProgrammee: interventions.dateProgrammee,
         numeroInterne: appareils.numeroInterne,
         technicien: users.nom,
+        technicienId: interventions.technicienId,
         rapportId: rapports.id,
         travauxRealises: rapports.travauxRealises,
         tempsPasseMinutes: rapports.tempsPasseMinutes,
@@ -380,27 +382,27 @@ export default async function ProjetDetailPage({
             </Link>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="rounded-xl bg-bg px-4 py-3">
+            <Link href={ongletHref("missions")} className="rounded-xl bg-bg px-4 py-3 hover:bg-blue-pale transition-colors">
               <div className="text-xs text-ink-soft flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5" /> Missions actives</div>
               <div className="font-display text-[22px] font-extrabold tabular">
                 {missionsActives.length}
                 {missionsEnRetard.length > 0 && <span className="ml-2 text-xs font-bold rounded-full px-2 py-0.5 bg-red-fill text-red-ink align-middle">{missionsEnRetard.length} en retard</span>}
               </div>
-            </div>
-            <div className="rounded-xl bg-bg px-4 py-3">
+            </Link>
+            <Link href={ongletHref("appareils")} className="rounded-xl bg-bg px-4 py-3 hover:bg-blue-pale transition-colors">
               <div className="text-xs text-ink-soft flex items-center gap-1.5"><ArrowUpDown className="w-3.5 h-3.5" /> Appareils</div>
               <div className="font-display text-[22px] font-extrabold tabular">{appareilsAttaches.length}</div>
-            </div>
-            <div className="rounded-xl bg-bg px-4 py-3">
+            </Link>
+            <Link href={ongletHref("equipe")} className="rounded-xl bg-bg px-4 py-3 hover:bg-blue-pale transition-colors">
               <div className="text-xs text-ink-soft flex items-center gap-1.5"><HardHat className="w-3.5 h-3.5" /> Équipe</div>
               <div className="font-display text-[22px] font-extrabold tabular">{techniciensAffectes.length}</div>
-            </div>
-            <div className="rounded-xl bg-bg px-4 py-3">
+            </Link>
+            <Link href={ongletHref("garantie")} className="rounded-xl bg-bg px-4 py-3 hover:bg-blue-pale transition-colors">
               <div className="text-xs text-ink-soft flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Visites garantie</div>
               <div className="font-display text-[22px] font-extrabold tabular">
                 {garantie ? `${garantie.garantie.interventionsIncluses - garantie.garantie.interventionsRestantes} / ${garantie.garantie.interventionsIncluses}` : "—"}
               </div>
-            </div>
+            </Link>
           </div>
           <nav className="flex gap-1 overflow-x-auto -mb-px">
             {ONGLETS.map((o) => (
@@ -703,144 +705,137 @@ export default async function ProjetDetailPage({
 
       {tab === "equipe" && (
         <>
-        {/* Techniciens */}
+        {/* Équipe (Phase 13b : ajouter, changer le rôle, remplacer, retirer) */}
         <Card className="p-5">
-          <h2 className="font-display font-bold text-sm mb-3">
-            Techniciens ({techniciensAffectes.length})
-          </h2>
-          <div className="flex flex-col divide-y divide-line mb-3">
-            {techniciensAffectes.map((t) => (
-              <div key={t.id} className="py-2.5 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-3">
-                  <Link
-                    href={`/responsable/techniciens/${t.id}`}
-                    className="text-sm font-semibold text-blue hover:underline"
-                  >
-                    {t.nom}
-                  </Link>
-                  <div className="flex items-center gap-2">
-                    <Pill tone="neutral">{t.role || "Technicien"}</Pill>
-                    <form action={retirerTechnicienProjet}>
-                      <input type="hidden" name="projetId" value={projet.id} />
-                      <input type="hidden" name="technicienId" value={t.id} />
-                      <button
-                        type="submit"
-                        className="text-xs font-semibold text-red-ink hover:underline"
-                      >
-                        Retirer
-                      </button>
-                    </form>
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <h2 className="font-display font-bold text-[15px]">Équipe du projet ({techniciensAffectes.length})</h2>
+            <span className="text-xs text-ink-soft">Les missions déjà commencées gardent leur technicien (traçabilité ISO 9001).</span>
+          </div>
+
+          {techniciensDisponibles.length > 0 && (
+            <details className="mb-4 rounded-xl border border-blue/40 bg-[#f7fbfe]" open={techniciensAffectes.length === 0 || undefined}>
+              <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-sm text-blue flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Ajouter un technicien au projet
+              </summary>
+              <form action={ajouterTechnicienProjet} className="px-4 pb-4 flex flex-col gap-3">
+                <input type="hidden" name="projetId" value={projet.id} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Field label="Technicien">
+                    <select name="technicienId" required className={inputClass} defaultValue="">
+                      <option value="" disabled>Choisir un technicien</option>
+                      {techniciensDisponibles.map((t) => (
+                        <option key={t.id} value={t.id}>{t.nom}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Rôle">
+                    <select name="role" className={inputClass} defaultValue={techniciensAffectes.length === 0 ? "Chef de mission" : ""}>
+                      <option value="">Technicien</option>
+                      <option value="Chef de mission">Chef de mission</option>
+                      <option value="Renfort">Renfort</option>
+                    </select>
+                  </Field>
+                </div>
+                <Field label="Message / consignes (optionnel)">
+                  <textarea name="message" rows={2} className={inputClass} placeholder="Consignes particulières pour ce projet…" />
+                </Field>
+                {documentsPourEnvoi.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Documents à joindre (optionnel)</span>
+                    {documentsPourEnvoi.map((d) => (
+                      <label key={d.id} className="flex items-center gap-2 text-xs">
+                        <input type="checkbox" name="documentsIds" value={d.id} className="rounded border-line" />
+                        {d.titre}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <Btn className="self-start">Ajouter et envoyer l&apos;ordre de mission</Btn>
+              </form>
+            </details>
+          )}
+
+          <div className="flex flex-col gap-3">
+            {techniciensAffectes.map((t) => {
+              const ouvertes = interventionsListe.filter((i) => i.technicienId === t.id && !STATUTS_MISSION_FINIS.has(i.statut)).length;
+              const remplacants = techniciensOptions.filter((o) => o.id !== t.id);
+              return (
+                <div key={t.id} className="rounded-xl border border-line p-4 flex flex-col gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="w-10 h-10 rounded-full bg-navy text-white flex items-center justify-center text-[13px] font-bold shrink-0">
+                      {t.nom.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
+                    </span>
+                    <div className="flex-1 min-w-[160px]">
+                      <Link href={`/responsable/techniciens/${t.id}`} className="font-semibold text-[15px] hover:text-blue">{t.nom}</Link>
+                      <div className="text-xs text-ink-soft">{ouvertes} mission(s) en cours ou à venir sur ce projet</div>
+                    </div>
+                    <span className="text-xs font-semibold rounded-full px-2.5 py-1 bg-blue-pale text-blue">{t.role || "Technicien"}</span>
+                  </div>
+                  <div className="flex gap-2 flex-wrap text-[13px]">
+                    <details className="group">
+                      <summary className="cursor-pointer list-none rounded-lg border border-[#cfd8e3] bg-white px-3 py-1.5 font-semibold">Changer le rôle</summary>
+                      <form action={modifierRoleTechnicienProjet} className="flex items-center gap-2 mt-2">
+                        <input type="hidden" name="projetId" value={projet.id} />
+                        <input type="hidden" name="technicienId" value={t.id} />
+                        <select name="role" defaultValue={t.role ?? ""} className={`${inputClass} !py-1.5 max-w-[12rem]`}>
+                          <option value="">Technicien</option>
+                          <option value="Chef de mission">Chef de mission</option>
+                          <option value="Renfort">Renfort</option>
+                          {t.role && !["Chef de mission", "Renfort"].includes(t.role) && <option value={t.role}>{t.role}</option>}
+                        </select>
+                        <Btn variant="ghost" className="!px-3 !py-1.5 !text-xs">Enregistrer</Btn>
+                      </form>
+                    </details>
+                    {remplacants.length > 0 && (
+                      <details>
+                        <summary className="cursor-pointer list-none rounded-lg border border-[#cfd8e3] bg-white px-3 py-1.5 font-semibold">Remplacer par…</summary>
+                        <form action={remplacerTechnicienProjet} className="flex flex-col gap-2 mt-2 max-w-md">
+                          <input type="hidden" name="projetId" value={projet.id} />
+                          <input type="hidden" name="ancienId" value={t.id} />
+                          <select name="nouveauId" required defaultValue="" className={inputClass}>
+                            <option value="" disabled>Choisir le remplaçant</option>
+                            {remplacants.map((o) => (
+                              <option key={o.id} value={o.id}>{o.nom}{techniciensDejaAffectesIds.has(o.id) ? " (déjà dans l'équipe)" : ""}</option>
+                            ))}
+                          </select>
+                          <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="transfererMissions" defaultChecked /> Lui transférer les {ouvertes} mission(s) non commencée(s)</label>
+                          <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="envoyerOrdre" defaultChecked /> Envoyer l&apos;ordre de mission au remplaçant</label>
+                          <Btn variant="ghost" className="self-start !px-3 !py-1.5 !text-xs">Confirmer le remplacement</Btn>
+                        </form>
+                      </details>
+                    )}
+                    <details>
+                      <summary className="cursor-pointer list-none rounded-lg border border-[#cfd8e3] bg-white px-3 py-1.5 font-semibold">Renvoyer l&apos;ordre de mission</summary>
+                      <form action={envoyerOrdreMissionAvecMessage} className="flex flex-col gap-2 mt-2 max-w-md">
+                        <input type="hidden" name="projetId" value={projet.id} />
+                        <input type="hidden" name="technicienId" value={t.id} />
+                        <textarea name="message" rows={2} className={inputClass} placeholder="Message / consignes" />
+                        {documentsPourEnvoi.map((d) => (
+                          <label key={d.id} className="flex items-center gap-2 text-xs">
+                            <input type="checkbox" name="documentsIds" value={d.id} className="rounded border-line" />
+                            {d.titre}
+                          </label>
+                        ))}
+                        <Btn variant="ghost" className="self-start !px-3 !py-1.5 !text-xs">Envoyer</Btn>
+                      </form>
+                    </details>
+                    <details>
+                      <summary className="cursor-pointer list-none rounded-lg border border-red-ink/30 bg-white px-3 py-1.5 font-semibold text-red-ink">Retirer du projet</summary>
+                      <form action={retirerTechnicienProjet} className="flex flex-col gap-2 mt-2 max-w-md">
+                        <input type="hidden" name="projetId" value={projet.id} />
+                        <input type="hidden" name="technicienId" value={t.id} />
+                        <p className="text-xs text-ink-soft">
+                          {ouvertes > 0 ? `Ses ${ouvertes} mission(s) non commencée(s) repasseront « à affecter ».` : "Aucune mission ouverte à réaffecter."}
+                        </p>
+                        <button type="submit" className="self-start rounded-lg bg-red-ink text-white px-3 py-1.5 text-xs font-bold">Confirmer le retrait</button>
+                      </form>
+                    </details>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <details>
-                    <summary className="text-xs font-semibold text-blue cursor-pointer select-none">
-                      Modifier le rôle
-                    </summary>
-                    <form
-                      action={modifierRoleTechnicienProjet}
-                      className="flex items-center gap-2 mt-1.5"
-                    >
-                      <input type="hidden" name="projetId" value={projet.id} />
-                      <input type="hidden" name="technicienId" value={t.id} />
-                      <input
-                        name="role"
-                        defaultValue={t.role ?? ""}
-                        placeholder="Chef de mission…"
-                        className={`${inputClass} !py-1 !text-xs max-w-[10rem]`}
-                      />
-                      <Btn variant="ghost" className="!text-xs !px-2 !py-1">
-                        Modifier
-                      </Btn>
-                    </form>
-                  </details>
-                  <details>
-                    <summary className="text-xs font-semibold text-blue cursor-pointer select-none">
-                      Renvoyer un message
-                    </summary>
-                    <form
-                      action={envoyerOrdreMissionAvecMessage}
-                      className="flex flex-col gap-2 mt-2"
-                    >
-                      <input type="hidden" name="projetId" value={projet.id} />
-                      <input type="hidden" name="technicienId" value={t.id} />
-                      <Field label="Message / consignes">
-                        <textarea name="message" rows={2} className={inputClass} />
-                      </Field>
-                      {documentsPourEnvoi.length > 0 && (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">
-                            Documents à joindre
-                          </span>
-                          {documentsPourEnvoi.map((d) => (
-                            <label key={d.id} className="flex items-center gap-2 text-xs">
-                              <input
-                                type="checkbox"
-                                name="documentsIds"
-                                value={d.id}
-                                className="rounded border-line"
-                              />
-                              {d.titre}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                      <Btn variant="ghost" className="self-start !text-xs">
-                        Envoyer
-                      </Btn>
-                    </form>
-                  </details>
-                </div>
-              </div>
-            ))}
-            {techniciensAffectes.length === 0 && (
-              <p className="text-sm text-ink-soft py-2">Aucun technicien affecté.</p>
-            )}
+              );
+            })}
+            {techniciensAffectes.length === 0 && <p className="text-sm text-ink-soft">Aucun technicien dans l&apos;équipe pour l&apos;instant.</p>}
           </div>
-          {techniciensDisponibles.length > 0 && (
-            <form
-              action={ajouterTechnicienProjet}
-              className="flex flex-col gap-2 pt-3 border-t border-line"
-            >
-              <input type="hidden" name="projetId" value={projet.id} />
-              <div className="flex items-end gap-2 flex-wrap">
-                <Field label="Affecter un technicien">
-                  <select name="technicienId" required className={inputClass} defaultValue="">
-                    <option value="" disabled>
-                      Choisir un technicien
-                    </option>
-                    {techniciensDisponibles.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.nom}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Rôle (optionnel)">
-                  <input name="role" placeholder="Chef de mission…" className={`${inputClass} max-w-[10rem]`} />
-                </Field>
-              </div>
-              <Field label="Message / consignes (optionnel)">
-                <textarea name="message" rows={2} className={inputClass} placeholder="Consignes particulières pour cette mission..." />
-              </Field>
-              {documentsPourEnvoi.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">
-                    Documents à joindre (optionnel)
-                  </span>
-                  {documentsPourEnvoi.map((d) => (
-                    <label key={d.id} className="flex items-center gap-2 text-xs">
-                      <input type="checkbox" name="documentsIds" value={d.id} className="rounded border-line" />
-                      {d.titre}
-                    </label>
-                  ))}
-                </div>
-              )}
-              <Btn variant="ghost" className="self-start !px-3 !py-2 !text-xs">
-                Affecter &amp; envoyer l&apos;ordre de mission
-              </Btn>
-            </form>
-          )}
 
           {/* Phase 7 : historique des ordres de mission envoyés */}
           <div className="mt-4 pt-3 border-t border-line">

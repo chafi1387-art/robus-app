@@ -7,6 +7,7 @@ import {
   clients,
   documentsFormations,
   garantieFormules,
+  interventions,
   garanties,
   habilitationsTechnicien,
   mouvementsStock,
@@ -382,6 +383,11 @@ const retirerTechnicienSchema = z.object({
   technicienId: z.string().uuid(),
 });
 
+// Missions « pas encore commencées » : les seules qu'on désaffecte ou
+// transfère automatiquement (une mission en cours ou terminée garde son
+// technicien pour la traçabilité ISO 9001).
+const STATUTS_MISSION_NON_COMMENCEE = ["creee", "planifiee", "affectee"] as const;
+
 export async function retirerTechnicienProjet(formData: FormData) {
   const user = await requireUser(ROLES_BUREAU);
   const parsed = retirerTechnicienSchema.safeParse({
@@ -399,14 +405,122 @@ export async function retirerTechnicienProjet(formData: FormData) {
       )
     );
 
+  // Phase 13b : ses missions non commencées de ce projet repassent « à affecter ».
+  const liberees = await db
+    .update(interventions)
+    .set({ technicienId: null, statut: "creee" })
+    .where(
+      and(
+        eq(interventions.projetId, parsed.data.projetId),
+        eq(interventions.technicienId, parsed.data.technicienId),
+        inArray(interventions.statut, [...STATUTS_MISSION_NON_COMMENCEE])
+      )
+    )
+    .returning({ id: interventions.id });
+
   await journaliser({
     entite: "projet",
     entiteId: parsed.data.projetId,
     action: "technicien_retire",
     utilisateurId: user.id,
+    details: liberees.length ? `${liberees.length} mission(s) non commencée(s) repassée(s) à affecter` : null,
   });
 
   revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
+  revalidatePath("/responsable/interventions");
+}
+
+const remplacerTechnicienSchema = z.object({
+  projetId: z.string().uuid(),
+  ancienId: z.string().uuid(),
+  nouveauId: z.string().uuid("Choisissez le technicien remplaçant."),
+});
+
+// Phase 13b : remplacer un technicien par un autre sur un projet — même
+// rôle, missions non commencées transférées (option), ordre de mission au nouveau.
+export async function remplacerTechnicienProjet(formData: FormData) {
+  const user = await requireUser(ROLES_BUREAU);
+  const parsed = remplacerTechnicienSchema.safeParse({
+    projetId: formData.get("projetId"),
+    ancienId: formData.get("ancienId"),
+    nouveauId: formData.get("nouveauId"),
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
+  const { projetId, ancienId, nouveauId } = parsed.data;
+  if (ancienId === nouveauId) return;
+  const transferer = formData.get("transfererMissions") === "on";
+  const envoyer = formData.get("envoyerOrdre") === "on";
+
+  const [lien] = await db
+    .select({ id: projetTechniciens.id, role: projetTechniciens.role })
+    .from(projetTechniciens)
+    .where(and(eq(projetTechniciens.projetId, projetId), eq(projetTechniciens.technicienId, ancienId)))
+    .limit(1);
+  if (!lien) throw new Error("Ce technicien n'est plus affecté à ce projet.");
+
+  const [nouveau] = await db
+    .select({ id: users.id, nom: users.nom })
+    .from(users)
+    .where(and(eq(users.id, nouveauId), eq(users.role, "technicien"), eq(users.actif, 1)))
+    .limit(1);
+  if (!nouveau) throw new Error("Technicien remplaçant introuvable.");
+
+  const [dejaLa] = await db
+    .select({ id: projetTechniciens.id })
+    .from(projetTechniciens)
+    .where(and(eq(projetTechniciens.projetId, projetId), eq(projetTechniciens.technicienId, nouveauId)))
+    .limit(1);
+  if (dejaLa) {
+    await db.delete(projetTechniciens).where(eq(projetTechniciens.id, lien.id));
+  } else {
+    await db.update(projetTechniciens).set({ technicienId: nouveauId }).where(eq(projetTechniciens.id, lien.id));
+  }
+
+  let transferees = 0;
+  if (transferer) {
+    const rows = await db
+      .update(interventions)
+      .set({ technicienId: nouveauId, statut: "affectee" })
+      .where(
+        and(
+          eq(interventions.projetId, projetId),
+          eq(interventions.technicienId, ancienId),
+          inArray(interventions.statut, [...STATUTS_MISSION_NON_COMMENCEE])
+        )
+      )
+      .returning({ id: interventions.id });
+    transferees = rows.length;
+  } else {
+    await db
+      .update(interventions)
+      .set({ technicienId: null, statut: "creee" })
+      .where(
+        and(
+          eq(interventions.projetId, projetId),
+          eq(interventions.technicienId, ancienId),
+          inArray(interventions.statut, [...STATUTS_MISSION_NON_COMMENCEE])
+        )
+      );
+  }
+
+  if (envoyer) {
+    try {
+      await envoyerEtJournaliserOrdreMission({ projetId, technicienId: nouveauId, envoyeParId: user.id });
+    } catch {
+      // l'échec d'email ne bloque pas le remplacement
+    }
+  }
+
+  await journaliser({
+    entite: "projet",
+    entiteId: projetId,
+    action: "technicien_remplace",
+    utilisateurId: user.id,
+    details: `Remplacé par ${nouveau.nom}${transferees ? ` — ${transferees} mission(s) transférée(s)` : ""}`,
+  });
+
+  revalidatePath(`/responsable/projets/${projetId}`);
+  revalidatePath("/responsable/interventions");
 }
 
 const modifierRoleTechnicienSchema = z.object({

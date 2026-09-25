@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, FileClock, Minus, Plus, Search, X } from "lucide-react";
 import { creerAppareilRapide, creerClientRapide, creerProjetComplet } from "./actions";
 
 export type DonneesAssistant = {
@@ -101,6 +101,110 @@ export function AssistantProjet({ donnees }: { donnees: DonneesAssistant }) {
   // Étape 6
   const [qte, setQte] = useState<Record<string, number>>({});
 
+  // ---------- Brouillon (Phase 13b) ----------
+  // Enregistré dans ce navigateur (localStorage) au fil de la saisie ; en
+  // quittant l'assistant on propose d'enregistrer le brouillon ou non.
+  const CLE = "robus-brouillon-projet-v1";
+  const [brouillonTrouve, setBrouillonTrouve] = useState<{ date: string; titre: string } | null>(null);
+  const [sortie, setSortie] = useState<string | null>(null);
+  const creeRef = useRef(false);
+  const instantane = useCallback(
+    () => ({ etape, titre, typeProjet, dateDebut, dateFin, adresse, acces, contactNom, contactTel, description, clientId, appSel, equipe, envoyerOrdre, formuleId, qte }),
+    [etape, titre, typeProjet, dateDebut, dateFin, adresse, acces, contactNom, contactTel, description, clientId, appSel, equipe, envoyerOrdre, formuleId, qte]
+  );
+  const modifie =
+    !!(titre || adresse || acces || contactNom || contactTel || description || clientId || appSel.length || equipe.length || formuleId || Object.values(qte).some((n) => n > 0));
+
+  const lireBrouillon = () => {
+    try {
+      const brut = localStorage.getItem(CLE);
+      return brut ? (JSON.parse(brut) as { date: string; data: ReturnType<typeof instantane> }) : null;
+    } catch {
+      return null;
+    }
+  };
+  const ecrireBrouillon = useCallback(() => {
+    try {
+      localStorage.setItem(CLE, JSON.stringify({ date: new Date().toISOString(), data: instantane() }));
+    } catch {
+      /* stockage indisponible : on ignore */
+    }
+  }, [instantane]);
+  const effacerBrouillon = () => {
+    try {
+      localStorage.removeItem(CLE);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    // Lecture du stockage du navigateur : possible seulement après le premier rendu.
+    const b = lireBrouillon();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (b?.data) setBrouillonTrouve({ date: b.date, titre: b.data.titre || "Projet sans nom" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function reprendreBrouillon() {
+    const b = lireBrouillon();
+    if (!b?.data) return setBrouillonTrouve(null);
+    const d = b.data;
+    setTitre(d.titre ?? ""); setTypeProjet(d.typeProjet ?? "installation"); setDateDebut(d.dateDebut ?? ""); setDateFin(d.dateFin ?? "");
+    setAdresse(d.adresse ?? ""); setAcces(d.acces ?? ""); setContactNom(d.contactNom ?? ""); setContactTel(d.contactTel ?? ""); setDescription(d.description ?? "");
+    setClientId(d.clientId && clients.some((c) => c.id === d.clientId) ? d.clientId : null);
+    setAppSel((d.appSel ?? []).filter((id) => appareils.some((a) => a.id === id)));
+    setEquipe((d.equipe ?? []).filter((e) => donnees.techniciens.some((t) => t.id === e.id)));
+    setEnvoyerOrdre(d.envoyerOrdre ?? true);
+    setFormuleId(d.formuleId && donnees.formules.some((f) => f.id === d.formuleId) ? d.formuleId : null);
+    setQte(d.qte ?? {});
+    setEtape(Math.min(Math.max(0, d.etape ?? 0), 6));
+    setBrouillonTrouve(null);
+  }
+
+  // Enregistrement automatique (léger différé) pendant la saisie.
+  useEffect(() => {
+    if (!modifie || creeRef.current || brouillonTrouve) return;
+    const t = setTimeout(ecrireBrouillon, 600);
+    return () => clearTimeout(t);
+  }, [modifie, ecrireBrouillon, brouillonTrouve]);
+
+  // Fermeture / rechargement de l'onglet : avertissement du navigateur.
+  useEffect(() => {
+    const avant = (e: BeforeUnloadEvent) => {
+      if (!modifie || creeRef.current) return;
+      ecrireBrouillon();
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", avant);
+    return () => window.removeEventListener("beforeunload", avant);
+  }, [modifie, ecrireBrouillon]);
+
+  // Clic sur un lien de l'application (menu, fil d'Ariane…) : on demande.
+  useEffect(() => {
+    const clic = (e: MouseEvent) => {
+      if (!modifie || creeRef.current || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      const a = (e.target as HTMLElement | null)?.closest?.("a");
+      if (!a || a.target === "_blank") return;
+      const href = a.getAttribute("href");
+      if (!href || href.startsWith("#") || !href.startsWith("/") || href.startsWith("/responsable/projets/nouveau")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setSortie(href);
+    };
+    document.addEventListener("click", clic, true);
+    return () => document.removeEventListener("click", clic, true);
+  }, [modifie]);
+
+  function quitter(enregistrer: boolean) {
+    const cible = sortie;
+    if (enregistrer) ecrireBrouillon();
+    else effacerBrouillon();
+    creeRef.current = true; // plus de question pour cette navigation
+    setSortie(null);
+    if (cible) router.push(cible);
+  }
+
   const client = clients.find((c) => c.id === clientId) ?? null;
   const formule = donnees.formules.find((f) => f.id === formuleId) ?? null;
 
@@ -193,6 +297,8 @@ export function AssistantProjet({ donnees }: { donnees: DonneesAssistant }) {
         prestations: lignesPresta.map(([catalogueId, quantite]) => ({ catalogueId, quantite })),
       });
       if (!r.ok) return setErreur(r.erreur);
+      creeRef.current = true;
+      effacerBrouillon();
       router.push(`/responsable/projets/${r.id}?tab=missions&cree=1`);
     });
   }
@@ -217,6 +323,32 @@ export function AssistantProjet({ donnees }: { donnees: DonneesAssistant }) {
           <p className="text-sm text-ink-soft">Client, appareils, équipe, garantie et prestations : tout se règle ici. Tout reste modifiable ensuite.</p>
         </div>
       </div>
+
+      {brouillonTrouve && (
+        <div className="rounded-2xl border border-blue/40 bg-[#f7fbfe] px-5 py-4 flex items-center gap-4 flex-wrap">
+          <FileClock className="w-5 h-5 text-blue shrink-0" />
+          <div className="flex-1 min-w-[220px] text-sm">
+            <div className="font-semibold">Un brouillon est enregistré : « {brouillonTrouve.titre} »</div>
+            <div className="text-ink-soft text-xs">Enregistré le {new Date(brouillonTrouve.date).toLocaleString("fr-BE", { dateStyle: "short", timeStyle: "short" })} sur ce navigateur.</div>
+          </div>
+          <button type="button" onClick={reprendreBrouillon} className="rounded-xl bg-blue text-white px-4 py-2 text-sm font-bold">Reprendre le brouillon</button>
+          <button type="button" onClick={() => { effacerBrouillon(); setBrouillonTrouve(null); }} className="rounded-xl border border-[#cfd8e3] bg-white px-4 py-2 text-sm font-semibold">Supprimer et repartir de zéro</button>
+        </div>
+      )}
+
+      {sortie && (
+        <div className="fixed inset-0 z-50 bg-[rgba(11,37,69,0.45)] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="titre-sortie">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 flex flex-col gap-4">
+            <h2 id="titre-sortie" className="font-display font-extrabold text-lg">Quitter la création du projet ?</h2>
+            <p className="text-sm text-ink-soft">Le projet n&apos;est pas encore créé. Voulez-vous garder ce que vous avez saisi en brouillon pour le reprendre plus tard ?</p>
+            <div className="flex flex-col gap-2">
+              <button type="button" onClick={() => quitter(true)} className="rounded-xl bg-blue text-white px-4 py-2.5 text-sm font-bold">Enregistrer le brouillon et quitter</button>
+              <button type="button" onClick={() => quitter(false)} className="rounded-xl border border-red-ink/30 text-red-ink px-4 py-2.5 text-sm font-semibold">Quitter sans enregistrer</button>
+              <button type="button" onClick={() => setSortie(null)} className="rounded-xl border border-[#cfd8e3] px-4 py-2.5 text-sm font-semibold">Rester sur la page</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ol className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2">
         {ETAPES.map((label, i) => {
