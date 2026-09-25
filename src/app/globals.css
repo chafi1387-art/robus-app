@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  --navy: #003366;
+  --navy-2: #04407e;
+  --blue: #0055a4;
+  --blue-light: #007bff;
+  --blue-accent: #00a3e0;
+  --blue-pale: #e8f4fc;
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --ink: #333333;
+  --ink-soft: #6b7482;
+  --line: #e2e8f0;
+  --orange: #e67e22;
+  --orange-ink: #9c5210;
+  --orange-fill: #fdeedd;
+  --red: #c0392b;
+  --red-ink: #8e241a;
+  --red-fill: #fbe3e0;
+  --green: #27ae60;
+  --green-ink: #1b7a44;
+  --green-fill: #dff5e8;
+}
+
+@theme inline {
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-blue: var(--blue);
+  --color-blue-light: var(--blue-light);
+  --color-blue-accent: var(--blue-accent);
+  --color-blue-pale: var(--blue-pale);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-orange: var(--orange);
+  --color-orange-ink: var(--orange-ink);
+  --color-orange-fill: var(--orange-fill);
+  --color-red: var(--red);
+  --color-red-ink: var(--red-ink);
+  --color-red-fill: var(--red-fill);
+  --color-green: var(--green);
+  --color-green-ink: var(--green-ink);
+  --color-green-fill: var(--green-fill);
+  --font-display: "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-body: "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

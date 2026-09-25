@@ -1,0 +1,1 @@
+ALTER TABLE "pieces" ADD COLUMN "actif" integer DEFAULT 1 NOT NULL;

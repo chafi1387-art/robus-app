@@ -1,0 +1,1 @@
+ALTER TABLE "rapports" ADD COLUMN "heure_reelle" timestamp;
