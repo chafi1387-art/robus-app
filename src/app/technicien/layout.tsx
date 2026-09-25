@@ -4,6 +4,7 @@ import { signOut } from "@/auth";
 
 const TABS = [
   { href: "/technicien", label: "Interventions", icon: "🔧" },
+  { href: "/technicien/heures", label: "Heures", icon: "⏱️" },
   { href: "/technicien/formations", label: "Formations", icon: "📄" },
   { href: "/technicien/profil", label: "Mon profil", icon: "👤" },
 ];

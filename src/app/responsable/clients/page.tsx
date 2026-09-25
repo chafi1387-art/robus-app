@@ -29,6 +29,7 @@ const TYPE_LABEL: Record<string, string> = {
   entreprise: "Entreprise",
   particulier: "Particulier",
   syndicat: "Syndicat",
+  sous_traitance: "Sous-traitance",
 };
 
 export default async function ClientsPage() {
@@ -77,6 +78,7 @@ export default async function ClientsPage() {
                 <option value="entreprise">Entreprise</option>
                 <option value="particulier">Particulier</option>
                 <option value="syndicat">Syndicat</option>
+                <option value="sous_traitance">Sous-traitance</option>
               </select>
             </Field>
             <Btn>Créer le client</Btn>

@@ -33,6 +33,7 @@ const NAV_GROUPS: {
       { href: "/responsable/sites", label: "Sites", icon: "📍" },
       { href: "/responsable/appareils", label: "Appareils", icon: "🛗" },
       { href: "/responsable/interventions", label: "Interventions", icon: "🔧" },
+      { href: "/responsable/sous-traitance", label: "Sous-traitance", icon: "⏱️" },
       { href: "/responsable/planification", label: "Planning automatique", icon: "🗓️" },
       { href: "/responsable/non-conformites", label: "Non-conformités", icon: "🚫" },
     ],

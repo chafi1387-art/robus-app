@@ -8,6 +8,8 @@ import {
   integer,
   numeric,
   uniqueIndex,
+  date,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -30,6 +32,7 @@ export const typeClientEnum = pgEnum("type_client", [
   "entreprise",
   "particulier",
   "syndicat",
+  "sous_traitance",
 ]);
 
 export const statutAppareilEnum = pgEnum("statut_appareil", [
@@ -1085,4 +1088,38 @@ export const ordresMissionEnvoisRelations = relations(ordresMissionEnvois, ({ on
   projet: one(projets, { fields: [ordresMissionEnvois.projetId], references: [projets.id] }),
   technicien: one(users, { fields: [ordresMissionEnvois.technicienId], references: [users.id] }),
   envoyePar: one(users, { fields: [ordresMissionEnvois.envoyeParId], references: [users.id] }),
+}));
+
+// ==========================================================================
+// SOUS-TRAITANCE — heures déclarées par les techniciens pour un client de
+// type "sous_traitance" (suivi simple : date, durée, commentaire). Sert
+// d'historique pour la facturation (faite dans Odoo, non synchronisée).
+// La durée est stockée en minutes (entier) pour éviter les arrondis.
+// ==========================================================================
+export const heuresSousTraitance = pgTable(
+  "heures_sous_traitance",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    technicienId: uuid("technicien_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "restrict" }),
+    dateTravail: date("date_travail", { mode: "string" }).notNull(),
+    minutes: integer("minutes").notNull(),
+    commentaire: text("commentaire"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("heures_st_technicien_idx").on(t.technicienId),
+    index("heures_st_client_idx").on(t.clientId),
+    index("heures_st_date_idx").on(t.dateTravail),
+  ]
+);
+
+export const heuresSousTraitanceRelations = relations(heuresSousTraitance, ({ one }) => ({
+  technicien: one(users, { fields: [heuresSousTraitance.technicienId], references: [users.id] }),
+  client: one(clients, { fields: [heuresSousTraitance.clientId], references: [clients.id] }),
 }));

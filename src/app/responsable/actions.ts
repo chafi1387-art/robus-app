@@ -23,7 +23,7 @@ import { envoyerEtJournaliserOrdreMission } from "./projets/actions";
 
 const clientSchema = z.object({
   raisonSociale: z.string().min(2, "Raison sociale requise"),
-  type: z.enum(["copropriete", "entreprise", "particulier", "syndicat"]),
+  type: z.enum(["copropriete", "entreprise", "particulier", "syndicat", "sous_traitance"]),
 });
 
 export async function createClient(formData: FormData) {
@@ -37,6 +37,26 @@ export async function createClient(formData: FormData) {
   const [created] = await db.insert(clients).values(parsed.data).returning();
   revalidatePath("/responsable/clients");
   redirect(`/responsable/clients/${created.id}`);
+}
+
+export async function updateClientType(formData: FormData) {
+  const user = await requireUser(ROLES_BUREAU);
+  const id = z.string().uuid().parse(formData.get("clientId"));
+  const type = clientSchema.shape.type.parse(formData.get("type"));
+  const [avant] = await db.select({ type: clients.type }).from(clients).where(eq(clients.id, id)).limit(1);
+  if (!avant) throw new Error("Client introuvable");
+  if (avant.type !== type) {
+    await db.update(clients).set({ type }).where(eq(clients.id, id));
+    await journaliser({
+      entite: "client",
+      entiteId: id,
+      action: "changement_type",
+      utilisateurId: user.id,
+      details: `${avant.type} -> ${type}`,
+    });
+  }
+  revalidatePath(`/responsable/clients/${id}`);
+  revalidatePath("/responsable/clients");
 }
 
 const siteSchema = z.object({
