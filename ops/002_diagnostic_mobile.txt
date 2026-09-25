@@ -1,0 +1,344 @@
+
+########## Requetes non-bot en erreur (iPhone/Android/Mac), 14 derniers jours
+[25/Sep/2026:12:11:23 108.162.221.143 "GET /lander/ 404 196
+[25/Sep/2026:12:18:46 104.22.100.149 "GET / 404 134
+[25/Sep/2026:12:19:44 162.158.138.221 "GET / 404 134
+[25/Sep/2026:12:25:16 172.71.95.108 "GET / 404 134
+[25/Sep/2026:12:31:17 172.68.119.35 "GET / 404 134
+[25/Sep/2026:12:32:45 172.71.178.16 "GET / 404 134
+[25/Sep/2026:12:33:40 104.22.100.19 "GET / 404 134
+[25/Sep/2026:12:33:59 104.23.170.170 "GET / 404 134
+[25/Sep/2026:12:38:34 162.159.98.27 "GET / 404 134
+[25/Sep/2026:12:51:54 104.23.172.73 "GET / 404 134
+[25/Sep/2026:12:59:22 104.22.17.248 "GET / 404 134
+[25/Sep/2026:13:01:43 162.158.88.3 "GET / 404 134
+[25/Sep/2026:13:12:26 172.70.85.94 "GET / 404 134
+[25/Sep/2026:13:13:47 104.22.10.80 "GET / 404 134
+[25/Sep/2026:13:19:27 104.23.166.168 "GET / 404 134
+[25/Sep/2026:13:26:19 162.158.152.161 "GET / 404 134
+[25/Sep/2026:13:30:07 172.70.142.10 "GET / 404 134
+[25/Sep/2026:13:40:17 172.70.163.28 "GET / 404 134
+[25/Sep/2026:13:43:45 162.158.103.163 "GET / 404 134
+[25/Sep/2026:13:45:10 172.71.99.67 "GET / 404 134
+[25/Sep/2026:13:46:56 104.23.172.10 "GET /lander/ 404 196
+[25/Sep/2026:13:48:11 141.101.98.121 "GET / 404 134
+[25/Sep/2026:13:51:21 104.22.105.12 "GET / 404 134
+[25/Sep/2026:13:55:50 141.101.84.161 "GET / 404 134
+[25/Sep/2026:13:59:09 162.158.167.170 "GET / 404 134
+[25/Sep/2026:14:00:07 162.158.79.162 "GET / 404 134
+[25/Sep/2026:14:03:57 172.71.182.229 "GET / 404 196
+[25/Sep/2026:14:05:10 162.158.193.220 "GET / 404 134
+[25/Sep/2026:14:13:49 172.71.127.17 "GET / 404 134
+[25/Sep/2026:14:14:09 172.71.155.165 "GET / 404 196
+[25/Sep/2026:14:15:05 162.158.63.95 "GET /.env 404 134
+[25/Sep/2026:14:17:36 162.158.90.113 "GET / 404 134
+[25/Sep/2026:14:34:10 162.159.98.121 "GET / 404 134
+[25/Sep/2026:14:36:28 172.64.215.120 "GET / 404 134
+[25/Sep/2026:14:36:58 162.158.63.13 "GET /.env 404 134
+[25/Sep/2026:14:37:38 172.71.182.31 "GET / 404 134
+[25/Sep/2026:14:41:45 104.22.20.105 "GET /.env 404 134
+[25/Sep/2026:14:41:45 104.22.20.131 "GET / 404 134
+[25/Sep/2026:14:41:46 104.22.20.105 "GET /.git/config 404 134
+[25/Sep/2026:14:41:46 104.22.20.131 "GET /.env.local 404 134
+[25/Sep/2026:14:43:13 172.68.19.250 "GET / 404 134
+[25/Sep/2026:14:45:34 104.22.86.115 "GET /administrator/components/com_jce/ 404 134
+[25/Sep/2026:14:45:34 104.23.248.173 "GET /media/system/js/core.js 404 134
+[25/Sep/2026:14:45:35 108.162.210.214 "GET /media/jui/js/bootstrap.min.js 404 134
+[25/Sep/2026:14:48:20 162.159.110.68 "GET / 404 134
+[25/Sep/2026:14:53:21 172.70.216.68 "GET / 404 196
+[25/Sep/2026:14:53:22 172.70.216.68 "POST /api/graphql 404 196
+[25/Sep/2026:14:53:22 172.70.216.68 "POST /graphql 404 196
+[25/Sep/2026:14:53:22 172.70.216.68 "POST /v1/graphql 404 196
+[25/Sep/2026:14:53:29 162.158.167.213 "GET / 404 134
+[25/Sep/2026:14:53:42 172.64.213.56 "GET / 404 134
+[25/Sep/2026:15:00:51 104.22.101.146 "GET /.git/config 404 196
+[25/Sep/2026:15:02:06 172.71.81.224 "GET / 404 134
+[25/Sep/2026:15:15:43 172.71.218.244 "GET / 404 196
+[25/Sep/2026:15:18:43 172.71.95.38 "GET / 404 134
+[25/Sep/2026:15:19:23 172.69.224.156 "GET / 404 134
+[25/Sep/2026:15:19:41 172.71.141.246 "GET / 404 196
+[25/Sep/2026:15:37:34 104.23.199.14 "GET / 404 134
+[25/Sep/2026:15:38:19 172.71.234.36 "GET / 404 134
+[25/Sep/2026:15:40:01 172.70.223.163 "GET / 404 134
+[25/Sep/2026:15:42:03 162.158.172.182 "GET / 404 134
+[25/Sep/2026:15:43:53 104.23.217.168 "GET /lander/ 404 196
+[25/Sep/2026:15:49:16 172.71.141.217 "GET / 404 196
+[25/Sep/2026:15:51:02 104.23.254.188 "GET / 404 134
+[25/Sep/2026:15:52:23 172.71.194.224 "GET / 404 134
+[25/Sep/2026:15:54:00 172.71.154.128 "GET / 404 134
+[25/Sep/2026:15:54:10 104.23.229.6 "POST /api/graphql 404 196
+[25/Sep/2026:15:54:10 104.23.229.6 "POST /graphql 404 196
+[25/Sep/2026:15:54:10 104.23.229.6 "POST /v1/graphql 404 196
+[25/Sep/2026:15:54:10 104.23.229.72 "GET / 404 196
+[25/Sep/2026:16:06:31 172.70.176.160 "GET /.git/config 404 196
+[25/Sep/2026:16:06:57 172.69.130.182 "GET / 404 196
+[25/Sep/2026:16:06:57 172.71.120.171 "POST /api/graphql 404 196
+[25/Sep/2026:16:06:57 172.71.120.171 "POST /graphql 404 196
+[25/Sep/2026:16:06:58 172.71.120.171 "POST /v1/graphql 404 196
+[25/Sep/2026:16:08:34 104.22.18.4 "GET / 404 134
+[25/Sep/2026:16:11:21 104.22.17.40 "GET / 404 134
+[25/Sep/2026:16:15:16 172.71.99.96 "GET / 404 134
+[25/Sep/2026:16:22:48 162.159.108.134 "GET / 404 134
+[25/Sep/2026:16:23:42 104.22.20.103 "GET / 404 134
+
+########## POST en 404/400/5xx (actions serveur) hors bots
+[25/Sep/2026:16:07:11 172.71.120.171 /read-document 404
+[25/Sep/2026:16:07:11 172.71.120.172 /read-document 404
+[25/Sep/2026:16:07:12 172.71.120.171 /api/v1/build_public_tmp/00000000-0000-0000-0000-000000000000/flow 404
+[25/Sep/2026:16:07:12 172.71.120.171 /api/v1/validate/code 404
+[25/Sep/2026:16:07:12 172.71.120.172 /feast/read-document 404
+[25/Sep/2026:16:07:12 172.71.120.172 /langflow/api/v1/validate/code 404
+[25/Sep/2026:16:07:13 172.71.120.171 /api/designer/v1/file-content 404
+[25/Sep/2026:16:07:13 172.71.120.171 /api/templates/preview 404
+[25/Sep/2026:16:07:13 172.71.120.172 /api/designer/v1/file-content 404
+[25/Sep/2026:16:07:13 172.71.120.172 /api/fs/exec 404
+[25/Sep/2026:16:07:14 172.69.130.182 /cgi-bin/php-cgi.exe?%ADd+allow_url_include%3d1+%ADd+auto_prepend_file%3dphp://input 404
+[25/Sep/2026:16:07:14 172.69.130.182 /php-cgi/php-cgi.exe?%ADd+allow_url_include%3d1+%ADd+auto_prepend_file%3dphp://input 404
+[25/Sep/2026:16:07:14 172.71.120.172 /api/templates/preview 404
+[25/Sep/2026:16:07:15 172.69.130.182 /api/v1/node-load-method/customMCP 404
+[25/Sep/2026:16:07:15 172.69.130.182 /cgi-bin/php?%ADd+allow_url_include%3d1+%ADd+auto_prepend_file%3dphp://input 404
+[25/Sep/2026:16:07:15 172.69.130.182 /exec-py 404
+[25/Sep/2026:16:07:15 172.69.130.182 /flowise/api/v1/node-load-method/customMCP 404
+[25/Sep/2026:16:12:47 172.71.120.41 /api/graphql 404
+[25/Sep/2026:16:12:47 172.71.120.41 /graphql 404
+[25/Sep/2026:16:12:50 172.69.130.106 /v1/graphql 404
+[25/Sep/2026:16:12:59 172.71.120.42 /functionRouter 404
+[25/Sep/2026:16:13:00 172.69.130.107 /api/functionRouter 404
+[25/Sep/2026:16:13:01 172.69.130.107 /feast/read-document 404
+[25/Sep/2026:16:13:01 172.69.130.107 /read-document 404
+[25/Sep/2026:16:13:01 172.71.120.42 /read-document 404
+[25/Sep/2026:16:13:02 172.69.130.107 /api/designer/v1/file-content 404
+[25/Sep/2026:16:13:02 172.69.130.107 /api/v1/build_public_tmp/00000000-0000-0000-0000-000000000000/flow 404
+[25/Sep/2026:16:13:02 172.69.130.107 /api/v1/validate/code 404
+[25/Sep/2026:16:13:02 172.71.120.42 /api/fs/exec 404
+[25/Sep/2026:16:13:02 172.71.120.42 /feast/read-document 404
+[25/Sep/2026:16:13:02 172.71.120.42 /langflow/api/v1/validate/code 404
+[25/Sep/2026:16:13:03 172.71.120.42 /api/designer/v1/file-content 404
+[25/Sep/2026:16:13:03 172.71.120.42 /api/templates/preview 404
+[25/Sep/2026:16:13:03 172.71.120.42 /api/templates/preview 404
+[25/Sep/2026:16:13:03 172.71.120.42 /cgi-bin/php-cgi.exe?%ADd+allow_url_include%3d1+%ADd+auto_prepend_file%3dphp://input 404
+[25/Sep/2026:16:13:03 172.71.120.42 /php-cgi/php-cgi.exe?%ADd+allow_url_include%3d1+%ADd+auto_prepend_file%3dphp://input 404
+[25/Sep/2026:16:13:04 172.71.120.42 /api/v1/node-load-method/customMCP 404
+[25/Sep/2026:16:13:04 172.71.120.42 /cgi-bin/php?%ADd+allow_url_include%3d1+%ADd+auto_prepend_file%3dphp://input 404
+[25/Sep/2026:16:13:04 172.71.120.42 /exec-py 404
+[25/Sep/2026:16:13:04 172.71.120.42 /flowise/api/v1/node-load-method/customMCP 404
+
+########## IP des connexions reussies (POST /connexion suivis de GET /technicien ou /responsable)
+    209 86.218.96.95
+
+########## Chronologie d'une IP telephone : 22/09 et 25/09
+== 86.218.96.95
+[25/Sep/2026:16:32:40 "GET /responsable/clients?_rsc=BPYdETq2f3B3H9Ko 200
+[25/Sep/2026:16:32:40 "GET /responsable/interventions?_rsc=BPYdETq2f3B3H9Ko 200
+[25/Sep/2026:16:32:40 "GET /responsable/planification?_rsc=BPYdETq2f3B3H9Ko 200
+[25/Sep/2026:16:32:40 "GET /responsable/projets?_rsc=BPYdETq2f3B3H9Ko 200
+[25/Sep/2026:16:32:40 "GET /responsable/sites?_rsc=BPYdETq2f3B3H9Ko 200
+[25/Sep/2026:16:32:41 "GET /responsable/clients 200
+[25/Sep/2026:16:32:41 "GET /responsable/clients?_rsc=yeDhQ5Xs75P07lAp 200
+[25/Sep/2026:16:32:42 "GET /responsable/appareils?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/appareils?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/auditeurs?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/auditeurs?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/audits?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/audits?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/checklists?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/checklists?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/clients/37225553-f1b5-484b-84de-094c457ac2e9?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/clients?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/devis?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/documents?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/etalonnage?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/etalonnage?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/garanties?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/interventions?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/interventions?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/journal?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/non-conformites?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/non-conformites?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/planification?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/planification?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/prestations-catalogue?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/prestations?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/projets?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/projets?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/rapports?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/revues-direction?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/revues-direction?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/risques?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/risques?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/satisfaction?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/satisfaction?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/score-iso?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/score-iso?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/sites?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable/sites?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/stock?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/techniciens?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable/utilisateurs?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:42 "GET /responsable?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:42 "GET /responsable?_rsc=WB-X6pBlEe2IWvCn 200
+[25/Sep/2026:16:32:43 "GET /responsable/clients/37225553-f1b5-484b-84de-094c457ac2e9?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/devis?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/documents?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/garanties?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/journal?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/prestations-catalogue?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/prestations?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/rapports?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/stock?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/techniciens?_rsc=N8x0ZUGsn3_5eTtD 200
+[25/Sep/2026:16:32:43 "GET /responsable/utilisateurs?_rsc=N8x0ZUGsn3_5eTtD 200
+== 8.208.71.132
+[12/Sep/2026:09:54:30 "GET / 301
+[12/Sep/2026:09:54:36 "GET / 307
+[12/Sep/2026:09:54:46 "GET /connexion?next=%2F 200
+[12/Sep/2026:13:37:22 "GET / 301
+[12/Sep/2026:13:37:29 "GET / 307
+[12/Sep/2026:13:37:35 "GET /connexion?next=%2F 200
+[12/Sep/2026:18:00:19 "GET / 301
+[12/Sep/2026:18:00:27 "GET / 307
+[12/Sep/2026:18:00:34 "GET /connexion?next=%2F 200
+[13/Sep/2026:12:58:18 "GET / 301
+[13/Sep/2026:12:58:25 "GET / 307
+[13/Sep/2026:12:58:34 "GET /connexion?next=%2F 200
+[13/Sep/2026:17:58:12 "GET / 301
+[13/Sep/2026:17:58:16 "GET / 307
+[13/Sep/2026:17:58:23 "GET /connexion?next=%2F 200
+[15/Sep/2026:05:50:52 "GET / 301
+[15/Sep/2026:05:50:59 "GET / 307
+[15/Sep/2026:05:51:07 "GET /connexion?next=%2F 200
+[15/Sep/2026:16:36:29 "GET / 301
+[15/Sep/2026:16:36:38 "GET / 307
+[15/Sep/2026:16:36:44 "GET /connexion?next=%2F 200
+[16/Sep/2026:06:26:04 "GET / 301
+[16/Sep/2026:06:26:11 "GET / 307
+[16/Sep/2026:06:26:19 "GET /connexion?next=%2F 200
+[16/Sep/2026:21:39:03 "GET / 301
+[16/Sep/2026:21:39:09 "GET / 307
+[16/Sep/2026:21:39:17 "GET /connexion?next=%2F 200
+[17/Sep/2026:18:02:22 "GET / 301
+[17/Sep/2026:18:02:27 "GET / 307
+[17/Sep/2026:18:02:35 "GET /connexion?next=%2F 200
+[17/Sep/2026:21:43:55 "GET / 301
+[17/Sep/2026:21:44:02 "GET / 307
+[17/Sep/2026:21:44:11 "GET /connexion?next=%2F 200
+[18/Sep/2026:19:08:17 "GET / 301
+[18/Sep/2026:19:08:24 "GET / 307
+[18/Sep/2026:19:08:32 "GET /connexion?next=%2F 200
+[19/Sep/2026:12:19:38 "GET / 301
+[19/Sep/2026:12:19:42 "GET / 307
+[19/Sep/2026:12:19:49 "GET /connexion?next=%2F 200
+[20/Sep/2026:08:53:45 "GET / 301
+[20/Sep/2026:08:53:53 "GET / 307
+[20/Sep/2026:08:54:01 "GET /connexion?next=%2F 200
+[20/Sep/2026:21:11:37 "GET / 301
+[20/Sep/2026:21:11:44 "GET / 307
+[20/Sep/2026:21:11:51 "GET /connexion?next=%2F 200
+[21/Sep/2026:00:08:47 "GET / 301
+[21/Sep/2026:00:08:52 "GET / 307
+[21/Sep/2026:00:08:59 "GET /connexion?next=%2F 200
+[21/Sep/2026:03:06:07 "GET / 301
+[21/Sep/2026:03:06:10 "GET / 307
+[21/Sep/2026:03:06:17 "GET /connexion?next=%2F 200
+[21/Sep/2026:12:02:12 "GET / 301
+[21/Sep/2026:12:02:20 "GET / 307
+[21/Sep/2026:12:02:26 "GET /connexion?next=%2F 200
+[24/Sep/2026:05:02:59 "GET / 301
+[24/Sep/2026:05:03:04 "GET / 307
+[24/Sep/2026:05:03:12 "GET /connexion?next=%2F 200
+[25/Sep/2026:11:21:38 "GET / 301
+[25/Sep/2026:11:21:44 "GET / 307
+[25/Sep/2026:11:21:50 "GET /connexion?next=%2F 200
+== 47.113.205.75
+[11/Sep/2026:05:00:27 "GET / 301
+[11/Sep/2026:05:00:34 "GET / 307
+[11/Sep/2026:05:00:42 "GET /connexion?next=%2F 200
+[11/Sep/2026:21:21:27 "GET / 301
+[11/Sep/2026:21:21:33 "GET / 307
+[11/Sep/2026:21:21:37 "GET /connexion?next=%2F 200
+[12/Sep/2026:02:26:28 "GET / 301
+[12/Sep/2026:02:26:35 "GET / 307
+[12/Sep/2026:02:26:42 "GET /connexion?next=%2F 200
+[13/Sep/2026:00:48:24 "GET / 301
+[13/Sep/2026:00:48:32 "GET / 307
+[13/Sep/2026:00:48:40 "GET /connexion?next=%2F 200
+[14/Sep/2026:07:27:34 "GET / 301
+[14/Sep/2026:07:27:42 "GET / 307
+[14/Sep/2026:07:27:46 "GET /connexion?next=%2F 200
+[14/Sep/2026:16:16:53 "GET / 301
+[14/Sep/2026:16:17:02 "GET / 307
+[14/Sep/2026:16:17:10 "GET /connexion?next=%2F 200
+[15/Sep/2026:12:53:41 "GET / 301
+[15/Sep/2026:12:53:48 "GET / 307
+[15/Sep/2026:12:53:52 "GET /connexion?next=%2F 200
+[16/Sep/2026:13:36:59 "GET / 301
+[16/Sep/2026:13:37:06 "GET / 307
+[16/Sep/2026:13:37:15 "GET /connexion?next=%2F 200
+[16/Sep/2026:17:23:18 "GET / 301
+[16/Sep/2026:17:23:28 "GET / 307
+[16/Sep/2026:17:23:39 "GET /connexion?next=%2F 200
+[17/Sep/2026:13:38:36 "GET / 301
+[17/Sep/2026:13:38:43 "GET / 307
+[17/Sep/2026:13:38:50 "GET /connexion?next=%2F 200
+[18/Sep/2026:01:17:00 "GET / 301
+[18/Sep/2026:01:17:09 "GET / 307
+[18/Sep/2026:01:17:14 "GET /connexion?next=%2F 200
+[18/Sep/2026:10:25:07 "GET / 301
+[18/Sep/2026:10:25:16 "GET / 307
+[18/Sep/2026:10:25:22 "GET /connexion?next=%2F 200
+[21/Sep/2026:11:39:14 "GET / 301
+[21/Sep/2026:11:39:22 "GET / 307
+[21/Sep/2026:11:39:30 "GET /connexion?next=%2F 200
+
+########## pm2 : lignes avant chaque 'Failed to find Server Action' / UntrustedHost (contexte)
+1:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+5:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+9:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+13:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+17:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+21:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+25:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+29:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+33:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+37:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+41:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+45:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+49:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+53:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+57:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+61:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+65:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+69:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+73:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+77:[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: https://robuswork.tech/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+--
+
+########## Dates des fichiers de log pm2
+total 108
+drwxr-xr-x 2 root root  4096 2026-08-30 22:13:17.802341452 +0000 .
+drwxr-xr-x 5 root root  4096 2026-09-01 13:48:54.394892958 +0000 ..
+-rw-r--r-- 1 root root 88362 2026-09-25 07:35:51.626716089 +0000 robus-dashboard-error.log
+-rw-r--r-- 1 root root  6638 2026-09-25 16:10:31.435174205 +0000 robus-dashboard-out.log
+
+########## Historique deploiements pm2 restart (dates)
+2026-08-30T22:41:55: PM2 log: Script /usr/bin/npm had too many unstable restarts (16). Stopped. "errored"
+(code retour 0, 2026-09-25 16:34:03)

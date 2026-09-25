@@ -29,3 +29,5 @@ npm notice
 STATUT: OK 6432c99
 === 2026-09-25 16:33:02 : e83d4b9 (ops seulement, pas de build)
 STATUT: OK e83d4b9
+=== 2026-09-25 16:34:01 : 0704cb2 (ops seulement, pas de build)
+STATUT: OK 0704cb2
