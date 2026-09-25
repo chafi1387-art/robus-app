@@ -144,3 +144,32 @@ STATUT: OK 206a596
 STATUT: OK aa02dce
 === 2026-09-25 18:07:02 : 3efc7f0 (ops seulement, pas de build)
 STATUT: OK 3efc7f0
+=== Deploiement 2026-09-25 18:31:02 : 3efc7f0 -> 9a30018
+--- build
+├ ƒ /responsable/rapports
+├ ƒ /responsable/revues-direction
+├ ƒ /responsable/risques
+├ ƒ /responsable/satisfaction
+├ ƒ /responsable/score-iso
+├ ƒ /responsable/sites
+├ ƒ /responsable/sites/[id]
+├ ƒ /responsable/sous-traitance
+├ ƒ /responsable/stock
+├ ƒ /responsable/stock/pieces/[id]
+├ ƒ /responsable/techniciens
+├ ƒ /responsable/techniciens/[id]
+├ ƒ /responsable/utilisateurs
+├ ƒ /technicien
+├ ƒ /technicien/formations
+├ ƒ /technicien/heures
+├ ƒ /technicien/interventions/[id]
+└ ƒ /technicien/profil
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+--- curl /responsable/projets : 307
+STATUT: OK 9a30018
