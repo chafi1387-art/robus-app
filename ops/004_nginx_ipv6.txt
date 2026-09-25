@@ -1,0 +1,17 @@
+Fichier: /etc/nginx/sites-available/robuswork.tech
+--- diff
+17a18
+>     listen [::]:443 ssl;
+36a38
+>     listen [::]:80;
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+--- tests
+IPv4 200
+IPv6 200
+IPv6 http->https 301
+LISTEN 0      511          0.0.0.0:80        0.0.0.0:*          
+LISTEN 0      511          0.0.0.0:443       0.0.0.0:*          
+LISTEN 0      511             [::]:80           [::]:*          
+LISTEN 0      511             [::]:443          [::]:*          
+(code retour 0, 2026-09-25 16:36:04)

@@ -33,3 +33,5 @@ STATUT: OK e83d4b9
 STATUT: OK 0704cb2
 === 2026-09-25 16:35:02 : 8ae8113 (ops seulement, pas de build)
 STATUT: OK 8ae8113
+=== 2026-09-25 16:36:02 : a7ec1cd (ops seulement, pas de build)
+STATUT: OK a7ec1cd
