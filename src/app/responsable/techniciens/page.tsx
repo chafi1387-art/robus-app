@@ -26,9 +26,9 @@ const STATUT_CLS: Record<string, string> = {
   sorti_effectifs: "bg-[#eef2f6] text-ink-soft",
 };
 
-export default async function TechniciensPage({ searchParams }: { searchParams: Promise<{ vue?: string; q?: string; nouveau?: string }> }) {
+export default async function TechniciensPage({ searchParams }: { searchParams: Promise<{ vue?: string; q?: string; nouveau?: string; erreur?: string }> }) {
   const user = await requireUser(ROLES_BUREAU);
-  const { vue = "actifs", q = "", nouveau } = await searchParams;
+  const { vue = "actifs", q = "", nouveau, erreur } = await searchParams;
   const estAdmin = user.role === "administrateur";
 
   const [rows, sitesOptions] = await Promise.all([
@@ -155,6 +155,7 @@ export default async function TechniciensPage({ searchParams }: { searchParams: 
         {estAdmin && nouveau && (
           <Card className="p-5 h-fit" >
             <h2 className="font-display font-bold text-[15px] mb-3" id="nouveau">Nouveau technicien</h2>
+            {erreur && <div role="alert" className="mb-3 rounded-xl bg-red-fill text-red-ink px-3 py-2.5 text-sm font-medium">{erreur}</div>}
             <form action={createTechnicien} className="flex flex-col gap-3">
               <Field label="Nom complet">
                 <input name="nom" required className={inputClass} />

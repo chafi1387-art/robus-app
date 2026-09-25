@@ -60,14 +60,15 @@ export async function createTechnicien(formData: FormData) {
     adresseDomicile: formData.get("adresseDomicile") || undefined,
     statutRh: formData.get("statutRh") || undefined,
   });
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
+  // Phase 13b : erreurs de saisie affichées sur la page (plus de page d'erreur serveur).
+  if (!parsed.success) redirect(`/responsable/techniciens?nouveau=1&erreur=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Données invalides")}#nouveau`);
 
   const [existing] = await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.email, parsed.data.email))
     .limit(1);
-  if (existing) throw new Error("Un utilisateur existe déjà avec cet email.");
+  if (existing) redirect(`/responsable/techniciens?nouveau=1&erreur=${encodeURIComponent(`Un compte existe déjà avec l'email ${parsed.data.email} (technicien actuel, ancien ou autre utilisateur). Utilisez un autre email ou ouvrez sa fiche.`)}#nouveau`);
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
 

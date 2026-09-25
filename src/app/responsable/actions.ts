@@ -16,7 +16,7 @@ import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { envoyerEtJournaliserOrdreMission } from "./projets/actions";
@@ -420,7 +420,9 @@ export async function getTechniciens() {
   return db
     .select({ id: users.id, nom: users.nom })
     .from(users)
-    .where(eq(users.role, "technicien"));
+    // Phase 13b : les anciens techniciens (compte désactivé) ne sont plus proposés.
+    .where(and(eq(users.role, "technicien"), eq(users.actif, 1)))
+    .orderBy(users.nom);
 }
 
 export async function getClientsForSelect() {
