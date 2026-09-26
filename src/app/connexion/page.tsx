@@ -15,7 +15,7 @@ const ROLE_HOME: Record<string, string> = {
 export default async function ConnexionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; erreur?: string }>;
+  searchParams: Promise<{ next?: string; erreur?: string; reinit?: string }>;
 }) {
   const params = await searchParams;
 
@@ -83,6 +83,11 @@ export default async function ConnexionPage({
             <h2 className="font-display text-xl font-bold mb-1">Connexion</h2>
             <p className="text-sm text-ink-soft mb-6">Accédez à votre espace ROBUS.</p>
 
+            {params.reinit && (
+              <div className="mb-4 text-sm bg-green-fill text-green-ink rounded-lg px-3 py-2">
+                Mot de passe modifié. Connectez-vous avec le nouveau.
+              </div>
+            )}
             {params.erreur && (
               <div className="mb-4 text-sm bg-red-fill text-red-ink rounded-lg px-3 py-2">
                 Email ou mot de passe incorrect.
@@ -122,6 +127,9 @@ export default async function ConnexionPage({
               >
                 Se connecter
               </button>
+              <a href="/mot-de-passe-oublie" className="text-center text-sm font-semibold text-blue hover:underline">
+                Mot de passe oublié ?
+              </a>
             </form>
           </div>
         </div>

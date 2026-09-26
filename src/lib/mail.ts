@@ -281,3 +281,31 @@ ${params.message ? `Message : ${params.message}\n\n` : ""}Intervention concerné
     });
   }
 }
+
+/**
+ * Phase 14 : lien de réinitialisation du mot de passe (valable 30 min).
+ * Renvoie true si l'email est parti, false sinon (SMTP absent ou erreur).
+ */
+export async function envoyerLienReinitialisation(params: { email: string; nom: string; lien: string }) {
+  const transport = getTransport();
+  if (!transport) return false;
+  const nom = echapperHtml(params.nom);
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: params.email,
+      subject: "ROBUS — Réinitialisation de votre mot de passe",
+      text: `Bonjour ${params.nom},\n\nPour choisir un nouveau mot de passe, ouvrez ce lien (valable 30 minutes, utilisable une seule fois) :\n${params.lien}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email : votre mot de passe actuel reste valable.\n\nROBUS`,
+      html: `${enteteHtml()}<div style="font-family:Arial,sans-serif;padding:20px;color:#1f2a37;">
+        <p>Bonjour ${nom},</p>
+        <p>Pour choisir un nouveau mot de passe, cliquez sur le bouton ci-dessous. Le lien est valable <strong>30 minutes</strong> et utilisable une seule fois.</p>
+        <p><a href="${params.lien}" style="display:inline-block;background:#0055a4;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Choisir un nouveau mot de passe</a></p>
+        <p style="font-size:12px;color:#5b6675;">Si vous n'êtes pas à l'origine de cette demande, ignorez cet email : votre mot de passe actuel reste valable.</p>
+      </div>`,
+      attachments: logoAttachment(),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}

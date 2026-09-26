@@ -1131,3 +1131,18 @@ export const heuresSousTraitanceRelations = relations(heuresSousTraitance, ({ on
   technicien: one(users, { fields: [heuresSousTraitance.technicienId], references: [users.id] }),
   client: one(clients, { fields: [heuresSousTraitance.clientId], references: [clients.id] }),
 }));
+
+// ==========================================================================
+// PHASE 14 — Réinitialisation du mot de passe (lien par email, 30 min,
+// usage unique). Seul le hachage SHA-256 du jeton est stocké.
+// ==========================================================================
+export const reinitialisationsMotDePasse = pgTable("reinitialisations_mot_de_passe", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  jetonHash: varchar("jeton_hash", { length: 64 }).notNull(),
+  expireLe: timestamp("expire_le").notNull(),
+  utiliseLe: timestamp("utilise_le"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

@@ -11,7 +11,11 @@ const ROLE_HOME: Record<string, string> = {
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   // /api/auth-check répond lui-même 204/401 (utilisé par nginx pour /uploads/)
-  const isPublic = pathname === "/connexion" || pathname.startsWith("/api/auth");
+  const isPublic =
+    pathname === "/connexion" ||
+    pathname === "/mot-de-passe-oublie" ||
+    pathname === "/reinitialiser" ||
+    pathname.startsWith("/api/auth");
   const session = req.auth;
 
   if (isPublic) {
