@@ -350,12 +350,12 @@ export function AssistantProjet({ donnees }: { donnees: DonneesAssistant }) {
         </div>
       )}
 
-      <ol className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2">
+      <ol className="flex overflow-x-auto -mx-4 px-4 pb-1 snap-x sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 xl:grid-cols-7 gap-2">
         {ETAPES.map((label, i) => {
           const actif = i === etape;
           const fait = i < etape;
           return (
-            <li key={label}>
+            <li key={label} className="shrink-0 snap-start">
               <button
                 type="button"
                 onClick={() => aller(i)}

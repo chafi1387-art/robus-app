@@ -6,6 +6,7 @@ import { and, eq, count, ne, isNull } from "drizzle-orm";
 import { signOut } from "@/auth";
 import { getNotifications } from "@/lib/notifications";
 import { NavBureau } from "@/components/nav-bureau";
+import { MenuMobile } from "@/components/menu-mobile";
 import { Bell, FileText } from "lucide-react";
 
 async function getBadgeCounts() {
@@ -29,7 +30,7 @@ export default async function ResponsableLayout({ children }: { children: React.
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-[264px] shrink-0 bg-navy text-blue-pale flex flex-col sticky top-0 h-screen">
+      <aside className="hidden lg:flex w-[264px] shrink-0 bg-navy text-blue-pale flex-col sticky top-0 h-screen">
         <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-robus.png" alt="ROBUS" className="h-9 w-auto object-contain" />
@@ -49,14 +50,17 @@ export default async function ResponsableLayout({ children }: { children: React.
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-20 bg-surface/95 backdrop-blur border-b border-line flex items-center gap-4 px-8 h-16">
+        <header className="sticky top-0 z-20 bg-surface/95 backdrop-blur border-b border-line flex items-center gap-2 sm:gap-4 px-3 sm:px-8 h-16">
+          <MenuMobile role={user.role} badges={{ panne: badges.retard, nonAffectees: badges.nonAffectees }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-robus.png" alt="ROBUS" className="lg:hidden h-7 w-auto object-contain" />
           <div className="flex-1" />
 
           <Link
             href="/responsable/rapports"
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold font-display bg-blue hover:bg-blue-light text-white transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg px-2.5 sm:px-4 py-2 text-sm font-bold font-display bg-blue hover:bg-blue-light text-white transition-colors" aria-label="Générer un rapport"
           >
-            <FileText className="w-4 h-4" /> Générer un rapport
+            <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Générer un rapport</span>
           </Link>
 
           <details className="relative">
@@ -72,7 +76,7 @@ export default async function ResponsableLayout({ children }: { children: React.
                 </span>
               )}
             </summary>
-            <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-surface border border-line rounded-xl shadow-lg z-30 p-2">
+            <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-1.5rem))] max-h-96 overflow-y-auto bg-surface border border-line rounded-xl shadow-lg z-30 p-2">
               <div className="text-xs font-bold uppercase tracking-wide text-ink-soft px-2 py-1.5">
                 Notifications
               </div>
@@ -110,7 +114,7 @@ export default async function ResponsableLayout({ children }: { children: React.
                   .slice(0, 2)
                   .toUpperCase()}
               </div>
-              <div className="text-sm leading-tight">
+              <div className="text-sm leading-tight hidden md:block">
                 <div className="font-semibold">{user.name}</div>
                 <div className="text-xs text-ink-soft">
                   {user.role === "responsable_qualite"
@@ -122,14 +126,14 @@ export default async function ResponsableLayout({ children }: { children: React.
               </div>
               <button
                 type="submit"
-                className="text-xs font-semibold text-ink-soft hover:text-red-ink border border-line rounded-lg px-2.5 py-1.5 ml-2"
+                className="text-xs font-semibold text-ink-soft hover:text-red-ink border border-line rounded-lg px-2 sm:px-2.5 py-1.5 sm:ml-2"
               >
                 Déconnexion
               </button>
             </div>
           </form>
         </header>
-        <main className="flex-1 px-8 py-8 max-w-[1360px] w-full mx-auto">{children}</main>
+        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-8 max-w-[1360px] w-full mx-auto min-w-0">{children}</main>
       </div>
     </div>
   );

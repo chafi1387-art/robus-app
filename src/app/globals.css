@@ -71,3 +71,11 @@ details > summary::-webkit-details-marker { display: none; }
 input, select, textarea { font-family: inherit; }
 ::selection { background: var(--blue-pale); }
 html { font-size: 17px; }
+
+/* ---------- Phase 15 : espace bureau sur téléphone ---------- */
+@media (max-width: 1023px) {
+  html { font-size: 16px; }
+  /* Les grands tableaux défilent horizontalement au lieu de déborder. */
+  main table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  main pre { max-width: 100%; overflow-x: auto; }
+}
