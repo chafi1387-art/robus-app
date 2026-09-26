@@ -17,6 +17,7 @@ import {
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { envoyerAlerteAide } from "@/lib/mail";
+import { notifierBureau } from "@/lib/push";
 import { peutModifierHeureReelle } from "@/lib/rapport-rules";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -321,6 +322,13 @@ export async function demanderAide(formData: FormData) {
     technicienNom: user.name ?? "Technicien",
     numeroInterne: appareil?.numeroInterne ?? "—",
     message: parsed.data.message ?? null,
+  });
+  // Phase 16 : notification immédiate sur les téléphones du bureau.
+  await notifierBureau({
+    titre: `🆘 Demande d'aide — ${user.name ?? "Technicien"}`,
+    corps: `${appareil?.numeroInterne ?? "Appareil"}${parsed.data.message ? ` : ${parsed.data.message.slice(0, 120)}` : ""}`,
+    url: "/responsable/interventions",
+    tag: `aide-${created.id}`,
   });
 
   revalidatePath(`/technicien/interventions/${parsed.data.interventionId}`);

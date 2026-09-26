@@ -13,6 +13,8 @@ import {
 import { and, count, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
 import { formatDateTime } from "@/lib/format";
 import { BLOCS_ISO, calculerScoreGlobal } from "@/lib/score-iso";
+import { CarteApplication } from "@/components/app-installable";
+import { clePubliqueVapid } from "@/lib/push";
 import Link from "next/link";
 
 const DONE_STATUSES = ["terminee", "validee", "cloturee"] as const;
@@ -209,6 +211,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="lg:hidden">
+        <CarteApplication cleVapid={clePubliqueVapid()} seulementSiAction compact />
+      </div>
       <div>
         <h1 className="text-2xl font-extrabold font-display">Tableau de bord synthétique</h1>
         <p className="text-sm text-ink-soft">

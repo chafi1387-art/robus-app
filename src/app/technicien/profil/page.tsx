@@ -12,6 +12,8 @@ import {
 } from "@/db/schema";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { CarteApplication } from "@/components/app-installable";
+import { clePubliqueVapid } from "@/lib/push";
 
 const CATEGORIE_LABEL: Record<string, string> = {
   securite: "Sécurité",
@@ -101,6 +103,8 @@ export default async function ProfilPage() {
           <div className="text-sm text-ink-soft">Technicien</div>
         </div>
       </div>
+
+      <CarteApplication cleVapid={clePubliqueVapid()} />
 
       <Card className="p-4">
         <h2 className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-2">Coordonnées</h2>

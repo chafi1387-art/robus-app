@@ -24,6 +24,7 @@ import { requireUser, Role, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { envoyerOrdreDeMission } from "@/lib/mail";
 import { appliquerGarantie } from "@/lib/projet-garantie";
+import { notifierUtilisateurs } from "@/lib/push";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -268,6 +269,16 @@ export async function envoyerEtJournaliserOrdreMission(params: {
       dateDebutPrevue: contexte.dateDebutPrevue,
       message: params.message,
       documents: documentsResolus.map((d) => ({ titre: d.titre, url: d.urlFichier })),
+    });
+  }
+
+  // Phase 16 : notification sur le téléphone du technicien (en plus de l'email).
+  if (contexte) {
+    await notifierUtilisateurs([params.technicienId], {
+      titre: `📋 Nouvelle mission — ${contexte.reference}`,
+      corps: `${contexte.titre} · ${contexte.clientNom}${contexte.adresse ? ` · ${contexte.adresse}` : ""}`,
+      url: "/technicien",
+      tag: `mission-${params.projetId}`,
     });
   }
 

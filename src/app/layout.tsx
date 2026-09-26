@@ -7,10 +7,17 @@ import "@fontsource/ibm-plex-sans/latin-500.css";
 import "@fontsource/ibm-plex-sans/latin-600.css";
 import "@fontsource/ibm-plex-sans/latin-700.css";
 import "./globals.css";
+import { EnregistrementSW } from "@/components/app-installable";
 
 export const metadata: Metadata = {
   title: "ROBUS — Dashboard Qualité ISO 9001",
   description: "Pilotage qualité ISO 9001 — ROBUS Liften Ascenseurs",
+  applicationName: "ROBUS",
+  appleWebApp: { capable: true, title: "ROBUS", statusBarStyle: "default" },
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -20,7 +27,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className="h-full antialiased">
-      <body className="min-h-full flex flex-col bg-bg text-ink">{children}</body>
+      <body className="min-h-full flex flex-col bg-bg text-ink">
+        <EnregistrementSW />
+        {children}
+      </body>
     </html>
   );
 }

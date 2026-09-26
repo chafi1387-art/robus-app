@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { appareils, clients, interventions, projets } from "@/db/schema";
 import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
 import Link from "next/link";
+import { CarteApplication } from "@/components/app-installable";
+import { clePubliqueVapid } from "@/lib/push";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime } from "@/lib/format";
 
@@ -194,6 +196,8 @@ export default async function MesInterventionsPage({
           </div>
         </div>
       </div>
+
+      <CarteApplication cleVapid={clePubliqueVapid()} seulementSiAction compact />
 
       {enRetard.length > 0 && (
         <div>

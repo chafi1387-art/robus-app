@@ -360,7 +360,8 @@ export async function assignerIntervention(formData: FormData) {
     .set({
       technicienId: parsed.data.technicienId ?? null,
       statut: parsed.data.technicienId ? "affectee" : "creee",
-      ...(parsed.data.dateProgrammee ? { dateProgrammee: new Date(parsed.data.dateProgrammee) } : {}),
+      // Phase 16 : une mission reprogrammée pourra de nouveau être signalée en retard.
+      ...(parsed.data.dateProgrammee ? { dateProgrammee: new Date(parsed.data.dateProgrammee), retardNotifieLe: null } : {}),
     })
     .where(eq(interventions.id, parsed.data.interventionId));
 

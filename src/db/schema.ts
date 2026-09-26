@@ -238,6 +238,8 @@ export const interventions = pgTable("interventions", {
   dateProgrammee: timestamp("date_programmee"),
   dateDebut: timestamp("date_debut"),
   dateFin: timestamp("date_fin"),
+  // Phase 16 : date de la notification « mission en retard » (une seule fois).
+  retardNotifieLe: timestamp("retard_notifie_le"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1146,3 +1148,23 @@ export const reinitialisationsMotDePasse = pgTable("reinitialisations_mot_de_pas
   utiliseLe: timestamp("utilise_le"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// ==========================================================================
+// PHASE 16 — Notifications push (application installable). Un abonnement
+// par appareil/navigateur ; supprimé automatiquement s'il expire.
+// ==========================================================================
+export const pushAbonnements = pgTable(
+  "push_abonnements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    appareil: varchar("appareil", { length: 200 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("push_abonnements_endpoint_idx").on(t.endpoint)]
+);

@@ -15,6 +15,11 @@ export default auth((req) => {
     pathname === "/connexion" ||
     pathname === "/mot-de-passe-oublie" ||
     pathname === "/reinitialiser" ||
+    // Phase 16 : fichiers de l'application installable, lisibles sans connexion.
+    pathname === "/sw.js" ||
+    pathname === "/api/cron/retards" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname.startsWith("/icons/") ||
     pathname.startsWith("/api/auth");
   const session = req.auth;
 
