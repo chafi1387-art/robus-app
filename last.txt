@@ -1,7 +1,4 @@
-=== Deploiement 2026-09-26 09:30:02 : 3fe27da -> 6c42704
---- migration 0012_reinitialisation_mot_de_passe.sql
-CREATE TABLE
-CREATE INDEX
+=== Deploiement 2026-09-26 09:45:02 : 6c42704 -> cdcfadf
 --- build
 ├ ƒ /responsable/rapports
 ├ ƒ /responsable/revues-direction
@@ -29,4 +26,4 @@ CREATE INDEX
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK 6c42704
+STATUT: OK cdcfadf
