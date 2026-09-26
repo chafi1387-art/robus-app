@@ -1,0 +1,28 @@
+chafi.amine@outlook.com|administrateur|1|60|$2b$
+== POST /connexion récents
+[17/Sep/2026:06:56:15 1.2.189.66 200
+[17/Sep/2026:11:22:18 27.79.167.211 200
+[22/Sep/2026:22:51:06 86.218.96.95 200
+[22/Sep/2026:22:51:54 86.218.96.95 200
+[25/Sep/2026:18:10:16 2a01:cb08:3c8:f00:2cee:f269:da45:35e5 200
+[25/Sep/2026:18:10:30 2a01:cb08:3c8:f00:2cee:f269:da45:35e5 200
+[26/Sep/2026:09:20:05 2001:fd8:b647:ec00:8446:5fa4:4a8e:7807 200
+[26/Sep/2026:09:20:26 2a01:cb08:3c8:f00:8818:ff2b:c601:ac6c 200
+[26/Sep/2026:09:20:29 2a01:cb08:3c8:f00:8818:ff2b:c601:ac6c 200
+[26/Sep/2026:09:20:33 2a01:cb08:3c8:f00:8818:ff2b:c601:ac6c 200
+[26/Sep/2026:09:20:38 2a01:cb08:3c8:f00:8818:ff2b:c601:ac6c 200
+[26/Sep/2026:09:20:43 2a01:cb08:3c8:f00:8818:ff2b:c601:ac6c 200
+[26/Sep/2026:09:20:46 2a01:cb08:3c8:f00:8818:ff2b:c601:ac6c 200
+[26/Sep/2026:09:24:54 2a01:cb08:3c8:f00:8818:ff2b:c601:ac6c 200
+== erreurs pm2 récentes
+⨯ Error: Un utilisateur existe déjà avec cet email.
+  digest: '833388311'
+}
+⨯ Error: Un utilisateur existe déjà avec cet email.
+  digest: '833388311'
+}
+⨯ Error: Un utilisateur existe déjà avec cet email.
+  digest: '833388311'
+}
+Sat Sep 26 09:26:02 UTC 2026
+(code retour 0, 2026-09-26 09:26:03)

@@ -177,3 +177,5 @@ STATUT: OK 9a30018
 STATUT: OK 64b3e98
 === 2026-09-25 18:42:02 : fc2cebb (ops seulement, pas de build)
 STATUT: OK fc2cebb
+=== 2026-09-26 09:26:02 : 3fe27da (ops seulement, pas de build)
+STATUT: OK 3fe27da
