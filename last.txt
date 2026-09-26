@@ -1,4 +1,9 @@
-=== Deploiement 2026-09-26 09:45:02 : 6c42704 -> cdcfadf
+=== Deploiement 2026-09-26 10:09:02 : cdcfadf -> 50dd24a
+--- npm install
+--- migration 0013_notifications_push.sql
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
 --- build
 ├ ƒ /responsable/rapports
 ├ ƒ /responsable/revues-direction
@@ -26,4 +31,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK cdcfadf
+STATUT: OK 50dd24a

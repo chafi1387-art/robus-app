@@ -240,3 +240,37 @@ STATUT: OK 6c42704
 
 --- curl /responsable/projets : 307
 STATUT: OK cdcfadf
+=== Deploiement 2026-09-26 10:09:02 : cdcfadf -> 50dd24a
+--- npm install
+--- migration 0013_notifications_push.sql
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+--- build
+├ ƒ /responsable/rapports
+├ ƒ /responsable/revues-direction
+├ ƒ /responsable/risques
+├ ƒ /responsable/satisfaction
+├ ƒ /responsable/score-iso
+├ ƒ /responsable/sites
+├ ƒ /responsable/sites/[id]
+├ ƒ /responsable/sous-traitance
+├ ƒ /responsable/stock
+├ ƒ /responsable/stock/pieces/[id]
+├ ƒ /responsable/techniciens
+├ ƒ /responsable/techniciens/[id]
+├ ƒ /responsable/utilisateurs
+├ ƒ /technicien
+├ ƒ /technicien/formations
+├ ƒ /technicien/heures
+├ ƒ /technicien/interventions/[id]
+└ ƒ /technicien/profil
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+--- curl /responsable/projets : 307
+STATUT: OK 50dd24a

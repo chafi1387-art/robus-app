@@ -1,0 +1,14 @@
+clés VAPID ajoutées
+secret cron ajouté
+== vérifications
+*/15 * * * * /root/robus-deploy/cron-retards.sh
+{"notifiees":0} 2026-09-26 10:10:16
+/manifest.webmanifest 200 application/manifest+json
+/sw.js 200 application/javascript; charset=UTF-8
+/icons/icon-192.png 200 image/png
+/connexion 200 text/html; charset=utf-8
+cron sans secret: 401
+profil (non connecté): 307
+robus-dashboard online
+0
+(code retour 0, 2026-09-26 10:10:17)
