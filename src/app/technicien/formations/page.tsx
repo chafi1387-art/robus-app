@@ -3,10 +3,12 @@ import { HabilitationsCartes } from "@/components/habilitations-cartes";
 import { habilitationsCourantes } from "@/lib/habilitations";
 import Link from "next/link";
 import { db } from "@/db";
-import { documentsFormations, habilitationsTechnicien, formationsConsultations } from "@/db/schema";
+import { documentsFormations, formationsConsultations, formationsParticipants, formationsSessions, habilitationsCatalogue } from "@/db/schema";
 import { and, desc, eq, ilike } from "drizzle-orm";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
+
+const LIEU_SESSION: Record<string, string> = { terrain: "Sur le terrain", bureau: "Au bureau", ecole: "École / organisme" };
 import { consulterDocument } from "./actions";
 
 const LIEU_FORMATION_LABEL: Record<string, string> = {
@@ -44,6 +46,29 @@ export default async function FormationsPage({
 }) {
   const user = await requireUser(ROLES_TECHNICIEN);
   const { categorie, q } = await searchParams;
+  // Phase 19b : les sessions de formation auxquelles le technicien est inscrit
+  // (la notification « Formation planifiée » renvoie ici).
+  const mesSessions = await db
+    .select({
+      id: formationsSessions.id,
+      titre: formationsSessions.titre,
+      dateDebut: formationsSessions.dateDebut,
+      dureeHeures: formationsSessions.dureeHeures,
+      lieu: formationsSessions.lieu,
+      organisme: formationsSessions.organisme,
+      programme: formationsSessions.programme,
+      statut: formationsSessions.statut,
+      habilitation: habilitationsCatalogue.nom,
+      present: formationsParticipants.present,
+      resultat: formationsParticipants.resultat,
+    })
+    .from(formationsParticipants)
+    .innerJoin(formationsSessions, eq(formationsParticipants.sessionId, formationsSessions.id))
+    .leftJoin(habilitationsCatalogue, eq(formationsSessions.catalogueId, habilitationsCatalogue.id))
+    .where(eq(formationsParticipants.technicienId, user.id))
+    .orderBy(desc(formationsSessions.dateDebut));
+  const aVenir = mesSessions.filter((x) => x.statut !== "terminee").reverse();
+  const passees = mesSessions.filter((x) => x.statut === "terminee");
 
   const categorieValide =
     categorie && (CATEGORIES as readonly string[]).includes(categorie) ? (categorie as Categorie) : undefined;
@@ -78,6 +103,47 @@ export default async function FormationsPage({
         <h1 className="text-xl font-extrabold font-display">Formations &amp; Documentation</h1>
         <p className="text-sm text-ink-soft">Notices, procédures, vidéos et vos habilitations.</p>
       </div>
+
+      <section id="sessions" className="scroll-mt-20">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-2">
+          Mes formations planifiées ({aVenir.length})
+        </h2>
+        <div className="flex flex-col gap-2.5">
+          {aVenir.map((x) => (
+            <Card key={x.id} className="p-4 border-[1.5px] border-blue/50">
+              <div className="flex items-start justify-between gap-2">
+                <div className="font-display font-bold text-[15px]">{x.titre}</div>
+                <Pill tone="warn">À venir</Pill>
+              </div>
+              <div className="text-sm mt-1 font-semibold text-navy">{formatDateTime(x.dateDebut)}{x.dureeHeures ? ` · ${x.dureeHeures} h` : ""}</div>
+              <div className="text-[13px] text-ink-soft">
+                {LIEU_SESSION[x.lieu] ?? x.lieu}{x.organisme ? ` · ${x.organisme}` : ""}
+                {x.habilitation ? ` · délivre « ${x.habilitation} »` : ""}
+              </div>
+              {x.programme && <p className="text-[13px] mt-2 whitespace-pre-wrap">{x.programme}</p>}
+            </Card>
+          ))}
+          {aVenir.length === 0 && <p className="text-sm text-ink-soft">Aucune formation planifiée pour l&apos;instant.</p>}
+          {passees.length > 0 && (
+            <details className="mt-1">
+              <summary className="text-xs font-bold text-blue cursor-pointer select-none">Formations suivies ({passees.length})</summary>
+              <div className="flex flex-col gap-2 mt-2">
+                {passees.map((x) => (
+                  <div key={x.id} className="rounded-xl border border-line bg-surface p-3 text-sm flex items-center justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="font-semibold">{x.titre}</span>
+                      <span className="block text-xs text-ink-soft">{formatDate(x.dateDebut)}</span>
+                    </span>
+                    <Pill tone={x.present === 0 ? "crit" : x.resultat === "reussi" ? "ok" : "warn"}>
+                      {x.present === 0 ? "Absent" : x.resultat === "reussi" ? "Réussie" : x.resultat === "a_refaire" ? "À refaire" : "Terminée"}
+                    </Pill>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      </section>
 
       <section>
         <h2 className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-2">

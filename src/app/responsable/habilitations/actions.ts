@@ -225,7 +225,7 @@ export async function creerSession(formData: FormData) {
       {
         titre: "🎓 Formation planifiée",
         corps: `${parsed.data.titre} — ${dateDebut!.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", dateStyle: "full", timeStyle: "short" })}`,
-        url: "/technicien/formations",
+        url: "/technicien/formations#sessions",
       }
     )
   );

@@ -2,7 +2,7 @@ import { TypeInterventionPill, StatutInterventionPill } from "@/components/ui";
 import { db } from "@/db";
 import { appareils, clients, interventions, projets } from "@/db/schema";
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, or, sql } from "drizzle-orm";
-import { rapportPhotos, rapports } from "@/db/schema";
+import { formationsParticipants, formationsSessions, rapportPhotos, rapports } from "@/db/schema";
 import { tempsRestantModification } from "@/lib/rapport-rules";
 import { Lock, Search } from "lucide-react";
 import Link from "next/link";
@@ -116,6 +116,21 @@ export default async function MesInterventionsPage({
     return `/technicien?vue=${v}&date=${toDateParam(d)}`;
   }
 
+  // Phase 19b : formation planifiée dans les 14 prochains jours -> rappel sur l'accueil.
+  const prochainesFormations = await db
+    .select({ id: formationsSessions.id, titre: formationsSessions.titre, dateDebut: formationsSessions.dateDebut })
+    .from(formationsParticipants)
+    .innerJoin(formationsSessions, eq(formationsParticipants.sessionId, formationsSessions.id))
+    .where(
+      and(
+        eq(formationsParticipants.technicienId, user.id),
+        eq(formationsSessions.statut, "planifiee"),
+        gte(formationsSessions.dateDebut, aujourdhui),
+        lt(formationsSessions.dateDebut, addDays(aujourdhui, 14))
+      )
+    )
+    .orderBy(asc(formationsSessions.dateDebut));
+
   const [nouvelles, sansDate, enRetard, periode, ajourdhuiCount] = await Promise.all([
     // Phase 17 : toute mission envoyée et pas encore acceptée apparaît ici,
     // quelle que soit sa date (une mission du 14 du mois prochain ne doit
@@ -228,6 +243,16 @@ export default async function MesInterventionsPage({
       </div>
 
       <OngletsMissions actif="afaire" />
+
+      {prochainesFormations.map((f) => (
+        <Link key={f.id} href="/technicien/formations#sessions" className="rounded-2xl bg-blue-pale/60 border border-blue/30 px-4 py-3 flex items-center gap-3">
+          <span className="text-xl">🎓</span>
+          <span className="min-w-0 text-sm">
+            <span className="block font-bold text-navy truncate">Formation : {f.titre}</span>
+            <span className="block text-ink-soft">{formatDateTime(f.dateDebut)}</span>
+          </span>
+        </Link>
+      ))}
 
       <CarteApplication cleVapid={clePubliqueVapid()} seulementSiAction compact />
 
