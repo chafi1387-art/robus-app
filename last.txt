@@ -1,26 +1,25 @@
-=== Deploiement 2026-10-01 10:03:02 : 94ddbe7 -> de56aea
---- npm install
---- migration 0015_historique_direct_observateur.sql
+=== Deploiement 2026-10-01 11:19:02 : de56aea -> 7acbfda
+--- migration 0016_mission_bureau_habilitations_garantie.sql
 ALTER TABLE
 ALTER TABLE
 ALTER TABLE
 ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
 CREATE TABLE
 CREATE INDEX
-ALTER TYPE
+INSERT 0 8
 CREATE TABLE
 CREATE INDEX
 CREATE INDEX
-CREATE TABLE
-CREATE INDEX
-CREATE INDEX
-ALTER TABLE
-CREATE INDEX
-ALTER TABLE
-CREATE TABLE
-CREATE INDEX
-ALTER TABLE
-CREATE TABLE
+INSERT 0 18
+UPDATE 2
 --- build
 ├ ƒ /responsable/rapports
 ├ ƒ /responsable/revues-direction
@@ -48,4 +47,4 @@ CREATE TABLE
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK de56aea
+STATUT: OK 7acbfda

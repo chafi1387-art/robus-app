@@ -1,0 +1,30 @@
+== commit
+7acbfda Phase 19 : page Mission (édition bureau, rapport du bureau, notes), habilitations & formations, échéancier de garantie — migration 0016
+== tables (rôle robus)
+rapport_versions 0
+mission_notes 0
+habilitations_catalogue 8
+formations_sessions 0
+formations_participants 0
+garantie_passages 18
+== garanties -> passages
+               garantie               | n | passages | realises |  premier   
+--------------------------------------+---+----------+----------+------------
+ e2fbfda6-8940-4ca3-8541-f3083f3d3efc | 6 |        6 |        0 | 2026-11-26
+ af08a92a-9a71-4988-8a02-bb65bd89d2e9 | 6 |       12 |        0 | 2026-11-26
+(2 rows)
+
+== règles garantie actives (doit être 0)
+0
+== habilitations
+== cron
+{"notifiees":0,"nonVues":0,"passagesCrees":0,"alertesHabilitations":0}
+== pages
+/responsable/habilitations 307
+/api/export/matrice-competences 307
+/connexion 200
+== pm2
+robus-dashboard online
+== erreurs récentes
+Thu Oct  1 11:21:08 UTC 2026
+(code retour 0, 2026-10-01 11:21:08)
