@@ -1,5 +1,3 @@
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.1.0
-npm notice To update run: npm install -g npm@12.1.0
 npm notice
 --- curl /responsable/projets : 307
 STATUT: OK 6432c99
@@ -298,3 +296,5 @@ UPDATE 1
 
 --- curl /responsable/projets : 307
 STATUT: OK 43b2501
+=== 2026-10-01 09:27:01 : 94ddbe7 (ops seulement, pas de build)
+STATUT: OK 94ddbe7

@@ -1,0 +1,27 @@
+== commit
+94ddbe7 ops: vérification Phase 17
+== colonnes (rôle robus)
+ envoyees | vues | acceptees 
+----------+------+-----------
+        3 |    1 |         0
+(1 row)
+
+== index
+interventions_technicien_date_idx
+interventions_projet_idx
+journal_activite_entite_idx
+push_abonnements_user_idx
+== cron
+{"notifiees":0,"nonVues":0}
+== temps de réponse (non connecté)
+/connexion 200 0.161131s
+/technicien 307 0.006752s
+/responsable 307 0.006212s
+== pm2
+robus-dashboard online restarts 41
+== erreurs récentes
+⨯ Error: Un utilisateur existe déjà avec cet email.
+⨯ Error: Un utilisateur existe déjà avec cet email.
+⨯ Error: Un utilisateur existe déjà avec cet email.
+Thu Oct  1 09:27:02 UTC 2026
+(code retour 0, 2026-10-01 09:27:02)
