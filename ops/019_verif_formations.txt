@@ -1,0 +1,19 @@
+== commit
+dae0368 Phase 19b : le technicien voit ses formations planifiées (page Formations + rappel sur l'accueil)
+== sessions
+    id    |     titre     |     date_debut      |  lieu  |  statut  |         habilitation          | inscrits 
+----------+---------------+---------------------+--------+----------+-------------------------------+----------
+ d9a5d799 | ;fjsgwwfhdhfd | 2026-10-23 18:06:00 | bureau | terminee | Consignation / déconsignation |        2
+(1 row)
+
+== inscrits
+ session  |  nom  |    role    | present | resultat | push 
+----------+-------+------------+---------+----------+------
+ d9a5d799 | amine | technicien |       1 | reussi   |    0
+ d9a5d799 | chafi | technicien |       1 | reussi   |    1
+(2 rows)
+
+== page
+/technicien/formations 307
+Thu Oct  1 16:16:40 UTC 2026
+(code retour 0, 2026-10-01 16:16:40)

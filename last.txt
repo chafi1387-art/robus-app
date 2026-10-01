@@ -1,25 +1,4 @@
-=== Deploiement 2026-10-01 11:19:02 : de56aea -> 7acbfda
---- migration 0016_mission_bureau_habilitations_garantie.sql
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-CREATE INDEX
-CREATE TABLE
-CREATE TABLE
-CREATE INDEX
-INSERT 0 8
-CREATE TABLE
-CREATE INDEX
-CREATE INDEX
-INSERT 0 18
-UPDATE 2
+=== Deploiement 2026-10-01 16:15:02 : 7acbfda -> dae0368
 --- build
 ├ ƒ /responsable/rapports
 ├ ƒ /responsable/revues-direction
@@ -47,4 +26,4 @@ UPDATE 2
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK 7acbfda
+STATUT: OK dae0368
