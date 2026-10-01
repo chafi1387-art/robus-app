@@ -1,4 +1,4 @@
-=== Deploiement 2026-10-01 16:15:02 : 7acbfda -> dae0368
+=== Deploiement 2026-10-01 16:20:01 : dae0368 -> d4646c2
 --- build
 ├ ƒ /responsable/rapports
 ├ ƒ /responsable/revues-direction
@@ -26,4 +26,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK dae0368
+STATUT: OK d4646c2
