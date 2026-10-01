@@ -1,12 +1,15 @@
 import { Card } from "@/components/ui";
-import { HabilitationsList } from "@/components/habilitations-list";
+import { HabilitationsCartes } from "@/components/habilitations-cartes";
+import { habilitationsCourantes } from "@/lib/habilitations";
+import { deposerCertificat } from "../formations/actions";
+import { Btn, Field, inputClass } from "@/components/ui";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { db } from "@/db";
 import {
   appareils,
   documentsFormations,
   formationsConsultations,
-  habilitationsTechnicien,
+  habilitationsCatalogue,
   interventions,
   users,
 } from "@/db/schema";
@@ -26,7 +29,9 @@ const CATEGORIE_LABEL: Record<string, string> = {
   fournisseur_iso: "Fournisseur / ISO 9001",
 };
 
-export default async function ProfilPage() {
+export default async function ProfilPage({ searchParams }: { searchParams: Promise<{ depose?: string; erreurHab?: string }> }) {
+  const sp = await searchParams;
+  const catalogue = await db.select({ id: habilitationsCatalogue.id, nom: habilitationsCatalogue.nom }).from(habilitationsCatalogue).where(eq(habilitationsCatalogue.actif, 1)).orderBy(habilitationsCatalogue.nom);
   const user = await requireUser(ROLES_TECHNICIEN);
 
   const [
@@ -48,18 +53,7 @@ export default async function ProfilPage() {
         )
       ),
     db.select({ telephone: users.telephone }).from(users).where(eq(users.id, user.id)).limit(1),
-    db
-      .select({
-        id: habilitationsTechnicien.id,
-        titre: documentsFormations.titre,
-        categorie: documentsFormations.categorie,
-        dateObtention: habilitationsTechnicien.dateObtention,
-        dateExpiration: habilitationsTechnicien.dateExpiration,
-      })
-      .from(habilitationsTechnicien)
-      .innerJoin(documentsFormations, eq(habilitationsTechnicien.documentId, documentsFormations.id))
-      .where(eq(habilitationsTechnicien.technicienId, user.id))
-      .orderBy(desc(habilitationsTechnicien.dateObtention)),
+    habilitationsCourantes([user.id]),
     db
       .select({
         documentId: formationsConsultations.documentId,
@@ -125,19 +119,37 @@ export default async function ProfilPage() {
         </Card>
       </div>
 
-      <section>
-        <h2 className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-2">
-          Habilitations
-        </h2>
-        <HabilitationsList
-          habilitations={habilitations.map((h) => ({
-            id: h.id,
-            titre: h.titre,
-            subtitle: CATEGORIE_LABEL[h.categorie] ?? h.categorie,
-            dateObtention: h.dateObtention,
-            dateExpiration: h.dateExpiration,
-          }))}
-        />
+      <section id="habilitations" className="scroll-mt-20">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-2">Mes habilitations</h2>
+        {sp.depose && <div className="mb-2 text-xs bg-green-fill text-green-ink rounded-lg px-3 py-2">Certificat envoyé — en attente de validation par le bureau.</div>}
+        {sp.erreurHab && <div className="mb-2 text-xs bg-red-fill text-red-ink rounded-lg px-3 py-2">{sp.erreurHab}</div>}
+        <HabilitationsCartes habilitations={habilitations} />
+        <details className="mt-3 rounded-xl border border-line bg-surface p-3.5">
+          <summary className="text-sm font-bold text-blue cursor-pointer select-none">+ Déposer un certificat (nouveau ou renouvellement)</summary>
+          <form action={deposerCertificat} className="flex flex-col gap-3 mt-3">
+            <Field label="Habilitation">
+              <select name="catalogueId" required defaultValue="" className={inputClass}>
+                <option value="" disabled>Choisir…</option>
+                {catalogue.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nom}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Date d'obtention">
+              <input type="date" name="dateObtention" required className={inputClass} />
+            </Field>
+            <Field label="Organisme (facultatif)">
+              <input name="organisme" className={inputClass} />
+            </Field>
+            <Field label="N° de certificat (facultatif)">
+              <input name="numeroCertificat" className={inputClass} />
+            </Field>
+            <Field label="Certificat (PDF ou photo)">
+              <input type="file" name="certificat" required accept="application/pdf,image/jpeg,image/png,image/webp" className="text-sm" />
+            </Field>
+            <Btn className="justify-center">Envoyer au bureau</Btn>
+          </form>
+        </details>
       </section>
 
       <section>

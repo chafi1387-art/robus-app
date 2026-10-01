@@ -1,5 +1,7 @@
 import { db } from "@/db";
-import { appareils, interventions, projets, users } from "@/db/schema";
+import { appareils, habilitationsTechnicien, interventions, projets, users } from "@/db/schema";
+import { creerMissionsPassagesProches } from "@/lib/garantie-passages";
+import { habilitationsCourantes } from "@/lib/habilitations";
 import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
 import { and, eq, inArray, isNotNull, isNull, lt, notInArray } from "drizzle-orm";
 import { timingSafeEqual } from "node:crypto";
@@ -108,5 +110,32 @@ export async function POST(req: Request) {
     });
   }
 
-  return Response.json({ notifiees: retards.length, nonVues: nonVues.length });
+  // Phase 19 : passages de garantie à 30 jours -> mission « à affecter » + alerte bureau.
+  const passages = await creerMissionsPassagesProches();
+  if (passages.length) {
+    await notifierBureau({
+      titre: `🛡️ ${passages.length} passage(s) de garantie à planifier`,
+      corps: passages.slice(0, 3).map((p) => `${p.numeroAppareil} (${p.numero}/${p.total})`).join(", ") + (passages.length > 3 ? "…" : ""),
+      url: "/responsable",
+      tag: "passages-garantie",
+    });
+  }
+
+  // Phase 19 : habilitations — alerte au seuil du catalogue, à J-30 et à l'expiration (une fois chacune).
+  const habs = (await habilitationsCourantes()).filter((h) => h.dateExpiration && h.catalogueId);
+  let alertesHab = 0;
+  for (const h of habs) {
+    const jours = Math.floor((h.dateExpiration!.getTime() - Date.now()) / 86400000);
+    const deja = await db.select({ a: habilitationsTechnicien.alertesEnvoyees }).from(habilitationsTechnicien).where(eq(habilitationsTechnicien.id, h.id)).limit(1);
+    const envoyees = new Set(deja[0]?.a ?? []);
+    const etape = jours < 0 ? "j0" : jours <= 30 ? "j30" : jours <= (h.alerteJours ?? 60) ? "jseuil" : null;
+    if (!etape || envoyees.has(etape)) continue;
+    const texte = jours < 0 ? `${h.nom} a expiré` : `${h.nom} expire dans ${jours} jour(s)`;
+    await notifierUtilisateurs([h.technicienId], { titre: "🎓 Habilitation à renouveler", corps: texte, url: "/technicien/profil#habilitations", tag: `hab-${h.id}` });
+    await notifierBureau({ titre: "🎓 Habilitation à renouveler", corps: texte, url: `/responsable/techniciens/${h.technicienId}?tab=habilitations`, tag: `hab-${h.id}` });
+    await db.update(habilitationsTechnicien).set({ alertesEnvoyees: [...envoyees, etape] }).where(eq(habilitationsTechnicien.id, h.id));
+    alertesHab++;
+  }
+
+  return Response.json({ notifiees: retards.length, nonVues: nonVues.length, passagesCrees: passages.length, alertesHabilitations: alertesHab });
 }

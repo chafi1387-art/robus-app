@@ -20,6 +20,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { envoyerEtJournaliserOrdreMission } from "./projets/actions";
+import { controlerHabilitations, controlerHabilitationsSpecs, messageManques, nomUtilisateur } from "@/lib/habilitations";
+import { avecMessage } from "@/lib/url";
 
 const clientSchema = z.object({
   raisonSociale: z.string().min(2, "Raison sociale requise"),
@@ -277,14 +279,14 @@ export async function createIntervention(formData: FormData) {
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
 
   const [appareilExists] = await db
-    .select({ id: appareils.id })
+    .select({ id: appareils.id, numero: appareils.numeroInterne, marque: appareils.marque })
     .from(appareils)
     .where(eq(appareils.id, parsed.data.appareilId))
     .limit(1);
   if (!appareilExists) throw new Error("Appareil introuvable — impossible de créer l'intervention.");
 
   const [projetExists] = await db
-    .select({ id: projets.id })
+    .select({ id: projets.id, typeProjet: projets.typeProjet })
     .from(projets)
     .where(eq(projets.id, parsed.data.projetId))
     .limit(1);
@@ -292,6 +294,17 @@ export async function createIntervention(formData: FormData) {
   // Phase 17 : une mission envoyée a toujours un technicien ET une date.
   if (parsed.data.technicienId && !parsed.data.dateProgrammee) {
     throw new Error("Choisissez la date et l'heure de la mission avant de l'envoyer au technicien.");
+  }
+  // Phase 19 : contrôle de sécurité — habilitations obligatoires en règle.
+  if (parsed.data.technicienId) {
+    const manques = await controlerHabilitationsSpecs(parsed.data.technicienId, [
+      { type: parsed.data.type, numero: appareilExists.numero, marque: appareilExists.marque, typeProjet: projetExists.typeProjet ?? null },
+    ]);
+    if (manques.length) {
+      const retourErr = String(formData.get("retour") ?? "");
+      const base = retourErr.startsWith("/responsable/") ? retourErr : `/responsable/appareils/${parsed.data.appareilId}`;
+      redirect(avecMessage(base, "erreur", messageManques(await nomUtilisateur(parsed.data.technicienId), manques)));
+    }
   }
 
   const [creee] = await db.insert(interventions).values({
@@ -357,6 +370,13 @@ export async function assignerIntervention(formData: FormData) {
     .where(eq(interventions.id, parsed.data.interventionId))
     .limit(1);
   if (!existing) throw new Error("Intervention introuvable.");
+  // Phase 19 : contrôle des habilitations obligatoires avant l'envoi.
+  if (parsed.data.technicienId && parsed.data.technicienId !== existing.technicienId) {
+    const manques = await controlerHabilitations(parsed.data.technicienId, [parsed.data.interventionId]);
+    if (manques.length) {
+      redirect(avecMessage("/responsable/interventions", "erreur", messageManques(await nomUtilisateur(parsed.data.technicienId), manques)));
+    }
+  }
   // Phase 17 : pas d'envoi sans date.
   if (parsed.data.technicienId && !parsed.data.dateProgrammee && !existing.dateProgrammee) {
     throw new Error("Cette mission n'a pas de date : choisissez la date et l'heure avant de l'affecter.");

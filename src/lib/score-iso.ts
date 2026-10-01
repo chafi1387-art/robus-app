@@ -1,3 +1,5 @@
+import { habilitationsCatalogue, users } from "@/db/schema";
+import { estEnRegle, habilitationsCourantes } from "@/lib/habilitations";
 import { db } from "@/db";
 import { interventions, nonConformites } from "@/db/schema";
 import { and, count, eq, lt, sql } from "drizzle-orm";
@@ -58,6 +60,24 @@ export async function calculerBlocsAutomatiques(): Promise<Partial<Record<string
   ]);
   resultats.non_conformites =
     Number(nbNc) > 0 ? Math.round((Number(nbNcCloturees) / Number(nbNc)) * 100) : 100;
+
+  // Phase 19 : bloc « competences » = part des habilitations OBLIGATOIRES en
+  // règle (valide ou expire bientôt) sur l'ensemble des techniciens actifs.
+  const [techs, catalogue, habs] = await Promise.all([
+    db.select({ id: users.id }).from(users).where(and(eq(users.role, "technicien"), eq(users.actif, 1))),
+    db.select({ id: habilitationsCatalogue.id }).from(habilitationsCatalogue).where(and(eq(habilitationsCatalogue.actif, 1), eq(habilitationsCatalogue.obligatoire, 1))),
+    habilitationsCourantes(),
+  ]);
+  const attendues = techs.length * catalogue.length;
+  if (attendues > 0) {
+    let enRegle = 0;
+    for (const t of techs) {
+      for (const c of catalogue) {
+        if (habs.some((h) => h.technicienId === t.id && h.catalogueId === c.id && estEnRegle(h.etat))) enRegle++;
+      }
+    }
+    resultats.competences = Math.round((enRegle / attendues) * 100);
+  }
 
   return resultats;
 }

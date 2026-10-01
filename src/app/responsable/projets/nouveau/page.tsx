@@ -1,3 +1,4 @@
+import { estEnRegle, habilitationsCourantes } from "@/lib/habilitations";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { db } from "@/db";
 import {
@@ -35,11 +36,7 @@ export default async function NouveauProjetPage() {
       .leftJoin(technicienFiches, eq(technicienFiches.technicienId, users.id))
       .where(and(eq(users.role, "technicien"), eq(users.actif, 1)))
       .orderBy(users.nom),
-    db
-      .select({ technicienId: habilitationsTechnicien.technicienId, titre: documentsFormations.titre })
-      .from(habilitationsTechnicien)
-      .innerJoin(documentsFormations, eq(habilitationsTechnicien.documentId, documentsFormations.id))
-      .where(sql`${habilitationsTechnicien.dateExpiration} is null or ${habilitationsTechnicien.dateExpiration} > now()`),
+    habilitationsCourantes().then((r) => r.filter((h) => estEnRegle(h.etat)).map((h) => ({ technicienId: h.technicienId, titre: h.nom }))),
     db
       .select({ technicienId: interventions.technicienId, n: sql<number>`count(*)::int` })
       .from(interventions)

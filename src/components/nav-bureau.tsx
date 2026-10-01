@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Archive, ArrowUpDown, Eye, BookOpen, Building2, CalendarDays, ClipboardList, FileText, FolderKanban,
+  Archive, ArrowUpDown, Eye, GraduationCap, BookOpen, Building2, CalendarDays, ClipboardList, FileText, FolderKanban,
   HardHat, LayoutDashboard, ListChecks, MapPin, OctagonAlert, Package, Presentation, Receipt, Ruler,
   ScrollText, ShieldCheck, Smile, Target, Timer, TriangleAlert, UserCog, UserSearch, Search,
 } from "lucide-react";
@@ -42,6 +42,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
     items: [
       { href: "/responsable/score-iso", label: "Score ISO 9001", icon: Target },
       { href: "/responsable/non-conformites", label: "Non-conformités", icon: OctagonAlert },
+      { href: "/responsable/habilitations", label: "Habilitations & formations", icon: GraduationCap },
       { href: "/responsable/checklists", label: "Checklists", icon: ListChecks },
       { href: "/responsable/audits", label: "Audits", icon: Search },
       { href: "/responsable/auditeurs", label: "Auditeurs", icon: UserSearch },

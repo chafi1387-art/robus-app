@@ -22,7 +22,10 @@ import {
 import { requireUser, Role, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { envoyerMissionsAuTechnicien } from "@/lib/envoi-mission";
+import { controlerHabilitations, messageManques, nomUtilisateur, type Manque } from "@/lib/habilitations";
+import { avecMessage } from "@/lib/url";
 import { appliquerGarantie } from "@/lib/projet-garantie";
+import { genererPassages, recalculerRestantes } from "@/lib/garantie-passages";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
@@ -174,6 +177,12 @@ export async function ajouterAppareilProjet(formData: FormData) {
   if (dejaLie) throw new Error("Cet appareil est déjà attaché à ce projet.");
 
   await db.insert(projetAppareils).values(parsed.data);
+  // Phase 19 : un appareil ajouté à un projet sous garantie reçoit son échéancier.
+  const [g] = await db.select({ id: garanties.id }).from(garanties).where(eq(garanties.projetId, parsed.data.projetId)).limit(1);
+  if (g) {
+    await genererPassages(g.id, parsed.data.appareilId);
+    await recalculerRestantes(g.id);
+  }
   revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
 }
 
@@ -246,9 +255,10 @@ export async function ajouterTechnicienProjet(formData: FormData) {
   // attribuées — il les voit tout de suite dans son application. Les
   // missions sans date restent à affecter : une mission n'est envoyée
   // qu'avec un technicien ET une date.
-  await db
-    .update(interventions)
-    .set({ technicienId: parsed.data.technicienId, statut: "affectee" })
+  // Phase 19 : seulement les missions pour lesquelles il a les habilitations obligatoires.
+  const candidates = await db
+    .select({ id: interventions.id })
+    .from(interventions)
     .where(
       and(
         eq(interventions.projetId, parsed.data.projetId),
@@ -257,6 +267,19 @@ export async function ajouterTechnicienProjet(formData: FormData) {
         inArray(interventions.statut, ["creee", "planifiee"])
       )
     );
+  const autorisees: string[] = [];
+  const bloquees: Manque[] = [];
+  for (const c of candidates) {
+    const manques = await controlerHabilitations(parsed.data.technicienId, [c.id]);
+    if (manques.length) bloquees.push(...manques);
+    else autorisees.push(c.id);
+  }
+  if (autorisees.length) {
+    await db
+      .update(interventions)
+      .set({ technicienId: parsed.data.technicienId, statut: "affectee" })
+      .where(inArray(interventions.id, autorisees));
+  }
 
   await envoyerMissionsAuTechnicien({
     projetId: parsed.data.projetId,
@@ -267,6 +290,15 @@ export async function ajouterTechnicienProjet(formData: FormData) {
   });
 
   revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
+  if (bloquees.length) {
+    redirect(
+      avecMessage(
+        `/responsable/projets/${parsed.data.projetId}?tab=equipe`,
+        "erreur",
+        `Technicien ajouté, mais ${new Set(bloquees.map((b) => b.mission)).size} mission(s) restent à affecter — ${messageManques(await nomUtilisateur(parsed.data.technicienId), bloquees)}`
+      )
+    );
+  }
 }
 
 const envoyerOrdreMissionSchema = z.object({
@@ -409,6 +441,22 @@ export async function remplacerTechnicienProjet(formData: FormData) {
     .where(and(eq(users.id, nouveauId), eq(users.role, "technicien"), eq(users.actif, 1)))
     .limit(1);
   if (!nouveau) throw new Error("Technicien remplaçant introuvable.");
+
+  // Phase 19 : les missions transférées exigent les habilitations obligatoires.
+  if (transferer) {
+    const aTransferer = await db
+      .select({ id: interventions.id })
+      .from(interventions)
+      .where(
+        and(
+          eq(interventions.projetId, projetId),
+          eq(interventions.technicienId, ancienId),
+          inArray(interventions.statut, [...STATUTS_MISSION_NON_COMMENCEE])
+        )
+      );
+    const manques = await controlerHabilitations(nouveauId, aTransferer.map((m) => m.id));
+    if (manques.length) redirect(avecMessage(`/responsable/projets/${projetId}?tab=equipe`, "erreur", messageManques(nouveau.nom, manques)));
+  }
 
   const [dejaLa] = await db
     .select({ id: projetTechniciens.id })

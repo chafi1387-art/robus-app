@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/db";
-import { garantieFormules, garanties, projetAppareils, reglesPlanification } from "@/db/schema";
+import { garantieFormules, garanties } from "@/db/schema";
+import { genererPassages } from "@/lib/garantie-passages";
 import { eq } from "drizzle-orm";
 
 /**
@@ -29,23 +30,9 @@ export async function appliquerGarantie(projetId: string, formuleId: string) {
     })
     .returning();
 
-  const [premierAppareil] = await db
-    .select({ appareilId: projetAppareils.appareilId })
-    .from(projetAppareils)
-    .where(eq(projetAppareils.projetId, projetId))
-    .limit(1);
-
-  if (premierAppareil && formule.nombreInterventionsInclues > 0) {
-    const periodiciteMois = Math.max(1, Math.round(formule.dureeMois / formule.nombreInterventionsInclues));
-    const prochaineDate = new Date(dateDebut);
-    prochaineDate.setMonth(prochaineDate.getMonth() + periodiciteMois);
-    await db.insert(reglesPlanification).values({
-      appareilId: premierAppareil.appareilId,
-      type: "preventive",
-      periodiciteMois,
-      prochaineDate,
-      garantieId: garantieCreee.id,
-    });
-  }
+  // Phase 19 : échéancier des passages pour CHAQUE appareil du projet
+  // (au milieu de chaque période) — remplace l'ancienne règle de
+  // planification posée sur le premier appareil seulement.
+  await genererPassages(garantieCreee.id);
   return garantieCreee;
 }

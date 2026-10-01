@@ -46,7 +46,7 @@ export default async function TechniciensPage({ searchParams }: { searchParams: 
         motifSortie: technicienFiches.motifSortie,
         missionsActives: sql<number>`(select count(*)::int from ${interventions} where ${interventions.technicienId} = ${users.id} and ${interventions.statut} not in ('terminee','validee','cloturee'))`,
         missionsTotal: sql<number>`(select count(*)::int from ${interventions} where ${interventions.technicienId} = ${users.id})`,
-        habExpirent: sql<number>`(select count(*)::int from ${habilitationsTechnicien} where ${habilitationsTechnicien.technicienId} = ${users.id} and ${habilitationsTechnicien.dateExpiration} between now() and now() + interval '30 days')`,
+        habExpirent: sql<number>`(select count(*)::int from ${habilitationsTechnicien} where ${habilitationsTechnicien.technicienId} = ${users.id} and ${habilitationsTechnicien.statut} = 'valide' and ${habilitationsTechnicien.dateExpiration} < now() + interval '60 days')`,
       })
       .from(users)
       .leftJoin(technicienFiches, eq(technicienFiches.technicienId, users.id))

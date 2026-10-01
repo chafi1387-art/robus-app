@@ -1,3 +1,5 @@
+import { passagesAVenirTableauDeBord, ETAT_PASSAGE } from "@/lib/garantie-passages";
+import { missionNotes } from "@/db/schema";
 import { Card, Pill, StatutInterventionPill, TypeInterventionPill } from "@/components/ui";
 import { db } from "@/db";
 import {
@@ -10,7 +12,7 @@ import {
   sites,
   users,
 } from "@/db/schema";
-import { and, count, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
 import { formatDateTime } from "@/lib/format";
 import { BLOCS_ISO, calculerScoreGlobal } from "@/lib/score-iso";
 import { CarteApplication } from "@/components/app-installable";
@@ -201,13 +203,23 @@ const TONE_TEXT: Record<"ok" | "warn" | "crit", string> = {
 };
 
 export default async function DashboardPage() {
-  const [stats, alertes, planning, scoreIso, garantiesStats] = await Promise.all([
+  const [stats, alertes, planning, scoreIso, garantiesStats, passages, piecesManquantes] = await Promise.all([
     getStats(),
     getAlertes(),
     getPlanningDuJour(),
     getScoreIsoTeaser(),
     getGarantiesStats(),
+    passagesAVenirTableauDeBord(),
+    db
+      .select({ id: missionNotes.id, texte: missionNotes.texte, titre: missionNotes.titre, interventionId: missionNotes.interventionId, createdAt: missionNotes.createdAt, numero: appareils.numeroInterne })
+      .from(missionNotes)
+      .innerJoin(interventions, eq(missionNotes.interventionId, interventions.id))
+      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .where(and(eq(missionNotes.type, "piece_manquante"), isNull(missionNotes.regleLe), isNull(missionNotes.archiveLe)))
+      .orderBy(asc(missionNotes.createdAt)),
   ]);
+  const ORDRE_PASSAGE: Record<string, number> = { retard: 0, a_planifier: 1, bientot: 2, planifie: 3, a_venir: 4, realise: 5 };
+  passages.sort((a, b) => ORDRE_PASSAGE[a.etat] - ORDRE_PASSAGE[b.etat] || a.datePrevue.getTime() - b.datePrevue.getTime());
 
   return (
     <div className="flex flex-col gap-6">
@@ -292,6 +304,50 @@ export default async function DashboardPage() {
           {scoreIso.score}%
         </div>
       </Link>
+
+      {(passages.length > 0 || piecesManquantes.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card className="p-5">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h2 className="font-display font-bold text-sm">Passages de garantie ({passages.length})</h2>
+              <Link href="/responsable/garanties" className="text-xs font-semibold text-blue">Toutes les garanties</Link>
+            </div>
+            <div className="flex flex-col divide-y divide-line">
+              {passages.slice(0, 8).map((p) => {
+                const e = ETAT_PASSAGE[p.etat];
+                // eslint-disable-next-line react-hooks/purity
+                const jours = Math.round((p.datePrevue.getTime() - Date.now()) / 86400000);
+                return (
+                  <div key={p.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
+                    <div className="min-w-0">
+                      <div className="truncate"><span className="font-semibold">{p.client}</span> · {p.numeroAppareil} · Passage {p.numero}/{p.total}</div>
+                      <div className={`text-xs ${e.tone === "crit" ? "text-red-ink" : e.tone === "warn" ? "text-orange-ink" : "text-ink-soft"}`}>
+                        {e.label} · {p.etat === "planifie" && p.mDate ? `le ${p.mDate.toLocaleDateString("fr-BE")}${p.technicien ? ` avec ${p.technicien}` : ""}` : jours >= 0 ? `dans ${jours} j` : `en retard de ${-jours} j`}
+                      </div>
+                    </div>
+                    <Link href={`/responsable/garanties/passages/${p.id}`} className="shrink-0 text-xs font-bold rounded-lg border border-line px-2.5 py-1.5 hover:bg-blue-pale">
+                      {p.etat === "planifie" ? "Voir" : "Planifier"}
+                    </Link>
+                  </div>
+                );
+              })}
+              {passages.length === 0 && <p className="text-sm text-ink-soft py-1">Aucun passage dans les 30 prochains jours.</p>}
+            </div>
+          </Card>
+          <Card className="p-5">
+            <h2 className="font-display font-bold text-sm mb-3">Pièces manquantes ({piecesManquantes.length})</h2>
+            <div className="flex flex-col divide-y divide-line">
+              {piecesManquantes.slice(0, 8).map((n) => (
+                <Link key={n.id} href={`/responsable/missions/${n.interventionId}#notes`} className="py-2.5 text-sm hover:text-blue">
+                  <span className="font-semibold">{n.numero}</span> · {n.titre || n.texte}
+                  <span className="block text-xs text-ink-soft">signalée le {n.createdAt.toLocaleDateString("fr-BE")}</span>
+                </Link>
+              ))}
+              {piecesManquantes.length === 0 && <p className="text-sm text-ink-soft py-1">Aucune pièce manquante.</p>}
+            </div>
+          </Card>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="p-5">

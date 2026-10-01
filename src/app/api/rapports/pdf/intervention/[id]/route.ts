@@ -98,6 +98,9 @@ export async function GET(
       rapport.tempsPasseMinutes != null ? `${rapport.tempsPasseMinutes} min` : ""
     );
     ligneCle(doc, "Statut final de l'appareil", rapport.statutFinalAppareil ?? "");
+    if (rapport.modifieLe) ligneCle(doc, "Corrigé par le technicien", formatDateTime(rapport.modifieLe));
+    // Phase 19 : mention de la correction par le bureau (versions dans l'application).
+    if (rapport.corrigeBureauLe) ligneCle(doc, "Corrigé par le bureau", formatDateTime(rapport.corrigeBureauLe));
 
     if (rapport.checklistModeleId) {
       const reponses = await db

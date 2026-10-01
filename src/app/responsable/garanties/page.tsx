@@ -4,6 +4,8 @@ import { clients, garanties, garantieFormules, projets } from "@/db/schema";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { desc, eq } from "drizzle-orm";
 import Link from "next/link";
+import { FrisePassages } from "@/components/frise-passages";
+import { passagesDeGaranties } from "@/lib/garantie-passages";
 import { formatDate } from "@/lib/format";
 import { createGarantieFormule, toggleGarantieFormuleActive } from "./actions";
 
@@ -30,6 +32,8 @@ export default async function GarantiesPage() {
       .orderBy(desc(garanties.createdAt)),
   ]);
 
+  const passages = await passagesDeGaranties(garantiesActives.map((g) => g.garantie.id));
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const seuilAlerte = now + JOURS_ALERTE_ECHEANCE * 24 * 60 * 60 * 1000;
 
@@ -59,8 +63,8 @@ export default async function GarantiesPage() {
                 pill = <Pill tone="ok">Valide jusqu&apos;au {formatDate(g.garantie.dateFin)}</Pill>;
               }
               return (
+                <div key={g.garantie.id} className="py-1">
                 <Link
-                  key={g.garantie.id}
                   href={`/responsable/projets/${g.projetId}`}
                   className="py-3 flex items-center justify-between gap-3 hover:bg-blue-pale/40 -mx-2 px-2 rounded-lg"
                 >
@@ -76,6 +80,10 @@ export default async function GarantiesPage() {
                   </div>
                   {pill}
                 </Link>
+                <div className="pb-3 pt-1">
+                  <FrisePassages passages={passages.filter((p) => p.garantieId === g.garantie.id)} />
+                </div>
+                </div>
               );
             })}
             {garantiesActives.length === 0 && (

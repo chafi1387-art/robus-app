@@ -10,6 +10,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { ETAPES, adressesAppareils, etapeObservateur, exigerAppareil, requireObservateur } from "@/lib/observateur";
 import { interventionsEnCours, interventionsTerminees, prenom, prochainesVisites } from "@/lib/observateur-donnees";
 import { signalerPanne } from "../../actions";
+import { passagesDAppareils } from "@/lib/garantie-passages";
 
 const TYPE: Record<string, string> = { preventive: "Maintenance préventive", corrective: "Dépannage", systematique: "Contrôle systématique" };
 
@@ -62,6 +63,7 @@ export default async function AppareilObservateurPage({
     db.select({ telephone: users.telephone }).from(users).where(eq(users.id, ctx.userId)).limit(1),
   ]);
   if (!a) notFound();
+  const passages = d.has("contrat") && garantiesRows.length ? await passagesDAppareils([id]) : [];
   const adresse = adresses.get(id);
   const rapportsVisibles = d.has("rapports");
 
@@ -169,7 +171,18 @@ export default async function AppareilObservateurPage({
               <div key={g.id} className="text-sm flex flex-col gap-1 py-1">
                 <div className="font-semibold">{formule ?? "Garantie"} <span className="text-ink-soft font-normal">· {projet}</span></div>
                 <div className="text-ink-soft">Du {formatDate(g.dateDebut)} au {formatDate(g.dateFin)}</div>
-                <div>Interventions restantes : <span className="font-semibold">{g.interventionsRestantes} / {g.interventionsIncluses}</span></div>
+                {(() => {
+                  const ps = passages.filter((p) => p.garantieId === g.id);
+                  if (!ps.length) return <div>Interventions restantes : <span className="font-semibold">{g.interventionsRestantes} / {g.interventionsIncluses}</span></div>;
+                  const faits = ps.filter((p) => p.etat === "realise").length;
+                  const prochain = ps.find((p) => p.etat !== "realise");
+                  return (
+                    <div>
+                      Passages réalisés : <span className="font-semibold">{faits} / {ps[0].total}</span>
+                      {prochain ? <> · prochain passage vers le <span className="font-semibold">{formatDate(prochain.mDate ?? prochain.datePrevue)}</span></> : null}
+                    </div>
+                  );
+                })()}
               </div>
             ))
           ) : (

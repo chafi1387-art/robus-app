@@ -1,6 +1,10 @@
 import { Card, Btn, Field, inputClass } from "@/components/ui";
 import { FileField } from "@/components/file-field";
-import { HabilitationsList } from "@/components/habilitations-list";
+import { HabilitationsCartes } from "@/components/habilitations-cartes";
+import { Pill } from "@/components/ui";
+import { STATUT_HAB, habilitationsCourantes } from "@/lib/habilitations";
+import { ajouterHabilitation, retirerHabilitation } from "../../habilitations/actions";
+import { habilitationsCatalogue } from "@/db/schema";
 import { db } from "@/db";
 import {
   appareils,
@@ -77,30 +81,21 @@ export default async function TechnicienDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
-  await requireUser(ROLES_BUREAU);
+  const user = await requireUser(ROLES_BUREAU);
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
   const tab = (ONGLETS.map((o) => o.id) as string[]).includes(tabParam ?? "") ? (tabParam as string) : "apercu";
 
   const debutMois = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const gestionHab = user.role === "administrateur" || user.role === "responsable_qualite";
+  const catalogueHab = await db.select({ id: habilitationsCatalogue.id, nom: habilitationsCatalogue.nom, validiteMois: habilitationsCatalogue.validiteMois }).from(habilitationsCatalogue).where(eq(habilitationsCatalogue.actif, 1)).orderBy(habilitationsCatalogue.nom);
 
   // Phase 17 : une seule vague de requêtes en parallèle (avant : 3 vagues
   // successives) — la fiche s'ouvre nettement plus vite.
   const [[userRow], [fiche], habilitations, documents, projetsAffectes, sitesOptions, missions, heuresMois, [stats], consultations, journal] = await Promise.all([
     db.select().from(users).where(eq(users.id, id)).limit(1),
     db.select().from(technicienFiches).where(eq(technicienFiches.technicienId, id)).limit(1),
-    db
-      .select({
-        id: habilitationsTechnicien.id,
-        titre: documentsFormations.titre,
-        categorie: documentsFormations.categorie,
-        dateObtention: habilitationsTechnicien.dateObtention,
-        dateExpiration: habilitationsTechnicien.dateExpiration,
-      })
-      .from(habilitationsTechnicien)
-      .innerJoin(documentsFormations, eq(habilitationsTechnicien.documentId, documentsFormations.id))
-      .where(eq(habilitationsTechnicien.technicienId, id))
-      .orderBy(desc(habilitationsTechnicien.dateObtention)),
+    habilitationsCourantes([id]),
     db.select().from(technicienDocuments).where(eq(technicienDocuments.technicienId, id)).orderBy(desc(technicienDocuments.createdAt)),
     db
       .select({ id: projets.id, reference: projets.reference, titre: projets.titre, statut: projets.statut, clientNom: clients.raisonSociale, role: projetTechniciens.role })
@@ -170,8 +165,7 @@ export default async function TechnicienDetailPage({
   const ancien = fiche?.statutRh === "sorti_effectifs";
 
   const siteRattache = fiche?.siteRattachementId ? sitesOptions.find((s) => s.id === fiche.siteRattachementId) : undefined;
-  const habValides = habilitations.filter((h) => !h.dateExpiration || h.dateExpiration.getTime() > Date.now());
-  const habBientot = habValides.filter((h) => h.dateExpiration && h.dateExpiration.getTime() < Date.now() + 30 * 86400000);
+  const habValides = habilitations.filter((h) => h.etat === "valide" || h.etat === "bientot");
   const totalHeures = heuresMois.reduce((s, h) => s + h.minutes, 0);
   const initiales = userRow.nom.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
   const specialites = (fiche?.specialites ?? "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -288,18 +282,12 @@ export default async function TechnicienDetailPage({
                 <Link href={href("habilitations")} className="text-xs font-semibold text-blue">Tout voir</Link>
               </div>
               {habilitations.length === 0 && <p className="text-ink-soft">Aucune habilitation.</p>}
-              {habilitations.slice(0, 5).map((h) => {
-                const expiree = h.dateExpiration && h.dateExpiration.getTime() < Date.now();
-                const bientot = habBientot.some((b) => b.id === h.id);
-                return (
-                  <div key={h.id} className="flex items-center justify-between gap-3">
-                    <span className="truncate">{h.titre}</span>
-                    <span className={`shrink-0 text-[11.5px] font-bold rounded-full px-2 py-0.5 ${expiree ? "bg-red-fill text-red-ink" : bientot ? "bg-orange-fill text-orange-ink" : "bg-green-fill text-green-ink"}`}>
-                      {expiree ? "Expirée" : bientot ? `Expire le ${formatDate(h.dateExpiration)}` : "Valide"}
-                    </span>
-                  </div>
-                );
-              })}
+              {habilitations.slice(0, 6).map((h) => (
+                <div key={h.id} className="flex items-center justify-between gap-3">
+                  <span className="truncate">{h.nom}</span>
+                  <Pill tone={STATUT_HAB[h.etat].tone}>{STATUT_HAB[h.etat].label}</Pill>
+                </div>
+              ))}
             </Card>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -349,15 +337,58 @@ export default async function TechnicienDetailPage({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <Card className="p-5">
             <h2 className="font-display font-bold text-[15px] mb-3">Habilitations ({habilitations.length})</h2>
-            <HabilitationsList
-              habilitations={habilitations.map((h) => ({
-                id: h.id,
-                titre: h.titre,
-                subtitle: CATEGORIE_LABEL[h.categorie] ?? h.categorie,
-                dateObtention: h.dateObtention,
-                dateExpiration: h.dateExpiration,
-              }))}
+            <HabilitationsCartes
+              habilitations={habilitations}
+              actions={(h) =>
+                gestionHab ? (
+                  <details className="text-xs">
+                    <summary className="font-bold text-red-ink cursor-pointer select-none">Retirer</summary>
+                    <form action={retirerHabilitation} className="flex items-center gap-2 mt-1.5">
+                      <input type="hidden" name="habilitationId" value={h.id} />
+                      <input type="hidden" name="technicienId" value={id} />
+                      <input name="motif" required placeholder="Motif" className={`${inputClass} !py-1 !text-xs w-40`} />
+                      <button type="submit" className="font-bold text-red-ink">OK</button>
+                    </form>
+                  </details>
+                ) : null
+              }
             />
+            {gestionHab && (
+              <details className="mt-4 pt-3 border-t border-line" open={habilitations.length === 0 || undefined}>
+                <summary className="text-sm font-bold text-blue cursor-pointer select-none">+ Ajouter / renouveler une habilitation</summary>
+                <form action={ajouterHabilitation} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  <input type="hidden" name="technicienId" value={id} />
+                  <Field label="Habilitation">
+                    <select name="catalogueId" required defaultValue="" className={inputClass}>
+                      <option value="" disabled>Choisir dans le catalogue…</option>
+                      {catalogueHab.map((c) => (
+                        <option key={c.id} value={c.id}>{c.nom}{c.validiteMois ? ` (${c.validiteMois} mois)` : ""}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Date d'obtention">
+                    <input type="date" name="dateObtention" required className={inputClass} />
+                  </Field>
+                  <Field label="Expire le (vide = calcul automatique)">
+                    <input type="date" name="dateExpiration" className={inputClass} />
+                  </Field>
+                  <Field label="Organisme">
+                    <input name="organisme" className={inputClass} />
+                  </Field>
+                  <Field label="N° de certificat">
+                    <input name="numeroCertificat" className={inputClass} />
+                  </Field>
+                  <Field label="Certificat (PDF ou photo)">
+                    <input type="file" name="certificat" accept="application/pdf,image/jpeg,image/png,image/webp" className="text-sm" />
+                  </Field>
+                  <div className="sm:col-span-2 flex items-center justify-between gap-3 flex-wrap">
+                    <span className="text-xs text-ink-soft">Un renouvellement remplace l&apos;ancienne habilitation, qui reste dans l&apos;historique.</span>
+                    <Btn>Enregistrer</Btn>
+                  </div>
+                </form>
+                <Link href="/responsable/habilitations?onglet=catalogue" className="inline-block mt-2 text-xs font-semibold text-blue">Gérer le catalogue →</Link>
+              </details>
+            )}
           </Card>
           <Card className="p-5">
             <h2 className="font-display font-bold text-[15px] mb-3">Formations consultées</h2>

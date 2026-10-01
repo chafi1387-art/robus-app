@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { Star } from "lucide-react";
 import { db } from "@/db";
-import { appareils, enquetesSatisfaction, interventions, mouvementsStock, pieces, rapportPhotos, rapports, users } from "@/db/schema";
+import { appareils, enquetesSatisfaction, interventions, missionNotes, rapportPhotos, rapports, users } from "@/db/schema";
 import { Card } from "@/components/ui";
 import { EtapesSuivi } from "@/components/etapes-suivi";
 import { GaleriePhotos } from "@/components/galerie-photos";
 import { formatDateTime } from "@/lib/format";
 import { DROIT_HISTO_12_MOIS, etapeObservateur, exigerAppareil, requireObservateur } from "@/lib/observateur";
 import { prenom } from "@/lib/observateur-donnees";
+import { piecesNettes } from "@/lib/pieces-mission";
 import { noterIntervention } from "../../actions";
 
 const TYPE: Record<string, string> = { preventive: "Maintenance préventive", corrective: "Dépannage", systematique: "Contrôle systématique" };
@@ -56,13 +57,7 @@ export default async function InterventionObservateurPage({
 
   const [[rapport], piecesUtilisees, [dejaNote]] = await Promise.all([
     rapportVisible ? db.select().from(rapports).where(eq(rapports.interventionId, id)).limit(1) : Promise.resolve([]),
-    d.has("pieces") && finie
-      ? db
-          .select({ nom: pieces.nom, quantite: mouvementsStock.quantite })
-          .from(mouvementsStock)
-          .innerJoin(pieces, eq(mouvementsStock.pieceId, pieces.id))
-          .where(and(eq(mouvementsStock.interventionId, id), eq(mouvementsStock.type, "sortie")))
-      : Promise.resolve([]),
+    d.has("pieces") && finie ? piecesNettes(id).then((r) => r.filter((p) => p.quantite > 0)) : Promise.resolve([]),
     d.has("satisfaction")
       ? db
           .select({ note: enquetesSatisfaction.note })
@@ -71,6 +66,14 @@ export default async function InterventionObservateurPage({
           .limit(1)
       : Promise.resolve([]),
   ]);
+  // Phase 19 : rapports du bureau rendus visibles au client.
+  const rapportsBureau = d.has("rapports")
+    ? await db
+        .select()
+        .from(missionNotes)
+        .where(and(eq(missionNotes.interventionId, id), eq(missionNotes.type, "rapport_bureau"), eq(missionNotes.visibleClient, 1), isNull(missionNotes.archiveLe)))
+        .orderBy(asc(missionNotes.createdAt))
+    : [];
   const photos = rapport ? await db.select({ url: rapportPhotos.url }).from(rapportPhotos).where(eq(rapportPhotos.rapportId, rapport.id)).orderBy(asc(rapportPhotos.createdAt)) : [];
 
   return (
@@ -120,6 +123,23 @@ export default async function InterventionObservateurPage({
           )}
         </Card>
       )}
+
+      {rapportsBureau.map((r) => (
+        <Card key={r.id} className="p-4">
+          <h2 className="font-display font-bold text-sm mb-1">{r.titre ?? "Rapport ROBUS"}</h2>
+          <p className="text-xs text-ink-soft mb-2">ROBUS · {formatDateTime(r.createdAt)}</p>
+          {r.texte && <p className="text-sm whitespace-pre-wrap">{r.texte}</p>}
+          {r.fichiers.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {r.fichiers.map((f) => (
+                <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue border border-line rounded-lg px-2 py-1">
+                  📎 {f.nom}
+                </a>
+              ))}
+            </div>
+          )}
+        </Card>
+      ))}
 
       {piecesUtilisees.length > 0 && (
         <Card className="p-4">

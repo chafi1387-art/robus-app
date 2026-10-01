@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import {
-  CheckCircle2, Clock, Eye, FileText, HandHelping, Mail, MapPin, Octagon, PenLine, Play, Send, ShieldCheck, Wrench,
+  CheckCircle2, Clock, Eye, FileText, HandHelping, Mail, MapPin, Octagon, PenLine, Play, Send, ShieldCheck, StickyNote, Wrench,
 } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -15,20 +15,54 @@ import {
   nonConformites,
   pieces,
   projets,
+  missionNotes,
   rapportPhotos,
   rapports,
+  rapportVersions,
   users,
 } from "@/db/schema";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
-import { formatDateTime } from "@/lib/format";
-import { Btn, Card, PrioritePill, StatutInterventionPill, TypeInterventionPill } from "@/components/ui";
+import { formatDateTime, toDatetimeLocalValue } from "@/lib/format";
+import { piecesNettes } from "@/lib/pieces-mission";
+import { Btn, Card, Field, Pill, PrioritePill, StatutInterventionPill, TypeInterventionPill, inputClass } from "@/components/ui";
 import { SuiviEnvoi } from "@/components/suivi-envoi";
 import { GaleriePhotos } from "@/components/galerie-photos";
 import { RafraichissementAuto } from "@/components/rafraichissement-auto";
-import { validerRapport } from "../actions";
+import {
+  actionNoteMission,
+  ajouterNoteMission,
+  ajouterPhotosBureau,
+  corrigerPieceBureau,
+  modifierRapportBureau,
+  retirerOuRemplacerPhotoBureau,
+  validerRapport,
+} from "../actions";
+
+const ACCEPT_FICHIERS = "application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 // Phase 18 : la mission vue par le bureau — fil en direct (photos, notes,
 // pièces, alertes), galerie plein écran, rapport et validation.
+
+const TYPE_NOTE: Record<string, { label: string; icone: string }> = {
+  commentaire: { label: "Commentaire", icone: "💬" },
+  piece_manquante: { label: "Pièce manquante", icone: "🔴" },
+  document: { label: "Document", icone: "📄" },
+  rapport_bureau: { label: "Rapport du bureau", icone: "📝" },
+};
+const LIBELLE_VERSION: Record<string, string> = {
+  rapport_modifie: "Rapport modifié",
+  photos_ajoutees: "Photos ajoutées",
+  photo_remplacee: "Photo remplacée",
+  photo_retiree: "Photo retirée",
+  pieces_corrigees: "Pièces corrigées",
+};
+const STATUT_APPAREIL: Record<string, string> = {
+  en_service: "En service",
+  sous_surveillance: "Sous surveillance",
+  en_panne: "En panne",
+  hors_service: "Hors service",
+  en_travaux: "En travaux",
+};
 
 type Evenement = { quand: Date; icone: React.ReactNode; titre: string; detail?: string | null; photos?: string[]; ton?: "crit" | "ok" };
 
@@ -79,9 +113,25 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
     db.select().from(rapports).where(eq(rapports.interventionId, id)).limit(1),
     m.valideeParId ? db.select({ nom: users.nom }).from(users).where(eq(users.id, m.valideeParId)).limit(1).then((r) => r[0]?.nom ?? null) : Promise.resolve(null),
   ]);
-  const photosRapport = rapport
-    ? await db.select().from(rapportPhotos).where(eq(rapportPhotos.rapportId, rapport.id)).orderBy(asc(rapportPhotos.createdAt))
-    : [];
+  const [photosRapport, notes, versions, pNettes, stockPieces] = await Promise.all([
+    rapport ? db.select().from(rapportPhotos).where(eq(rapportPhotos.rapportId, rapport.id)).orderBy(asc(rapportPhotos.createdAt)) : Promise.resolve([]),
+    db
+      .select({ n: missionNotes, auteur: users.nom })
+      .from(missionNotes)
+      .leftJoin(users, eq(missionNotes.auteurId, users.id))
+      .where(eq(missionNotes.interventionId, id))
+      .orderBy(desc(missionNotes.createdAt)),
+    db
+      .select({ v: rapportVersions, auteur: users.nom })
+      .from(rapportVersions)
+      .leftJoin(users, eq(rapportVersions.auteurId, users.id))
+      .where(eq(rapportVersions.interventionId, id))
+      .orderBy(desc(rapportVersions.createdAt)),
+    piecesNettes(id),
+    db.select({ id: pieces.id, nom: pieces.nom, reference: pieces.reference, stock: pieces.quantiteStock }).from(pieces).orderBy(asc(pieces.nom)),
+  ]);
+  const gestion = user.role === "administrateur" || user.role === "responsable_qualite";
+  const valide = ["validee", "cloturee"].includes(m.statut);
 
   const enDirect = m.statut === "en_cours";
   const ev: Evenement[] = [];
@@ -104,6 +154,12 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
   if (m.dateFin) ev.push({ quand: m.dateFin, icone: <FileText className="w-4 h-4" />, titre: "Terminée — rapport envoyé", ton: "ok" });
   if (rapport?.modifieLe) ev.push({ quand: rapport.modifieLe, icone: <PenLine className="w-4 h-4" />, titre: `Rapport corrigé par le technicien${rapport.nbModifications > 1 ? ` (${rapport.nbModifications} fois)` : ""}` });
   if (m.valideeLe) ev.push({ quand: m.valideeLe, icone: <ShieldCheck className="w-4 h-4" />, titre: `Rapport validé${valideur ? ` par ${valideur}` : ""}`, ton: "ok" });
+  for (const { v, auteur } of versions) {
+    ev.push({ quand: v.createdAt, icone: <PenLine className="w-4 h-4" />, titre: `${LIBELLE_VERSION[v.quoi] ?? "Rapport modifié"} par ${auteur ?? "le bureau"}`, detail: v.motif ? `Motif : ${v.motif}` : null });
+  }
+  for (const { n, auteur } of notes) {
+    ev.push({ quand: n.createdAt, icone: <StickyNote className="w-4 h-4" />, titre: `${TYPE_NOTE[n.type]?.label ?? "Note"} — ${auteur ?? "bureau"}`, detail: n.titre ?? n.texte, ton: n.type === "piece_manquante" && !n.regleLe ? "crit" : undefined });
+  }
   ev.sort((a, b) => a.quand.getTime() - b.quand.getTime());
 
   // Toutes les photos : rapport (inclut celles du fil une fois terminé) sinon fil.
@@ -198,7 +254,8 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
         </Card>
 
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <Card className="p-5">
+          <Card className="p-5 scroll-mt-20" >
+            <div id="photos" className="scroll-mt-24" />
             <h2 className="font-display font-bold text-sm mb-3">Photos ({toutesPhotos.length})</h2>
             {toutesPhotos.length ? (
               <GaleriePhotos photos={toutesPhotos} />
@@ -206,16 +263,45 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
               <p className="text-sm text-ink-soft">Aucune photo pour l&apos;instant.</p>
             )}
             <p className="text-[11px] text-ink-soft mt-2">Cliquez sur une photo pour l&apos;agrandir.</p>
+            {gestion && rapport && (
+              <details className="mt-3 pt-3 border-t border-line">
+                <summary className="text-sm font-bold text-blue cursor-pointer select-none">Gérer les photos du rapport</summary>
+                <div className="flex flex-col gap-3 mt-3">
+                  {photosRapport.map((ph, i) => (
+                    <form key={ph.id} action={retirerOuRemplacerPhotoBureau} className="flex items-center gap-2 flex-wrap" encType="multipart/form-data">
+                      <input type="hidden" name="interventionId" value={m.id} />
+                      <input type="hidden" name="photoId" value={ph.id} />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={ph.url} alt={`Photo ${i + 1}`} className="w-12 h-12 rounded-lg object-cover bg-blue-pale" />
+                      <input type="file" name="remplacement" accept="image/jpeg,image/png,image/webp" className="text-xs max-w-[150px]" />
+                      {valide && <input name="motif" required placeholder="Motif" className={`${inputClass} !py-1 !text-xs w-28`} />}
+                      <button type="submit" className="text-xs font-bold text-blue">Remplacer / retirer</button>
+                    </form>
+                  ))}
+                  <p className="text-[11px] text-ink-soft">Avec un fichier : la photo est remplacée. Sans fichier : elle est retirée (au moins une photo reste).</p>
+                  <form action={ajouterPhotosBureau} className="flex flex-col gap-2 pt-2 border-t border-line">
+                    <input type="hidden" name="interventionId" value={m.id} />
+                    <input type="file" name="photos" multiple accept="image/jpeg,image/png,image/webp" className="text-sm" required />
+                    {valide && <input name="motif" required placeholder="Motif (rapport validé)" className={inputClass} />}
+                    <Btn variant="ghost" className="self-start">Ajouter les photos</Btn>
+                  </form>
+                </div>
+              </details>
+            )}
           </Card>
 
           <Card className="p-5">
-            <div className="flex items-center justify-between gap-2 mb-2">
+            <div id="rapport" className="scroll-mt-24" />
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
               <h2 className="font-display font-bold text-sm">Rapport</h2>
-              {rapport && (
-                <a href={`/api/rapports/pdf/intervention/${m.id}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue hover:underline">
-                  PDF
-                </a>
-              )}
+              <div className="flex items-center gap-2">
+                {rapport?.corrigeBureauLe && <Pill tone="warn">Corrigé par le bureau</Pill>}
+                {rapport && (
+                  <a href={`/api/rapports/pdf/intervention/${m.id}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue hover:underline">
+                    PDF
+                  </a>
+                )}
+              </div>
             </div>
             {!rapport ? (
               <p className="text-sm text-ink-soft">{enDirect ? "En cours — le rapport arrivera à la fin de l'intervention." : "Pas encore de rapport."}</p>
@@ -233,11 +319,62 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                 )}
                 <div className="flex justify-between"><dt className="text-ink-soft">Temps passé</dt><dd>{rapport.tempsPasseMinutes != null ? `${rapport.tempsPasseMinutes} min` : "—"}</dd></div>
                 <div className="flex justify-between"><dt className="text-ink-soft">Heure réelle</dt><dd>{formatDateTime(rapport.heureReelle)}</dd></div>
+                <div className="flex justify-between"><dt className="text-ink-soft">État de l&apos;appareil</dt><dd>{STATUT_APPAREIL[rapport.statutFinalAppareil ?? ""] ?? "—"}</dd></div>
                 <div className="flex justify-between"><dt className="text-ink-soft">Envoyé le</dt><dd>{formatDateTime(rapport.dateEnvoi)}</dd></div>
                 {rapport.modifieLe && (
-                  <div className="flex justify-between"><dt className="text-ink-soft">Corrigé le</dt><dd>{formatDateTime(rapport.modifieLe)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-ink-soft">Corrigé par le technicien</dt><dd>{formatDateTime(rapport.modifieLe)}</dd></div>
+                )}
+                {rapport.corrigeBureauLe && (
+                  <div className="flex justify-between"><dt className="text-ink-soft">Corrigé par le bureau</dt><dd>{formatDateTime(rapport.corrigeBureauLe)}</dd></div>
                 )}
               </dl>
+            )}
+            {gestion && rapport && (
+              <details className="mt-3 pt-3 border-t border-line">
+                <summary className="text-sm font-bold text-blue cursor-pointer select-none">Modifier le rapport</summary>
+                <form action={modifierRapportBureau} className="flex flex-col gap-3 mt-3">
+                  <input type="hidden" name="interventionId" value={m.id} />
+                  <Field label="Travaux réalisés">
+                    <textarea name="travauxRealises" required rows={4} defaultValue={rapport.travauxRealises ?? ""} className={inputClass} />
+                  </Field>
+                  <Field label="Observations">
+                    <textarea name="observations" rows={2} defaultValue={rapport.observations ?? ""} className={inputClass} />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="Temps passé (min)">
+                      <input name="tempsPasseMinutes" type="number" min={0} defaultValue={rapport.tempsPasseMinutes ?? ""} className={inputClass} />
+                    </Field>
+                    <Field label="Heure réelle">
+                      <input name="heureReelle" type="datetime-local" defaultValue={toDatetimeLocalValue(rapport.heureReelle ?? m.dateProgrammee)} className={inputClass} />
+                    </Field>
+                  </div>
+                  <Field label="État de l'appareil après l'intervention">
+                    <select name="statutFinalAppareil" defaultValue={rapport.statutFinalAppareil ?? "en_service"} className={inputClass}>
+                      {Object.entries(STATUT_APPAREIL).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label={valide ? "Motif de la modification (obligatoire : rapport validé)" : "Motif (facultatif)"}>
+                    <input name="motif" required={valide} className={inputClass} />
+                  </Field>
+                  <Btn className="self-start">Enregistrer (l&apos;ancienne version est conservée)</Btn>
+                </form>
+              </details>
+            )}
+            {versions.length > 0 && (
+              <details className="mt-3 pt-3 border-t border-line">
+                <summary className="text-xs font-bold text-ink-soft cursor-pointer select-none">Historique des modifications ({versions.length})</summary>
+                <ol className="flex flex-col gap-3 mt-2">
+                  {versions.map(({ v, auteur }) => (
+                    <li key={v.id} className="text-xs">
+                      <div className="font-semibold">{formatDateTime(v.createdAt)} · {LIBELLE_VERSION[v.quoi] ?? v.quoi} · {auteur ?? "—"}</div>
+                      {v.motif && <div className="text-ink-soft">Motif : {v.motif}</div>}
+                      <Diff avant={v.avant as Instantane | null} apres={v.apres as Instantane | null} />
+                    </li>
+                  ))}
+                </ol>
+              </details>
             )}
             {peutValider && (
               <form action={validerRapport} className="mt-4 pt-3 border-t border-line">
@@ -256,9 +393,190 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
               </p>
             )}
           </Card>
+
+          <Card className="p-5">
+            <div id="pieces" className="scroll-mt-24" />
+            <h2 className="font-display font-bold text-sm mb-2">Pièces utilisées</h2>
+            <div className="flex flex-col divide-y divide-line">
+              {pNettes.filter((p) => p.quantite !== 0).map((p) => (
+                <div key={p.pieceId} className="py-2 flex items-center justify-between gap-2 text-sm flex-wrap">
+                  <span>{p.quantite} × {p.nom} <span className="text-xs text-ink-soft">({p.reference})</span></span>
+                  {gestion && (
+                    <form action={corrigerPieceBureau} className="flex items-center gap-1.5">
+                      <input type="hidden" name="interventionId" value={m.id} />
+                      <input type="hidden" name="pieceId" value={p.pieceId} />
+                      <input type="number" name="quantite" min={0} defaultValue={p.quantite} className={`${inputClass} !py-1 !text-xs w-16`} />
+                      {valide && <input name="motif" required placeholder="Motif" className={`${inputClass} !py-1 !text-xs w-24`} />}
+                      <button type="submit" className="text-xs font-bold text-blue">Corriger</button>
+                    </form>
+                  )}
+                </div>
+              ))}
+              {pNettes.every((p) => p.quantite === 0) && <p className="text-sm text-ink-soft py-1">Aucune pièce déclarée.</p>}
+            </div>
+            {gestion && (
+              <form action={corrigerPieceBureau} className="flex items-end gap-2 flex-wrap mt-3 pt-3 border-t border-line">
+                <input type="hidden" name="interventionId" value={m.id} />
+                <Field label="Ajouter une pièce">
+                  <select name="pieceId" required defaultValue="" className={`${inputClass} max-w-[220px]`}>
+                    <option value="" disabled>Choisir…</option>
+                    {stockPieces.map((p) => (
+                      <option key={p.id} value={p.id}>{p.reference} — {p.nom} ({p.stock})</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Qté">
+                  <input type="number" name="quantite" min={1} defaultValue={1} required className={`${inputClass} w-16`} />
+                </Field>
+                {valide && (
+                  <Field label="Motif">
+                    <input name="motif" required className={`${inputClass} w-32`} />
+                  </Field>
+                )}
+                <Btn variant="ghost">Ajouter</Btn>
+              </form>
+            )}
+            <p className="text-[11px] text-ink-soft mt-2">Chaque correction crée un mouvement de stock (aucune donnée effacée).</p>
+          </Card>
         </div>
       </div>
+
+      <Card className="p-5">
+        <div id="notes" className="scroll-mt-24" />
+        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+          <h2 className="font-display font-bold text-sm flex items-center gap-2"><StickyNote className="w-4 h-4 text-blue" /> Notes internes &amp; rapports du bureau</h2>
+          <span className="text-[11px] text-ink-soft">Jamais visibles par le technicien ; visibles par le client seulement si vous cochez « Visible par le client » sur un rapport du bureau.</span>
+        </div>
+        {gestion && (
+          <form action={ajouterNoteMission} className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 p-3 rounded-xl bg-bg">
+            <input type="hidden" name="interventionId" value={m.id} />
+            <Field label="Type">
+              <select name="type" defaultValue="commentaire" className={inputClass}>
+                {Object.entries(TYPE_NOTE).map(([k, v]) => (
+                  <option key={k} value={k}>{v.icone} {v.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Titre (obligatoire pour un rapport du bureau)">
+              <input name="titre" maxLength={200} className={inputClass} placeholder="Ex. Contacteur à commander" />
+            </Field>
+            <div className="md:col-span-2">
+              <Field label="Texte">
+                <textarea name="texte" rows={3} className={inputClass} placeholder="Votre commentaire, la pièce manquante, votre rapport…" />
+              </Field>
+            </div>
+            <Field label="Fichiers joints (PDF, Word, Excel, photos — 20 Mo max)">
+              <input type="file" name="fichiers" multiple accept={ACCEPT_FICHIERS} className="text-sm" />
+            </Field>
+            <label className="flex items-center gap-2 text-sm self-end pb-2">
+              <input type="checkbox" name="visibleClient" /> Visible par le client <span className="text-xs text-ink-soft">(rapport du bureau seulement)</span>
+            </label>
+            <div className="md:col-span-2">
+              <Btn>Ajouter</Btn>
+            </div>
+          </form>
+        )}
+        <div className="flex flex-col divide-y divide-line mt-3">
+          {notes.map(({ n, auteur }) => {
+            const t = TYPE_NOTE[n.type] ?? TYPE_NOTE.commentaire;
+            return (
+              <div key={n.id} className={`py-3 flex flex-col gap-1.5 ${n.archiveLe ? "opacity-50" : ""}`}>
+                <div className="flex items-center gap-2 flex-wrap text-sm">
+                  <span>{t.icone}</span>
+                  <span className="font-semibold">{t.label}</span>
+                  <span className="text-xs text-ink-soft">· {auteur ?? "—"} · {formatDateTime(n.createdAt)}</span>
+                  {n.type === "piece_manquante" && <Pill tone={n.regleLe ? "ok" : "crit"}>{n.regleLe ? `Réglé le ${formatDateTime(n.regleLe)}` : "À régler"}</Pill>}
+                  {n.type === "rapport_bureau" && <Pill tone={n.visibleClient ? "ok" : "neutral"}>{n.visibleClient ? "Visible par le client" : "Interne"}</Pill>}
+                  {n.archiveLe && <Pill tone="neutral">Archivé</Pill>}
+                </div>
+                {n.titre && <div className="text-sm font-semibold">{n.titre}</div>}
+                {n.texte && <div className="text-sm whitespace-pre-wrap">{n.texte}</div>}
+                {n.fichiers.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {n.fichiers.map((f) => (
+                      <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue border border-line rounded-lg px-2 py-1 hover:bg-blue-pale">
+                        📎 {f.nom}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {gestion && (
+                  <div className="flex gap-3 text-xs font-bold">
+                    {n.type === "piece_manquante" && (
+                      <form action={actionNoteMission}>
+                        <input type="hidden" name="interventionId" value={m.id} />
+                        <input type="hidden" name="noteId" value={n.id} />
+                        <input type="hidden" name="action" value="regle" />
+                        <button type="submit" className="text-green-ink">{n.regleLe ? "Rouvrir" : "Réglé ✓"}</button>
+                      </form>
+                    )}
+                    {n.type === "rapport_bureau" && (
+                      <form action={actionNoteMission}>
+                        <input type="hidden" name="interventionId" value={m.id} />
+                        <input type="hidden" name="noteId" value={n.id} />
+                        <input type="hidden" name="action" value="visible" />
+                        <button type="submit" className="text-blue">{n.visibleClient ? "Rendre interne" : "Rendre visible au client"}</button>
+                      </form>
+                    )}
+                    <form action={actionNoteMission}>
+                      <input type="hidden" name="interventionId" value={m.id} />
+                      <input type="hidden" name="noteId" value={n.id} />
+                      <input type="hidden" name="action" value="archiver" />
+                      <button type="submit" className="text-ink-soft">{n.archiveLe ? "Désarchiver" : "Archiver"}</button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {notes.length === 0 && <p className="text-sm text-ink-soft py-1">Aucune note pour l&apos;instant.</p>}
+        </div>
+      </Card>
     </div>
+  );
+}
+
+type Instantane = {
+  travauxRealises: string | null;
+  observations: string | null;
+  tempsPasseMinutes: number | null;
+  heureReelle: string | null;
+  statutFinalAppareil: string | null;
+  photos: string[];
+  pieces: string[];
+};
+
+/** Avant / après lisible pour l'historique (seuls les champs qui ont changé). */
+function Diff({ avant, apres }: { avant: Instantane | null; apres: Instantane | null }) {
+  if (!avant || !apres) return null;
+  const lignes: [string, string, string][] = [];
+  const champ = (l: string, a: unknown, b: unknown) => {
+    const sa = Array.isArray(a) ? a.join(", ") : a == null ? "—" : String(a);
+    const sb = Array.isArray(b) ? b.join(", ") : b == null ? "—" : String(b);
+    if (sa !== sb) lignes.push([l, sa, sb]);
+  };
+  champ("Travaux", avant.travauxRealises, apres.travauxRealises);
+  champ("Observations", avant.observations, apres.observations);
+  champ("Temps (min)", avant.tempsPasseMinutes, apres.tempsPasseMinutes);
+  champ("Heure réelle", avant.heureReelle?.slice(0, 16).replace("T", " "), apres.heureReelle?.slice(0, 16).replace("T", " "));
+  champ("État appareil", avant.statutFinalAppareil, apres.statutFinalAppareil);
+  if (avant.photos.length !== apres.photos.length || avant.photos.some((u, i) => u !== apres.photos[i])) {
+    lignes.push(["Photos", `${avant.photos.length}`, `${apres.photos.length}${avant.photos.length === apres.photos.length ? " (remplacée)" : ""}`]);
+  }
+  champ("Pièces", avant.pieces, apres.pieces);
+  if (!lignes.length) return null;
+  return (
+    <table className="mt-1 w-full text-[11px]">
+      <tbody>
+        {lignes.map(([l, a, b]) => (
+          <tr key={l} className="align-top">
+            <td className="pr-2 text-ink-soft whitespace-nowrap">{l}</td>
+            <td className="pr-2 line-through text-red-ink/80 break-words">{a}</td>
+            <td className="text-green-ink break-words">{b}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

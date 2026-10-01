@@ -27,6 +27,7 @@ import { after } from "next/server";
 import { enregistrerPhotos, photosDuFormulaire } from "@/lib/photos";
 import { peutModifierRapport } from "@/lib/rapport-rules";
 import { notifierObservateurs } from "@/lib/observateur";
+import { marquerPassageRealise } from "@/lib/garantie-passages";
 
 async function assertOwnIntervention(interventionId: string, userId: string, role: string) {
   const [row] = await db
@@ -198,6 +199,8 @@ export async function terminerIntervention(formData: FormData) {
     .update(interventions)
     .set({ statut: "terminee", dateFin: new Date() })
     .where(eq(interventions.id, parsed.data.interventionId));
+  // Phase 19 : passage de garantie lié -> réalisé (le compteur baisse maintenant).
+  await marquerPassageRealise(parsed.data.interventionId);
 
   const [fin] = await db
     .select({ appareilId: interventions.appareilId, numero: appareils.numeroInterne })

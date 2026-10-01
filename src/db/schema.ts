@@ -1,5 +1,6 @@
 import {
   pgTable,
+  jsonb,
   uuid,
   text,
   varchar,
@@ -273,6 +274,9 @@ export const rapports = pgTable(
     // Phase 18 : corrections du technicien (24 h après la fin).
     modifieLe: timestamp("modifie_le"),
     nbModifications: integer("nb_modifications").notNull().default(0),
+    // Phase 19 : corrigé par le bureau (administrateur / responsable qualité).
+    corrigeBureauLe: timestamp("corrige_bureau_le"),
+    corrigeBureauParId: uuid("corrige_bureau_par_id"),
     statutFinalAppareil: statutAppareilEnum("statut_final_appareil"),
     dateEnvoi: timestamp("date_envoi"),
     // Phase 10 : heure réelle de l'intervention (peut différer de l'heure
@@ -408,11 +412,22 @@ export const habilitationsTechnicien = pgTable("habilitations_technicien", {
   technicienId: uuid("technicien_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  documentId: uuid("document_id")
-    .notNull()
-    .references(() => documentsFormations.id, { onDelete: "restrict" }),
+  // Phase 19 : facultatif (ancien lien « formation validée par le technicien »).
+  documentId: uuid("document_id").references(() => documentsFormations.id, { onDelete: "restrict" }),
   dateObtention: timestamp("date_obtention").notNull().defaultNow(),
   dateExpiration: timestamp("date_expiration"),
+  // Phase 19 : habilitation du catalogue, justificatif et validation bureau.
+  catalogueId: uuid("catalogue_id"),
+  organisme: varchar("organisme", { length: 160 }),
+  numeroCertificat: varchar("numero_certificat", { length: 80 }),
+  certificatUrl: text("certificat_url"),
+  statut: varchar("statut", { length: 20 }).notNull().default("valide"), // valide | en_attente | refusee | remplacee
+  ajouteeParId: uuid("ajoutee_par_id"),
+  valideeParId: uuid("validee_par_id"),
+  valideeLe: timestamp("validee_le"),
+  commentaire: text("commentaire"),
+  sessionId: uuid("session_id"),
+  alertesEnvoyees: text("alertes_envoyees").array().notNull().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1256,3 +1271,113 @@ export const parametres = pgTable("parametres", {
   valeur: text("valeur"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+
+// ==========================================================================
+// PHASE 19 — Page Mission (bureau), habilitations & formations, garantie
+// ==========================================================================
+export const rapportVersions = pgTable("rapport_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  interventionId: uuid("intervention_id")
+    .notNull()
+    .references(() => interventions.id, { onDelete: "cascade" }),
+  auteurId: uuid("auteur_id").references(() => users.id, { onDelete: "set null" }),
+  quoi: varchar("quoi", { length: 80 }).notNull(),
+  motif: text("motif"),
+  avant: jsonb("avant"),
+  apres: jsonb("apres"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type FichierJoint = { url: string; nom: string };
+
+export const missionNotes = pgTable("mission_notes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  interventionId: uuid("intervention_id")
+    .notNull()
+    .references(() => interventions.id, { onDelete: "cascade" }),
+  auteurId: uuid("auteur_id").references(() => users.id, { onDelete: "set null" }),
+  type: varchar("type", { length: 30 }).notNull(), // commentaire | piece_manquante | document | rapport_bureau
+  titre: varchar("titre", { length: 200 }),
+  texte: text("texte"),
+  fichiers: jsonb("fichiers").$type<FichierJoint[]>().notNull().default(sql`'[]'::jsonb`),
+  visibleClient: integer("visible_client").notNull().default(0),
+  regleLe: timestamp("regle_le"),
+  regleParId: uuid("regle_par_id").references(() => users.id, { onDelete: "set null" }),
+  archiveLe: timestamp("archive_le"),
+  archiveParId: uuid("archive_par_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const habilitationsCatalogue = pgTable("habilitations_catalogue", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: varchar("nom", { length: 160 }).notNull(),
+  categorie: varchar("categorie", { length: 40 }).notNull().default("interne"),
+  pays: varchar("pays", { length: 10 }),
+  validiteMois: integer("validite_mois"),
+  alerteJours: integer("alerte_jours").notNull().default(60),
+  certificatObligatoire: integer("certificat_obligatoire").notNull().default(1),
+  obligatoire: integer("obligatoire").notNull().default(0),
+  typesMission: text("types_mission").array().notNull().default(sql`'{}'::text[]`),
+  marques: text("marques").array().notNull().default(sql`'{}'::text[]`),
+  description: text("description"),
+  actif: integer("actif").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const formationsSessions = pgTable("formations_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  titre: varchar("titre", { length: 200 }).notNull(),
+  catalogueId: uuid("catalogue_id").references(() => habilitationsCatalogue.id, { onDelete: "set null" }),
+  dateDebut: timestamp("date_debut").notNull(),
+  dureeHeures: numeric("duree_heures"),
+  lieu: varchar("lieu", { length: 20 }).notNull().default("bureau"),
+  organisme: varchar("organisme", { length: 160 }),
+  programme: text("programme"),
+  statut: varchar("statut", { length: 20 }).notNull().default("planifiee"), // planifiee | terminee
+  creeParId: uuid("cree_par_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const formationsParticipants = pgTable(
+  "formations_participants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => formationsSessions.id, { onDelete: "cascade" }),
+    technicienId: uuid("technicien_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    present: integer("present"),
+    resultat: varchar("resultat", { length: 20 }), // reussi | a_refaire
+    efficacite: varchar("efficacite", { length: 20 }), // efficace | partielle | non_efficace
+    efficaciteCommentaire: text("efficacite_commentaire"),
+    efficaciteLe: timestamp("efficacite_le"),
+    habilitationId: uuid("habilitation_id").references(() => habilitationsTechnicien.id, { onDelete: "set null" }),
+  },
+  (t) => [uniqueIndex("formations_participants_idx").on(t.sessionId, t.technicienId)]
+);
+
+export const garantiePassages = pgTable(
+  "garantie_passages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    garantieId: uuid("garantie_id")
+      .notNull()
+      .references(() => garanties.id, { onDelete: "cascade" }),
+    appareilId: uuid("appareil_id")
+      .notNull()
+      .references(() => appareils.id, { onDelete: "cascade" }),
+    numero: integer("numero").notNull(),
+    total: integer("total").notNull(),
+    datePrevue: timestamp("date_prevue").notNull(),
+    dateInitiale: timestamp("date_initiale").notNull(),
+    motifDecalage: text("motif_decalage"),
+    statut: varchar("statut", { length: 20 }).notNull().default("a_venir"), // a_venir | realise
+    interventionId: uuid("intervention_id").references(() => interventions.id, { onDelete: "set null" }),
+    realiseLe: timestamp("realise_le"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("garantie_passages_idx").on(t.garantieId, t.appareilId, t.numero)]
+);

@@ -1,5 +1,7 @@
 import { Card, Pill, Btn } from "@/components/ui";
-import { HabilitationsList } from "@/components/habilitations-list";
+import { HabilitationsCartes } from "@/components/habilitations-cartes";
+import { habilitationsCourantes } from "@/lib/habilitations";
+import Link from "next/link";
 import { db } from "@/db";
 import { documentsFormations, habilitationsTechnicien, formationsConsultations } from "@/db/schema";
 import { and, desc, eq, ilike } from "drizzle-orm";
@@ -57,19 +59,7 @@ export default async function FormationsPage({
       .from(documentsFormations)
       .where(filters.length ? and(...filters) : undefined)
       .orderBy(desc(documentsFormations.createdAt)),
-    db
-      .select({
-        id: habilitationsTechnicien.id,
-        documentId: habilitationsTechnicien.documentId,
-        dateObtention: habilitationsTechnicien.dateObtention,
-        dateExpiration: habilitationsTechnicien.dateExpiration,
-        titre: documentsFormations.titre,
-        categorie: documentsFormations.categorie,
-      })
-      .from(habilitationsTechnicien)
-      .innerJoin(documentsFormations, eq(habilitationsTechnicien.documentId, documentsFormations.id))
-      .where(eq(habilitationsTechnicien.technicienId, user.id))
-      .orderBy(desc(habilitationsTechnicien.dateObtention)),
+    habilitationsCourantes([user.id]),
     db
       .select({ documentId: formationsConsultations.documentId, dateConsultation: formationsConsultations.dateConsultation })
       .from(formationsConsultations)
@@ -93,15 +83,8 @@ export default async function FormationsPage({
         <h2 className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-2">
           Mes habilitations
         </h2>
-        <HabilitationsList
-          habilitations={habilitations.map((h) => ({
-            id: h.id,
-            titre: h.titre,
-            subtitle: CATEGORIE_LABEL[h.categorie] ?? h.categorie,
-            dateObtention: h.dateObtention,
-            dateExpiration: h.dateExpiration,
-          }))}
-        />
+        <HabilitationsCartes habilitations={habilitations} />
+        <Link href="/technicien/profil#habilitations" className="inline-block mt-2 text-sm font-bold text-blue">Déposer un certificat →</Link>
       </section>
 
       <section>
@@ -177,7 +160,7 @@ export default async function FormationsPage({
                   <form action={consulterDocument}>
                     <input type="hidden" name="documentId" value={d.id} />
                     <Btn variant="ghost" className="text-xs px-3 py-1.5">
-                      {d.estFormation === 1 ? "Valider cette formation" : "J'ai consulté ce document"}
+                      {d.estFormation === 1 ? "J'ai lu et compris" : "J'ai consulté ce document"}
                     </Btn>
                   </form>
                 </div>

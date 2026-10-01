@@ -1,3 +1,5 @@
+import { FrisePassages } from "@/components/frise-passages";
+import { passagesDeGaranties } from "@/lib/garantie-passages";
 import { basculerVisibiliteDocument } from "../../observateurs/actions";
 import { GaleriePhotos } from "@/components/galerie-photos";
 import { SuiviEnvoi } from "@/components/suivi-envoi";
@@ -331,6 +333,8 @@ export default async function ProjetDetailPage({
   for (const f of filRows) photosFilParMission.set(f.interventionId, [...(photosFilParMission.get(f.interventionId) ?? []), ...f.photos]);
 
   const garantie = garantieRow[0];
+  // Phase 19 : échéancier des passages (onglet Garantie).
+  const passagesGarantie = tab === "garantie" && garantie?.garantie ? await passagesDeGaranties([garantie.garantie.id]) : [];
   const indexEtapeActuelle = ETAPES_ISO.indexOf(projet.statut);
   const prochaineEtape = ETAPES_ISO[indexEtapeActuelle + 1];
   const techniciensDejaAffectesIds = new Set(techniciensAffectes.map((t) => t.id));
@@ -880,6 +884,13 @@ export default async function ProjetDetailPage({
         </>
       )}
 
+      {tab === "garantie" && garantie && (
+        <Card className="p-5 mb-4">
+          <h2 className="font-display font-bold text-sm mb-1">Passages de garantie</h2>
+          <p className="text-xs text-ink-soft mb-4">Un passage au milieu de chaque période · cliquez sur un passage pour le planifier ou le décaler.</p>
+          <FrisePassages passages={passagesGarantie} />
+        </Card>
+      )}
       {tab === "garantie" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Prestations */}

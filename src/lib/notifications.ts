@@ -13,6 +13,7 @@ import {
   users,
 } from "@/db/schema";
 import { and, eq, inArray, isNotNull, isNull, lt, ne, notExists, sql } from "drizzle-orm";
+import { habilitationsCourantes } from "@/lib/habilitations";
 
 export type Notification = {
   id: string;
@@ -86,17 +87,7 @@ export async function getNotifications(): Promise<Notification[]> {
       .from(reglesPlanification)
       .innerJoin(appareils, eq(reglesPlanification.appareilId, appareils.id))
       .where(eq(reglesPlanification.actif, 1)),
-    db
-      .select({
-        id: habilitationsTechnicien.id,
-        dateExpiration: habilitationsTechnicien.dateExpiration,
-        technicien: users.nom,
-        document: documentsFormations.titre,
-      })
-      .from(habilitationsTechnicien)
-      .innerJoin(users, eq(habilitationsTechnicien.technicienId, users.id))
-      .innerJoin(documentsFormations, eq(habilitationsTechnicien.documentId, documentsFormations.id))
-      .where(isNotNull(habilitationsTechnicien.dateExpiration)),
+    habilitationsCourantes(),
     // Phase 17 : mission envoyée depuis plus de 30 min et pas encore ouverte.
     db
       .select({ id: interventions.id, projetId: interventions.projetId, technicien: users.nom, numero: appareils.numeroInterne })
@@ -228,22 +219,16 @@ export async function getNotifications(): Promise<Notification[]> {
     }
   }
 
+  // Phase 19 : statut calculé selon le catalogue (délai d'alerte propre à chaque habilitation).
+  const nomsTech = new Map((await db.select({ id: users.id, nom: users.nom }).from(users).where(eq(users.role, "technicien"))).map((u) => [u.id, u.nom]));
   for (const h of habilitations) {
-    if (!h.dateExpiration) continue;
-    if (h.dateExpiration < now) {
-      notifications.push({
-        id: `habilitation-${h.id}`,
-        gravite: "crit",
-        titre: `Habilitation expirée — ${h.technicien} (${h.document})`,
-        href: "/responsable/documents",
-      });
-    } else if (h.dateExpiration < limite30) {
-      notifications.push({
-        id: `habilitation-${h.id}`,
-        gravite: "warn",
-        titre: `Habilitation à échéance sous 30 j — ${h.technicien} (${h.document})`,
-        href: "/responsable/documents",
-      });
+    const qui = nomsTech.get(h.technicienId) ?? "Technicien";
+    if (h.etat === "expiree") {
+      notifications.push({ id: `habilitation-${h.id}`, gravite: "crit", titre: `Habilitation expirée — ${qui} (${h.nom})`, href: `/responsable/techniciens/${h.technicienId}?tab=habilitations` });
+    } else if (h.etat === "bientot") {
+      notifications.push({ id: `habilitation-${h.id}`, gravite: "warn", titre: `Habilitation à renouveler — ${qui} (${h.nom}, ${h.dateExpiration?.toLocaleDateString("fr-BE")})`, href: `/responsable/techniciens/${h.technicienId}?tab=habilitations` });
+    } else if (h.etat === "en_attente") {
+      notifications.push({ id: `habilitation-${h.id}`, gravite: "warn", titre: `Certificat à valider — ${qui} (${h.nom})`, href: "/responsable/habilitations?onglet=a_valider" });
     }
   }
 

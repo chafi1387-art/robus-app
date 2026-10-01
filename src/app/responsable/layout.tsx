@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { BandeauMessages } from "@/components/bandeau-messages";
 import Link from "next/link";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { db } from "@/db";
@@ -133,7 +135,12 @@ export default async function ResponsableLayout({ children }: { children: React.
             </div>
           </form>
         </header>
-        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-8 max-w-[1360px] w-full mx-auto min-w-0">{children}</main>
+        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-8 max-w-[1360px] w-full mx-auto min-w-0">
+          <Suspense fallback={null}>
+            <BandeauMessages />
+          </Suspense>
+          {children}
+        </main>
       </div>
     </div>
   );
