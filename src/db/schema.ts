@@ -1232,6 +1232,9 @@ export const observateurs = pgTable(
     modele: varchar("modele", { length: 40 }),
     droits: text("droits").array().notNull().default(sql`'{}'::text[]`),
     dateFin: timestamp("date_fin"),
+    // Phase 20 : résumé mensuel par email (désactivable par l'observateur).
+    resumeMensuel: integer("resume_mensuel").notNull().default(1),
+    resumeEnvoyeLe: timestamp("resume_envoye_le"),
     creeParId: uuid("cree_par_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1381,3 +1384,85 @@ export const garantiePassages = pgTable(
   },
   (t) => [uniqueIndex("garantie_passages_idx").on(t.garantieId, t.appareilId, t.numero)]
 );
+
+// ==========================================================================
+// PHASE 20 — Documents client par appareil, demandes client (pannes…)
+// ==========================================================================
+export const documentsClient = pgTable("documents_client", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  appareilId: uuid("appareil_id")
+    .notNull()
+    .references(() => appareils.id, { onDelete: "cascade" }),
+  titre: varchar("titre", { length: 200 }).notNull(),
+  type: varchar("type", { length: 30 }).notNull().default("autre"),
+  url: text("url").notNull(),
+  nomFichier: varchar("nom_fichier", { length: 200 }),
+  message: text("message"),
+  creeParId: uuid("cree_par_id").references(() => users.id, { onDelete: "set null" }),
+  archiveLe: timestamp("archive_le"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const documentsClientConsultations = pgTable(
+  "documents_client_consultations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documentsClient.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    premiereLe: timestamp("premiere_le").notNull().defaultNow(),
+    derniereLe: timestamp("derniere_le").notNull().defaultNow(),
+    nb: integer("nb").notNull().default(1),
+  },
+  (t) => [uniqueIndex("documents_client_consultations_idx").on(t.documentId, t.userId)]
+);
+
+export const demandesClient = pgTable(
+  "demandes_client",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    numero: varchar("numero", { length: 20 }).notNull(),
+    appareilId: uuid("appareil_id")
+      .notNull()
+      .references(() => appareils.id, { onDelete: "restrict" }),
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    auteurId: uuid("auteur_id").references(() => users.id, { onDelete: "set null" }),
+    nom: varchar("nom", { length: 160 }),
+    telephone: varchar("telephone", { length: 40 }),
+    email: varchar("email", { length: 200 }),
+    type: varchar("type", { length: 20 }).notNull(), // panne | intervention | question | document
+    personneBloquee: integer("personne_bloquee").notNull().default(0),
+    description: text("description").notNull(),
+    photos: text("photos").array().notNull().default(sql`'{}'::text[]`),
+    statut: varchar("statut", { length: 20 }).notNull().default("nouvelle"), // nouvelle | prise_en_charge | planifiee | resolue | cloturee
+    priorite: varchar("priorite", { length: 20 }).notNull().default("normale"),
+    interventionId: uuid("intervention_id").references(() => interventions.id, { onDelete: "set null" }),
+    prisEnChargeLe: timestamp("pris_en_charge_le"),
+    prisEnChargeParId: uuid("pris_en_charge_par_id").references(() => users.id, { onDelete: "set null" }),
+    resolueLe: timestamp("resolue_le"),
+    clotureeLe: timestamp("cloturee_le"),
+    resolution: text("resolution"),
+    noteSatisfaction: integer("note_satisfaction"),
+    commentaireSatisfaction: text("commentaire_satisfaction"),
+    rappelEnvoyeLe: timestamp("rappel_envoye_le"),
+    origine: varchar("origine", { length: 20 }).notNull().default("espace"), // espace | qr
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("demandes_client_numero_idx").on(t.numero)]
+);
+
+export const demandesMessages = pgTable("demandes_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  demandeId: uuid("demande_id")
+    .notNull()
+    .references(() => demandesClient.id, { onDelete: "cascade" }),
+  auteurId: uuid("auteur_id").references(() => users.id, { onDelete: "set null" }),
+  auteurType: varchar("auteur_type", { length: 20 }).notNull(), // bureau | client | systeme
+  texte: text("texte"),
+  fichiers: jsonb("fichiers").$type<FichierJoint[]>().notNull().default(sql`'[]'::jsonb`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

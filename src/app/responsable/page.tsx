@@ -1,3 +1,5 @@
+import { STATUTS_DEMANDE, TYPES_DEMANDE, delais, echeancePriseEnCharge, statsDemandes } from "@/lib/demandes";
+import { demandesClient } from "@/db/schema";
 import { passagesAVenirTableauDeBord, ETAT_PASSAGE } from "@/lib/garantie-passages";
 import { missionNotes } from "@/db/schema";
 import { Card, Pill, StatutInterventionPill, TypeInterventionPill } from "@/components/ui";
@@ -12,7 +14,7 @@ import {
   sites,
   users,
 } from "@/db/schema";
-import { and, asc, count, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, gte, isNull, lt, ne, sql } from "drizzle-orm";
 import { formatDateTime } from "@/lib/format";
 import { BLOCS_ISO, calculerScoreGlobal } from "@/lib/score-iso";
 import { CarteApplication } from "@/components/app-installable";
@@ -203,6 +205,18 @@ const TONE_TEXT: Record<"ok" | "warn" | "crit", string> = {
 };
 
 export default async function DashboardPage() {
+  const [demandesOuvertes, statsDem, dlDem] = await Promise.all([
+    db
+      .select({ d: demandesClient, appareil: appareils.numeroInterne, client: clients.raisonSociale })
+      .from(demandesClient)
+      .innerJoin(appareils, eq(demandesClient.appareilId, appareils.id))
+      .leftJoin(clients, eq(demandesClient.clientId, clients.id))
+      .where(inArray(demandesClient.statut, ["nouvelle", "prise_en_charge", "planifiee"]))
+      .orderBy(desc(demandesClient.personneBloquee), asc(demandesClient.createdAt))
+      .limit(8),
+    statsDemandes(),
+    delais(),
+  ]);
   const [stats, alertes, planning, scoreIso, garantiesStats, passages, piecesManquantes] = await Promise.all([
     getStats(),
     getAlertes(),
@@ -304,6 +318,36 @@ export default async function DashboardPage() {
           {scoreIso.score}%
         </div>
       </Link>
+
+      <Card className={`p-5 ${statsDem.nouvelles > 0 ? "border-[1.5px] border-red-ink/50" : ""}`}>
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <h2 className="font-display font-bold text-sm flex items-center gap-2">
+            🚨 Pannes &amp; demandes clients
+            {statsDem.nouvelles > 0 && <span className="text-[11px] font-bold text-white bg-red-ink rounded-full px-2 py-0.5">{statsDem.nouvelles} à prendre en charge</span>}
+            {statsDem.enRetard > 0 && <span className="text-[11px] font-bold text-red-ink">· {statsDem.enRetard} délai dépassé</span>}
+          </h2>
+          <Link href="/responsable/demandes" className="text-xs font-semibold text-blue">Toutes les demandes</Link>
+        </div>
+        <div className="flex flex-col divide-y divide-line">
+          {demandesOuvertes.map(({ d, appareil, client }) => {
+            // eslint-disable-next-line react-hooks/purity
+            const minutes = Math.round((Date.now() - d.createdAt.getTime()) / 60000);
+            const retard = d.statut === "nouvelle" && echeancePriseEnCharge(d, dlDem).getTime() < d.createdAt.getTime() + minutes * 60000;
+            return (
+              <Link key={d.id} href={`/responsable/demandes/${d.id}`} className="py-2.5 flex items-center justify-between gap-3 text-sm hover:text-blue">
+                <span className="min-w-0">
+                  <span className="font-semibold">{TYPES_DEMANDE[d.type]?.icone} {d.personneBloquee ? "PERSONNE BLOQUÉE" : TYPES_DEMANDE[d.type]?.label}</span> · {appareil}{client ? ` · ${client}` : ""}
+                  <span className="block text-xs text-ink-soft truncate">{d.numero} · {d.description}</span>
+                </span>
+                <span className={`shrink-0 text-xs font-bold ${retard ? "text-red-ink" : d.statut === "nouvelle" ? "text-orange-ink" : "text-ink-soft"}`}>
+                  {STATUTS_DEMANDE[d.statut]?.label} · {minutes < 60 ? `${minutes} min` : minutes < 2880 ? `${Math.floor(minutes / 60)} h` : `${Math.round(minutes / 1440)} j`}
+                </span>
+              </Link>
+            );
+          })}
+          {demandesOuvertes.length === 0 && <p className="text-sm text-ink-soft py-1">Aucune demande en cours.</p>}
+        </div>
+      </Card>
 
       {(passages.length > 0 || piecesManquantes.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

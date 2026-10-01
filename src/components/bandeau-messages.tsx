@@ -13,7 +13,7 @@ export function BandeauMessages() {
   const ok = sp.get("ok");
   if (!erreur && !ok) return null;
   // Pages qui affichent déjà elles-mêmes leurs messages.
-  if (pathname === "/responsable/techniciens" || pathname.startsWith("/responsable/observateurs")) return null;
+  if (pathname === "/responsable/techniciens" || pathname.startsWith("/responsable/observateurs/")) return null;
   // Certaines pages gèrent déjà leurs propres codes courts (ex. « telephone »).
   if (erreur && erreur.length < 16 && !erreur.includes(" ")) return null;
   function fermer() {

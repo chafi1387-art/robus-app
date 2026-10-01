@@ -26,7 +26,7 @@ export default async function QrPage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ erreur?: string; erreurPanne?: string; panne?: string }>;
+  searchParams: Promise<{ erreur?: string; erreurPanne?: string; panne?: string; numero?: string }>;
 }) {
   const { code } = await params;
   const sp = await searchParams;
@@ -91,7 +91,9 @@ export default async function QrPage({
             </div>
 
             {sp.panne === "1" && (
-              <div className="text-sm bg-green-fill text-green-ink rounded-xl px-4 py-3">Merci, la panne a été transmise à ROBUS. Nous vous rappellerons si besoin.</div>
+              <div className="text-sm bg-green-fill text-green-ink rounded-xl px-4 py-3">
+                Merci, la panne a été transmise à ROBUS{sp.numero ? ` (demande ${sp.numero})` : ""}. Nous vous rappellerons si besoin.
+              </div>
             )}
 
             {tel && (
@@ -133,6 +135,10 @@ export default async function QrPage({
                 <input type="text" name="site_web" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
                 <input name="nom" required minLength={2} placeholder="Votre nom" className={champ} />
                 <input name="telephone" required inputMode="tel" placeholder="Votre téléphone" className={champ} />
+                <input name="email" type="email" placeholder="Votre email (facultatif, pour suivre la demande)" className={champ} />
+                <label className="flex items-center gap-2.5 rounded-xl bg-red-fill text-red-ink px-3 py-3 font-bold">
+                  <input type="checkbox" name="personneBloquee" className="w-5 h-5" /> Une personne est bloquée
+                </label>
                 <textarea name="description" required minLength={5} maxLength={1000} rows={3} placeholder="Que se passe-t-il ?" className={champ} />
                 <button type="submit" className="bg-navy text-white font-display font-bold rounded-xl py-3">Envoyer à ROBUS</button>
               </form>

@@ -401,3 +401,78 @@ export async function envoyerAvisObservateur(params: { email: string; nom: strin
     return "echec" as const;
   }
 }
+
+// ==========================================================================
+// Phase 20 — Demandes client : alerte au bureau (panne, demande…) et résumé
+// mensuel envoyé aux observateurs.
+// ==========================================================================
+export async function envoyerAlerteDemande(params: {
+  destinataires: string[];
+  sujet: string;
+  lignes: [string, string][];
+  description: string;
+  lien: string;
+  urgence: boolean;
+}) {
+  const transport = getTransport();
+  if (!transport || !params.destinataires.length) return "non_configure" as const;
+  const tableau = params.lignes
+    .map(
+      ([k, v]) =>
+        `<tr><td style="padding:3px 12px 3px 0;color:#6b7482;font-size:12px;font-weight:bold;white-space:nowrap;">${echapperHtml(k)}</td><td style="padding:3px 0;font-size:13px;color:#333333;">${echapperHtml(v)}</td></tr>`
+    )
+    .join("");
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: params.destinataires.join(", "),
+      subject: params.sujet,
+      priority: params.urgence ? "high" : "normal",
+      text: `${params.sujet}\n\n${params.lignes.map(([k, v]) => `${k} : ${v}`).join("\n")}\n\n${params.description}\n\nOuvrir la demande : ${params.lien}\n\nROBUS`,
+      html: `${enteteHtml()}<div style="font-family:Arial,sans-serif;padding:20px;color:#1f2a37;max-width:560px;">
+        ${params.urgence ? `<div style="background:#fdecea;color:#a3261b;font-weight:bold;padding:10px 14px;border-radius:8px;margin-bottom:12px;">URGENCE — à traiter immédiatement</div>` : ""}
+        <p style="font-size:16px;font-weight:bold;margin:0 0 10px;">${echapperHtml(params.sujet)}</p>
+        <table style="border-collapse:collapse;margin:0 0 12px;">${tableau}</table>
+        <div style="background:#f4f7fb;border-radius:8px;padding:12px 14px;font-size:14px;white-space:pre-wrap;">${echapperHtml(params.description)}</div>
+        <p style="margin-top:18px;"><a href="${params.lien}" style="display:inline-block;background:#0055a4;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Ouvrir la demande</a></p>
+      </div>`,
+      attachments: logoAttachment(),
+    });
+    return "ok" as const;
+  } catch {
+    return "echec" as const;
+  }
+}
+
+export async function envoyerResumeMensuel(params: { email: string; nom: string; mois: string; blocs: { titre: string; lignes: string[] }[]; lien: string }) {
+  const transport = getTransport();
+  if (!transport) return "non_configure" as const;
+  const html = params.blocs
+    .map(
+      (b) =>
+        `<p style="font-size:13px;font-weight:bold;color:#003366;margin:16px 0 4px;text-transform:uppercase;">${echapperHtml(b.titre)}</p>` +
+        (b.lignes.length
+          ? `<ul style="margin:0;padding-left:18px;">${b.lignes.map((l) => `<li style="font-size:13px;margin-bottom:3px;">${echapperHtml(l)}</li>`).join("")}</ul>`
+          : `<p style="font-size:13px;color:#6b7482;margin:0;">—</p>`)
+    )
+    .join("");
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: params.email,
+      subject: `ROBUS — Résumé de vos ascenseurs · ${params.mois}`,
+      text: `Bonjour ${params.nom},\n\nRésumé ${params.mois} :\n\n${params.blocs.map((b) => `${b.titre}\n${b.lignes.map((l) => `- ${l}`).join("\n") || "-"}`).join("\n\n")}\n\nVotre espace : ${params.lien}\n\nROBUS`,
+      html: `${enteteHtml()}<div style="font-family:Arial,sans-serif;padding:20px;color:#1f2a37;max-width:560px;">
+        <p>Bonjour ${echapperHtml(params.nom)},</p>
+        <p>Voici le résumé de vos ascenseurs pour <strong>${echapperHtml(params.mois)}</strong>.</p>
+        ${html}
+        <p style="margin-top:20px;"><a href="${params.lien}" style="display:inline-block;background:#0055a4;color:#ffffff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Ouvrir mon espace</a></p>
+        <p style="font-size:11px;color:#6b7482;margin-top:18px;">Vous pouvez désactiver ce résumé dans « Mon accès ».</p>
+      </div>`,
+      attachments: logoAttachment(),
+    });
+    return "ok" as const;
+  } catch {
+    return "echec" as const;
+  }
+}

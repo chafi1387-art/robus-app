@@ -1,6 +1,5 @@
 import { FrisePassages } from "@/components/frise-passages";
 import { passagesDeGaranties } from "@/lib/garantie-passages";
-import { basculerVisibiliteDocument } from "../../observateurs/actions";
 import { GaleriePhotos } from "@/components/galerie-photos";
 import { SuiviEnvoi } from "@/components/suivi-envoi";
 import { Card, Btn, Field, Pill, inputClass, StatutInterventionPill, TypeInterventionPill } from "@/components/ui";
@@ -1131,17 +1130,7 @@ export default async function ProjetDetailPage({
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <form action={basculerVisibiliteDocument}>
-                    <input type="hidden" name="documentId" value={d.id} />
-                    <input type="hidden" name="retour" value={`/responsable/projets/${projet.id}`} />
-                    <button
-                      type="submit"
-                      title="Visible dans l'espace Observateur du client"
-                      className={`text-[11px] font-bold rounded-full px-2.5 py-1 border ${d.visibleObservateur ? "bg-green-fill text-green-ink border-transparent" : "border-line text-ink-soft hover:bg-blue-pale"}`}
-                    >
-                      {d.visibleObservateur ? "👁 Visible observateur" : "Masqué observateur"}
-                    </button>
-                  </form>
+                  
                   <span className="text-xs text-ink-soft whitespace-nowrap">{formatDate(d.createdAt)}</span>
                   <form action={supprimerDocument}>
                     <input type="hidden" name="documentId" value={d.id} />

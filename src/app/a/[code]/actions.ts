@@ -8,7 +8,7 @@ import { signIn } from "@/auth";
 import { db } from "@/db";
 import { appareils, users } from "@/db/schema";
 import { accesObservateurValide } from "@/lib/observateur-acces";
-import { enregistrerPanne, tropDeSignalements } from "@/lib/panne";
+import { creerDemande, tropDeDemandes } from "@/lib/demandes";
 
 // Phase 18 : actions de la page ouverte en scannant le QR code de la cabine.
 
@@ -33,6 +33,7 @@ export async function connexionQr(formData: FormData) {
 const panneSchema = z.object({
   nom: z.string().trim().min(2, "Indiquez votre nom.").max(160),
   telephone: z.string().trim().regex(/^[+0-9 ().-]{6,40}$/, "Indiquez un numéro de téléphone valide."),
+  email: z.string().trim().toLowerCase().email("Adresse email invalide.").max(200).optional(),
   description: z.string().trim().min(5, "Décrivez la panne en quelques mots.").max(1000),
 });
 
@@ -43,11 +44,27 @@ export async function signalerPanneQr(formData: FormData) {
   if (String(formData.get("site_web") ?? "")) redirect(`/a/${code}?panne=1`);
   const [a] = await db.select({ id: appareils.id }).from(appareils).where(eq(appareils.qrCode, code)).limit(1);
   if (!a) redirect(`/a/${code}`);
-  const parsed = panneSchema.safeParse({ nom: formData.get("nom"), telephone: formData.get("telephone"), description: formData.get("description") });
+  const parsed = panneSchema.safeParse({
+    nom: formData.get("nom"),
+    telephone: formData.get("telephone"),
+    email: formData.get("email") || undefined,
+    description: formData.get("description"),
+  });
   if (!parsed.success) redirect(`/a/${code}?erreurPanne=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Formulaire invalide")}#panne`);
-  if ((await tropDeSignalements(a.id, null, parsed.data.telephone)) || (await tropDeSignalements(a.id, null, null))) {
+  if (await tropDeDemandes(a.id, null, parsed.data.telephone)) {
     redirect(`/a/${code}?erreurPanne=${encodeURIComponent("Cette panne a déjà été signalée — ROBUS est prévenu.")}#panne`);
   }
-  await enregistrerPanne({ appareilId: a.id, description: parsed.data.description, nom: parsed.data.nom, telephone: parsed.data.telephone, auteurId: null });
+  const { numero } = await creerDemande({
+    appareilId: a.id,
+    type: "panne",
+    description: parsed.data.description,
+    personneBloquee: formData.get("personneBloquee") === "on",
+    auteurId: null,
+    nom: parsed.data.nom,
+    telephone: parsed.data.telephone,
+    email: parsed.data.email ?? null,
+    origine: "qr",
+  });
+  redirect(`/a/${code}?panne=1&numero=${encodeURIComponent(numero)}`);
   redirect(`/a/${code}?panne=1`);
 }

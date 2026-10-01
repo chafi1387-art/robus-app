@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { AlertTriangle, CalendarClock, ChevronRight, FileText, History, MapPin, ShieldCheck } from "lucide-react";
 import { db } from "@/db";
-import { appareils, documentsFormations, garantieFormules, garanties, projetAppareils, projets, users } from "@/db/schema";
+import { appareils, documentsClient, garantieFormules, garanties, projetAppareils, projets, users } from "@/db/schema";
 import { Card, StatutAppareilPill } from "@/components/ui";
 import { EtapesSuivi } from "@/components/etapes-suivi";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { ETAPES, adressesAppareils, etapeObservateur, exigerAppareil, requireObservateur } from "@/lib/observateur";
 import { interventionsEnCours, interventionsTerminees, prenom, prochainesVisites } from "@/lib/observateur-donnees";
-import { signalerPanne } from "../../actions";
+import { creerDemandeObservateur } from "../../actions";
+import { TYPES_DOCUMENT_CLIENT } from "@/lib/documents-client";
 import { passagesDAppareils } from "@/lib/garantie-passages";
 
 const TYPE: Record<string, string> = { preventive: "Maintenance préventive", corrective: "Dépannage", systematique: "Contrôle systématique" };
@@ -51,14 +52,10 @@ export default async function AppareilObservateurPage({
       : Promise.resolve([]),
     d.has("documents")
       ? db
-          .select({ id: documentsFormations.id, titre: documentsFormations.titre, url: documentsFormations.urlFichier, createdAt: documentsFormations.createdAt })
-          .from(documentsFormations)
-          .where(
-            and(
-              eq(documentsFormations.visibleObservateur, 1),
-              or(eq(documentsFormations.appareilId, id), inArray(documentsFormations.projetId, projetsClient))
-            )
-          )
+          .select({ id: documentsClient.id, titre: documentsClient.titre, type: documentsClient.type, message: documentsClient.message, createdAt: documentsClient.createdAt })
+          .from(documentsClient)
+          .where(and(eq(documentsClient.appareilId, id), isNull(documentsClient.archiveLe)))
+          .orderBy(desc(documentsClient.createdAt))
       : Promise.resolve([]),
     db.select({ telephone: users.telephone }).from(users).where(eq(users.id, ctx.userId)).limit(1),
   ]);
@@ -107,8 +104,13 @@ export default async function AppareilObservateurPage({
               <AlertTriangle className="w-4 h-4" /> Signaler une panne
             </summary>
             {sp.erreur && <div className="mt-3 text-sm bg-red-fill text-red-ink rounded-lg px-3 py-2">{sp.erreur}</div>}
-            <form action={signalerPanne} className="flex flex-col gap-3 mt-3">
+            <form action={creerDemandeObservateur} className="flex flex-col gap-3 mt-3">
               <input type="hidden" name="appareilId" value={id} />
+              <input type="hidden" name="type" value="panne" />
+              <input type="hidden" name="depuis" value={`/observateur/appareils/${id}`} />
+              <label className="flex items-center gap-2.5 rounded-xl bg-red-fill text-red-ink px-3 py-3 font-bold text-[15px]">
+                <input type="checkbox" name="personneBloquee" className="w-5 h-5" /> Une personne est bloquée dans la cabine
+              </label>
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Que se passe-t-il ?</span>
                 <textarea name="description" required minLength={5} maxLength={1000} rows={3} className="rounded-lg border border-line px-3 py-2.5 text-[15px]" placeholder="Ex. l'ascenseur est bloqué au 3e étage, porte ouverte…" />
@@ -117,8 +119,13 @@ export default async function AppareilObservateurPage({
                 <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Téléphone pour vous rappeler</span>
                 <input name="telephone" defaultValue={moi?.telephone ?? ""} inputMode="tel" className="rounded-lg border border-line px-3 py-2.5 text-[15px]" />
               </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Photo (facultatif)</span>
+                <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple className="text-sm" />
+              </label>
               <button type="submit" className="bg-red-ink text-white font-display font-bold rounded-xl py-3">Envoyer à ROBUS</button>
             </form>
+            <Link href={`/observateur/demandes/nouvelle?appareil=${id}`} className="block text-center text-sm font-semibold text-blue mt-3">Autre demande (intervention, question, document)…</Link>
           </details>
         </Card>
       )}
@@ -226,16 +233,15 @@ export default async function AppareilObservateurPage({
           <h2 className="font-display font-bold text-sm mb-2 flex items-center gap-2"><FileText className="w-4 h-4 text-blue" /> Documents</h2>
           <div className="flex flex-col divide-y divide-line">
             {docs.map((doc) => (
-              <div key={doc.id} className="py-2 flex items-center justify-between gap-2 text-sm">
-                {doc.url ? (
-                  <a href={doc.url} target="_blank" rel="noreferrer" className="font-semibold text-blue truncate">{doc.titre}</a>
-                ) : (
-                  <span className="truncate">{doc.titre}</span>
-                )}
+              <a key={doc.id} href={`/observateur/documents/${doc.id}`} target="_blank" rel="noreferrer" className="py-2.5 flex items-center justify-between gap-2 text-sm">
+                <span className="min-w-0">
+                  <span className="font-semibold text-blue block truncate">{doc.titre}</span>
+                  <span className="text-xs text-ink-soft">{TYPES_DOCUMENT_CLIENT[doc.type] ?? "Document"}{doc.message ? ` · ${doc.message}` : ""}</span>
+                </span>
                 <span className="text-xs text-ink-soft shrink-0">{formatDate(doc.createdAt)}</span>
-              </div>
+              </a>
             ))}
-            {docs.length === 0 && <p className="text-sm text-ink-soft py-1">Aucun document partagé.</p>}
+            {docs.length === 0 && <p className="text-sm text-ink-soft py-1">Aucun document partagé pour cet ascenseur.</p>}
           </div>
         </Card>
       )}

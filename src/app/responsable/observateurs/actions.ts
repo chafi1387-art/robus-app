@@ -9,13 +9,27 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   clients,
-  documentsFormations,
   observateurAppareils,
   observateurs,
   reinitialisationsMotDePasse,
   users,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth-helpers";
+import { after } from "next/server";
+import { appareils, documentsClient } from "@/db/schema";
+import { enregistrerFichiers, fichiersDuFormulaire } from "@/lib/fichiers";
+import { avecMessage } from "@/lib/url";
+import { notifierObservateurs } from "@/lib/observateur";
+import { TYPES_DOCUMENT_CLIENT } from "@/lib/documents-client";
+import {
+  PARAM_CONTACT_EMAIL,
+  PARAM_CONTACT_NOM,
+  PARAM_CONTACT_TEL,
+  PARAM_DELAI_AUTRE_H,
+  PARAM_DELAI_PANNE_MIN,
+  PARAM_EMAILS_ALERTES,
+  PARAM_RESUME_MENSUEL,
+} from "@/lib/demandes";
 import { journaliser } from "@/lib/journal";
 import { envoyerInvitationObservateur } from "@/lib/mail";
 import {
@@ -203,16 +217,88 @@ export async function enregistrerTelephoneUrgence(formData: FormData) {
   revalidatePath("/responsable/observateurs");
 }
 
-/** Rend un document visible (ou non) dans l'espace Observateur. */
-export async function basculerVisibiliteDocument(formData: FormData) {
-  const user = await requireUser([...ROLES_GESTION]);
-  const id = String(formData.get("documentId") ?? "");
-  const retour = String(formData.get("retour") ?? "");
-  if (!z.string().uuid().safeParse(id).success) throw new Error("Document introuvable.");
-  const [doc] = await db.select({ v: documentsFormations.visibleObservateur }).from(documentsFormations).where(eq(documentsFormations.id, id)).limit(1);
-  if (!doc) throw new Error("Document introuvable.");
-  await db.update(documentsFormations).set({ visibleObservateur: doc.v ? 0 : 1 }).where(eq(documentsFormations.id, id));
-  await journaliser({ entite: "document", entiteId: id, action: doc.v ? "document_masque_observateur" : "document_visible_observateur", utilisateurId: user.id });
-  if (retour.startsWith("/responsable/")) revalidatePath(retour.split("?")[0]);
+// ==========================================================================
+// Phase 20 — Documents client (par appareil, séparés des documents internes)
+// et paramètres de la relation client.
+// ==========================================================================
+export async function ajouterDocumentClient(formData: FormData) {
+  const user = await requireUser([...ROLES_GESTION, "commercial"]);
+  const appareilId = String(formData.get("appareilId") ?? "");
+  const retour = `/responsable/appareils/${appareilId}#documents-client`;
+  if (!z.string().uuid().safeParse(appareilId).success) redirect("/responsable/appareils");
+  const titre = String(formData.get("titre") ?? "").trim().slice(0, 200);
+  const type = String(formData.get("type") ?? "autre");
+  const message = String(formData.get("message") ?? "").trim().slice(0, 1000) || null;
+  if (!titre) redirect(avecMessage(retour, "erreur", "Donnez un titre au document."));
+  let fichiers: File[] = [];
+  try {
+    fichiers = fichiersDuFormulaire(formData, "fichier", 1);
+  } catch (e) {
+    redirect(avecMessage(retour, "erreur", (e as Error).message));
+  }
+  if (!fichiers.length) redirect(avecMessage(retour, "erreur", "Joignez le fichier."));
+  const [f] = await enregistrerFichiers(fichiers, "missions", `client-${appareilId}`);
+  const [doc] = await db
+    .insert(documentsClient)
+    .values({ appareilId, titre, type: type in TYPES_DOCUMENT_CLIENT ? type : "autre", url: f.url, nomFichier: f.nom, message, creeParId: user.id })
+    .returning({ id: documentsClient.id });
+  await journaliser({ entite: "document_client", entiteId: doc.id, action: "partage", utilisateurId: user.id, details: `${titre} — appareil ${appareilId}` });
+  const [a] = await db.select({ numero: appareils.numeroInterne }).from(appareils).where(eq(appareils.id, appareilId)).limit(1);
+  after(() =>
+    notifierObservateurs(
+      appareilId,
+      "documents",
+      {
+        titre: "📄 Nouveau document disponible",
+        corps: `${titre} — ascenseur ${a?.numero ?? ""}${message ? ` : ${message}` : ""}`,
+        url: `/observateur/appareils/${appareilId}`,
+      },
+      true
+    )
+  );
+  revalidatePath(`/responsable/appareils/${appareilId}`);
+  redirect(avecMessage(retour, "ok", `Document « ${titre} » partagé avec le client.`));
 }
 
+export async function archiverDocumentClient(formData: FormData) {
+  const user = await requireUser([...ROLES_GESTION, "commercial"]);
+  const id = String(formData.get("documentId") ?? "");
+  const appareilId = String(formData.get("appareilId") ?? "");
+  if (!z.string().uuid().safeParse(id).success) redirect("/responsable/appareils");
+  const [doc] = await db.select({ archiveLe: documentsClient.archiveLe }).from(documentsClient).where(eq(documentsClient.id, id)).limit(1);
+  if (!doc) redirect("/responsable/appareils");
+  await db.update(documentsClient).set({ archiveLe: doc!.archiveLe ? null : new Date() }).where(eq(documentsClient.id, id));
+  await journaliser({ entite: "document_client", entiteId: id, action: doc!.archiveLe ? "restaure" : "retire", utilisateurId: user.id });
+  revalidatePath(`/responsable/appareils/${appareilId}`);
+  redirect(`/responsable/appareils/${appareilId}#documents-client`);
+}
+
+export async function enregistrerParametresClient(formData: FormData) {
+  const user = await requireUser([...ROLES_GESTION]);
+  const retour = "/responsable/observateurs";
+  const emails = String(formData.get("emailsAlertes") ?? "")
+    .split(/[,;\s]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const invalide = emails.find((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+  if (invalide) redirect(avecMessage(retour, "erreur", `Adresse email invalide : ${invalide}`));
+  const delaiPanne = Math.min(1440, Math.max(5, Number(formData.get("delaiPanne")) || 30));
+  const delaiAutre = Math.min(240, Math.max(1, Number(formData.get("delaiAutre")) || 24));
+  const tel = String(formData.get("telephone") ?? "").trim().slice(0, 40);
+  if (tel && !/^[+0-9 ().-]{6,40}$/.test(tel)) redirect(avecMessage(retour, "erreur", "Téléphone d'urgence invalide."));
+  const contactEmail = String(formData.get("contactEmail") ?? "").trim().toLowerCase().slice(0, 200);
+  if (contactEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) redirect(avecMessage(retour, "erreur", "Email de contact invalide."));
+  await Promise.all([
+    setParametre(PARAM_EMAILS_ALERTES, emails.join(", ") || null),
+    setParametre(PARAM_DELAI_PANNE_MIN, String(delaiPanne)),
+    setParametre(PARAM_DELAI_AUTRE_H, String(delaiAutre)),
+    setParametre(PARAM_RESUME_MENSUEL, formData.get("resumeMensuel") === "on" ? "1" : "0"),
+    setParametre(PARAM_TELEPHONE, tel || null),
+    setParametre(PARAM_CONTACT_NOM, String(formData.get("contactNom") ?? "").trim().slice(0, 160) || null),
+    setParametre(PARAM_CONTACT_TEL, String(formData.get("contactTelephone") ?? "").trim().slice(0, 40) || null),
+    setParametre(PARAM_CONTACT_EMAIL, contactEmail || null),
+  ]);
+  await journaliser({ entite: "parametre", entiteId: user.id, action: "relation_client_modifiee", utilisateurId: user.id, details: `alertes : ${emails.join(", ") || "(bureau)"} · délais ${delaiPanne} min / ${delaiAutre} h` });
+  revalidatePath(retour);
+  redirect(avecMessage(retour, "ok", "Paramètres de la relation client enregistrés."));
+}

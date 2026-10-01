@@ -1,5 +1,7 @@
 import { QrCode } from "lucide-react";
-import { basculerVisibiliteDocument } from "../../observateurs/actions";
+import { ajouterDocumentClient, archiverDocumentClient } from "../../observateurs/actions";
+import { TYPES_DOCUMENT_CLIENT } from "@/lib/documents-client";
+import { documentsClient, documentsClientConsultations, observateurAppareils } from "@/db/schema";
 import {
   Card,
   Btn,
@@ -14,7 +16,7 @@ import {
 import { FileField } from "@/components/file-field";
 import { db } from "@/db";
 import { appareils, clients, documentsFormations, interventions, sites, users } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -70,6 +72,22 @@ export default async function AppareilDetailPage({
     .limit(1);
   if (!row) notFound();
   const { appareil, site, client } = row;
+
+  // Phase 20 : documents partagés avec le client + qui les a consultés.
+  const docsClient = await db
+    .select({
+      d: documentsClient,
+      auteur: users.nom,
+      vus: sql<string | null>`(select string_agg(u.nom || ' le ' || to_char(c.premiere_le, 'DD/MM/YYYY HH24:MI'), ', ') from ${documentsClientConsultations} c join ${users} u on u.id = c.user_id where c.document_id = ${documentsClient.id})`,
+    })
+    .from(documentsClient)
+    .leftJoin(users, eq(documentsClient.creeParId, users.id))
+    .where(eq(documentsClient.appareilId, id))
+    .orderBy(desc(documentsClient.createdAt));
+  const [nbObservateurs] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(observateurAppareils)
+    .where(eq(observateurAppareils.appareilId, id));
 
   const [interventionRows, techniciens, projetsPourAppareil, documents] = await Promise.all([
     db
@@ -286,9 +304,63 @@ export default async function AppareilDetailPage({
             </form>
           </Card>
 
+          <Card className="p-5 border-[1.5px] border-blue/40">
+            <div id="documents-client" className="scroll-mt-24" />
+            <div className="flex items-start justify-between gap-2 flex-wrap mb-1">
+              <h2 className="font-display font-bold text-sm">Documents client ({docsClient.filter((x) => !x.d.archiveLe).length})</h2>
+              <span className="text-[11px] text-ink-soft">Visibles uniquement par les observateurs de cet ascenseur ({nbObservateurs?.n ?? 0})</span>
+            </div>
+            <p className="text-xs text-ink-soft mb-3">Contrat, attestation, rapport de contrôle, devis… Vos documents internes (ci-dessous) ne sont jamais montrés au client.</p>
+            <div className="flex flex-col divide-y divide-line">
+              {docsClient.map(({ d, auteur, vus }) => (
+                <div key={d.id} className={`py-2.5 flex items-start justify-between gap-3 ${d.archiveLe ? "opacity-50" : ""}`}>
+                  <div className="min-w-0 text-sm">
+                    <a href={d.url} target="_blank" rel="noreferrer" className="font-semibold text-blue hover:underline">{d.titre}</a>
+                    <span className="text-xs text-ink-soft"> · {TYPES_DOCUMENT_CLIENT[d.type] ?? "Document"} · {formatDate(d.createdAt)}{auteur ? ` · ${auteur}` : ""}</span>
+                    {d.message && <div className="text-xs text-ink-soft">« {d.message} »</div>}
+                    <div className={`text-[11px] font-semibold ${vus ? "text-green-ink" : "text-ink-soft"}`}>{vus ? `Consulté par ${vus}` : "Pas encore consulté"}</div>
+                  </div>
+                  <form action={archiverDocumentClient}>
+                    <input type="hidden" name="documentId" value={d.id} />
+                    <input type="hidden" name="appareilId" value={appareil.id} />
+                    <button type="submit" className="text-xs font-bold text-ink-soft hover:text-red-ink">{d.archiveLe ? "Remettre" : "Retirer"}</button>
+                  </form>
+                </div>
+              ))}
+              {docsClient.length === 0 && <p className="text-sm text-ink-soft py-1">Aucun document partagé avec le client.</p>}
+            </div>
+            <details className="mt-3 pt-3 border-t border-line">
+              <summary className="text-sm font-bold text-blue cursor-pointer select-none">+ Ajouter un document pour le client</summary>
+              <form action={ajouterDocumentClient} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <input type="hidden" name="appareilId" value={appareil.id} />
+                <Field label="Titre">
+                  <input name="titre" required maxLength={200} className={inputClass} placeholder="Ex. Contrat de maintenance 2026" />
+                </Field>
+                <Field label="Type">
+                  <select name="type" defaultValue="autre" className={inputClass}>
+                    {Object.entries(TYPES_DOCUMENT_CLIENT).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Message pour le client (facultatif)">
+                    <input name="message" maxLength={1000} className={inputClass} placeholder="Ex. Voici l'attestation demandée." />
+                  </Field>
+                </div>
+                <Field label="Fichier (PDF, image, Word, Excel — 20 Mo max)">
+                  <input type="file" name="fichier" required className="text-sm" />
+                </Field>
+                <div className="flex items-end">
+                  <Btn>Partager avec le client</Btn>
+                </div>
+              </form>
+            </details>
+          </Card>
+
           <Card className="p-5">
             <h2 className="font-display font-bold text-sm mb-3">
-              Documentation ({documents.length})
+              Documents internes ({documents.length})
             </h2>
             <div className="flex flex-col divide-y divide-line">
               {documents.map((d) => (
@@ -312,17 +384,7 @@ export default async function AppareilDetailPage({
                     <div className="text-xs text-ink-soft mt-0.5 capitalize">{d.typeContenu}</div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <form action={basculerVisibiliteDocument}>
-                      <input type="hidden" name="documentId" value={d.id} />
-                      <input type="hidden" name="retour" value={`/responsable/appareils/${appareil.id}`} />
-                      <button
-                        type="submit"
-                        title="Visible dans l'espace Observateur du client"
-                        className={`text-[11px] font-bold rounded-full px-2.5 py-1 border ${d.visibleObservateur ? "bg-green-fill text-green-ink border-transparent" : "border-line text-ink-soft hover:bg-blue-pale"}`}
-                      >
-                        {d.visibleObservateur ? "👁 Visible observateur" : "Masqué observateur"}
-                      </button>
-                    </form>
+                    
                     <span className="text-xs text-ink-soft whitespace-nowrap">
                       {formatDate(d.createdAt)}
                     </span>

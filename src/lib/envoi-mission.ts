@@ -17,6 +17,7 @@ import { envoyerOrdreDeMission } from "@/lib/mail";
 import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
 import { journaliser } from "@/lib/journal";
 import { notifierObservateurs } from "@/lib/observateur";
+import { demandesMissionPlanifiee } from "@/lib/demandes";
 
 // Phase 17 : envoi d'une (ou plusieurs) mission(s) au technicien — logique
 // unique utilisée partout (création, affectation, ajout à un projet,
@@ -183,6 +184,8 @@ export async function envoyerMissionsAuTechnicien(params: {
           tag: `email-echec-${params.projetId}`,
         });
       }
+      // Phase 20 : demandes client liées -> « Intervention planifiée » (client prévenu).
+      await demandesMissionPlanifiee(missionIds);
       // Phase 18 : l'observateur du client est prévenu de la date prévue.
       for (const m of missions) {
         await notifierObservateurs(

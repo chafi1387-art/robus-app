@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Building, User } from "lucide-react";
+import { Activity, Building, MessageSquare, User } from "lucide-react";
 
 // Phase 18 : barre du bas de l'espace Observateur.
 export function NavObservateur({ tempsReel }: { tempsReel: boolean }) {
@@ -10,6 +10,7 @@ export function NavObservateur({ tempsReel }: { tempsReel: boolean }) {
   const onglets = [
     { href: "/observateur", label: "Mes ascenseurs", icon: Building, actif: pathname === "/observateur" || pathname.startsWith("/observateur/appareils") || pathname.startsWith("/observateur/interventions") },
     ...(tempsReel ? [{ href: "/observateur/en-cours", label: "En cours", icon: Activity, actif: pathname.startsWith("/observateur/en-cours") }] : []),
+    { href: "/observateur/demandes", label: "Demandes", icon: MessageSquare, actif: pathname.startsWith("/observateur/demandes") },
     { href: "/observateur/compte", label: "Mon accès", icon: User, actif: pathname.startsWith("/observateur/compte") },
   ];
   return (

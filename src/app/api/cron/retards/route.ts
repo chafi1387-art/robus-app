@@ -2,6 +2,8 @@ import { db } from "@/db";
 import { appareils, habilitationsTechnicien, interventions, projets, users } from "@/db/schema";
 import { creerMissionsPassagesProches } from "@/lib/garantie-passages";
 import { habilitationsCourantes } from "@/lib/habilitations";
+import { relancerDemandesEnRetard } from "@/lib/demandes";
+import { envoyerResumesMensuels } from "@/lib/resume-mensuel";
 import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
 import { and, eq, inArray, isNotNull, isNull, lt, notInArray } from "drizzle-orm";
 import { timingSafeEqual } from "node:crypto";
@@ -137,5 +139,9 @@ export async function POST(req: Request) {
     alertesHab++;
   }
 
-  return Response.json({ notifiees: retards.length, nonVues: nonVues.length, passagesCrees: passages.length, alertesHabilitations: alertesHab });
+  // Phase 20 : demandes client non prises en charge dans le délai + résumé mensuel.
+  const demandesRelancees = await relancerDemandesEnRetard();
+  const resumes = await envoyerResumesMensuels(new URL(req.url).searchParams.get("resume") === "forcer");
+
+  return Response.json({ notifiees: retards.length, nonVues: nonVues.length, passagesCrees: passages.length, alertesHabilitations: alertesHab, demandesRelancees, resumes });
 }

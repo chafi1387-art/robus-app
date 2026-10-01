@@ -8,7 +8,7 @@ import { NavBureau } from "@/components/nav-bureau";
 // Phase 15 : sur téléphone/tablette, le menu latéral se replie derrière ☰.
 // Rendu dans <body> (portail) : l'en-tête a un flou d'arrière-plan qui
 // empêcherait le panneau de couvrir tout l'écran.
-export function MenuMobile({ role, badges }: { role: string; badges: { panne: number; nonAffectees: number } }) {
+export function MenuMobile({ role, badges }: { role: string; badges: { panne: number; nonAffectees: number; demandes?: number } }) {
   const [ouvert, setOuvert] = useState(false);
   return (
     <>

@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Archive, ArrowUpDown, Eye, GraduationCap, BookOpen, Building2, CalendarDays, ClipboardList, FileText, FolderKanban,
+  Archive, ArrowUpDown, Eye, GraduationCap, Inbox, BookOpen, Building2, CalendarDays, ClipboardList, FileText, FolderKanban,
   HardHat, LayoutDashboard, ListChecks, MapPin, OctagonAlert, Package, Presentation, Receipt, Ruler,
   ScrollText, ShieldCheck, Smile, Target, Timer, TriangleAlert, UserCog, UserSearch, Search,
 } from "lucide-react";
 
-type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; adminOnly?: boolean; badge?: "panne" | "nonAffectees" };
+type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; adminOnly?: boolean; badge?: "panne" | "nonAffectees" | "demandes" };
 
 // Refonte Phase 13 : plus d'entrée « Interventions » — les missions vivent
 // dans chaque Projet ; « Planning des missions » les montre toutes.
@@ -17,6 +17,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
     title: "Pilotage",
     items: [
       { href: "/responsable", label: "Tableau de bord", icon: LayoutDashboard },
+      { href: "/responsable/demandes", label: "Demandes clients", icon: Inbox, badge: "demandes" },
       { href: "/responsable/projets", label: "Projets", icon: FolderKanban },
       { href: "/responsable/interventions", label: "Planning des missions", icon: CalendarDays, badge: "nonAffectees" },
       { href: "/responsable/sous-traitance", label: "Sous-traitance", icon: Timer },
@@ -63,7 +64,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
   },
 ];
 
-export function NavBureau({ role, badges }: { role: string; badges: { panne: number; nonAffectees: number } }) {
+export function NavBureau({ role, badges }: { role: string; badges: { panne: number; nonAffectees: number; demandes?: number } }) {
   const pathname = usePathname();
   const actif = (href: string) => (href === "/responsable" ? pathname === href : pathname === href || pathname.startsWith(href + "/"));
   return (
@@ -77,7 +78,7 @@ export function NavBureau({ role, badges }: { role: string; badges: { panne: num
             {items.map((item) => {
               const on = actif(item.href);
               const Icon = item.icon;
-              const n = item.badge ? badges[item.badge] : 0;
+              const n = item.badge ? badges[item.badge] ?? 0 : 0;
               return (
                 <Link
                   key={item.href}
@@ -91,7 +92,7 @@ export function NavBureau({ role, badges }: { role: string; badges: { panne: num
                   {n > 0 && (
                     <span
                       className={`min-w-5 h-5 px-1.5 rounded-full text-white text-[11px] font-bold flex items-center justify-center ${
-                        item.badge === "panne" ? "bg-red" : "bg-orange"
+                        item.badge === "panne" || item.badge === "demandes" ? "bg-red" : "bg-orange"
                       }`}
                     >
                       {n}
