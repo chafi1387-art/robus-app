@@ -21,7 +21,7 @@ import { notifierBureau } from "@/lib/push";
 import { peutModifierHeureReelle } from "@/lib/rapport-rules";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -42,15 +42,51 @@ export async function commencerIntervention(formData: FormData) {
   const interventionId = formData.get("interventionId") as string;
   await assertOwnIntervention(interventionId, user.id, user.role);
 
+  const maintenant = new Date();
   await db
     .update(interventions)
-    .set({ statut: "en_cours", dateDebut: new Date() })
+    .set({ statut: "en_cours", dateDebut: maintenant })
     .where(eq(interventions.id, interventionId));
+  // Phase 17 : commencer une mission vaut acceptation.
+  await db
+    .update(interventions)
+    .set({ accepteeLe: maintenant })
+    .where(and(eq(interventions.id, interventionId), isNull(interventions.accepteeLe)));
+  await db
+    .update(interventions)
+    .set({ vueLe: maintenant })
+    .where(and(eq(interventions.id, interventionId), isNull(interventions.vueLe)));
 
   revalidatePath("/technicien");
   revalidatePath(`/technicien/interventions/${interventionId}`);
   // Pas de redirect() : on reste sur la même page, Next rafraîchit
   // automatiquement les données du Server Component après l'action.
+}
+
+// Phase 17 : le technicien confirme avoir reçu la mission (accusé de réception).
+export async function accepterMission(formData: FormData) {
+  const user = await requireUser(ROLES_TECHNICIEN);
+  const interventionId = String(formData.get("interventionId") ?? "");
+  if (!z.string().uuid().safeParse(interventionId).success) throw new Error("Mission introuvable.");
+  await assertOwnIntervention(interventionId, user.id, user.role);
+  const maintenant = new Date();
+  await db
+    .update(interventions)
+    .set({ accepteeLe: maintenant })
+    .where(and(eq(interventions.id, interventionId), isNull(interventions.accepteeLe)));
+  await db
+    .update(interventions)
+    .set({ vueLe: maintenant })
+    .where(and(eq(interventions.id, interventionId), isNull(interventions.vueLe)));
+  await journaliser({
+    entite: "intervention",
+    entiteId: interventionId,
+    action: "mission_acceptee",
+    utilisateurId: user.id,
+    details: "Mission acceptée par le technicien",
+  });
+  revalidatePath("/technicien");
+  revalidatePath(`/technicien/interventions/${interventionId}`);
 }
 
 const rapportSchema = z.object({

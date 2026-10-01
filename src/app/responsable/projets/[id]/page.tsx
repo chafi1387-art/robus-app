@@ -1,3 +1,4 @@
+import { SuiviEnvoi } from "@/components/suivi-envoi";
 import { Card, Btn, Field, Pill, inputClass, StatutInterventionPill, TypeInterventionPill } from "@/components/ui";
 import { FileField } from "@/components/file-field";
 import { db } from "@/db";
@@ -229,6 +230,11 @@ export default async function ProjetDetailPage({
         numeroInterne: appareils.numeroInterne,
         technicien: users.nom,
         technicienId: interventions.technicienId,
+        envoyeeLe: interventions.envoyeeLe,
+        vueLe: interventions.vueLe,
+        accepteeLe: interventions.accepteeLe,
+        envoiEmail: interventions.envoiEmail,
+        envoiPush: interventions.envoiPush,
         rapportId: rapports.id,
         travauxRealises: rapports.travauxRealises,
         tempsPasseMinutes: rapports.tempsPasseMinutes,
@@ -558,8 +564,8 @@ export default async function ProjetDetailPage({
                       <option value="critique">Critique</option>
                     </select>
                   </Field>
-                  <Field label="Date et heure">
-                    <input type="datetime-local" name="dateProgrammee" className={inputClass} />
+                  <Field label="Date et heure *">
+                    <input type="datetime-local" name="dateProgrammee" required className={inputClass} />
                   </Field>
                   <Field label="Technicien">
                     <select name="technicienId" className={inputClass} defaultValue={techniciensAffectes[0]?.id ?? ""}>
@@ -582,7 +588,7 @@ export default async function ProjetDetailPage({
                     <input name="description" className={inputClass} placeholder="Ce que le technicien doit faire…" />
                   </Field>
                   <div className="md:col-span-2 xl:col-span-3 flex items-center justify-between gap-3 flex-wrap">
-                    <span className="text-xs text-ink-soft">Si un technicien est choisi, son ordre de mission part par email immédiatement.</span>
+                    <span className="text-xs text-ink-soft">Si un technicien est choisi, la mission lui est envoyée immédiatement : application, notification sur son téléphone et email.</span>
                     <Btn>Créer la mission</Btn>
                   </div>
                 </form>
@@ -608,6 +614,7 @@ export default async function ProjetDetailPage({
                   <div className="flex-1 min-w-0 text-sm">
                     {i.numeroInterne} · {formatDateTime(i.dateProgrammee)} · {i.technicien ?? "Non affecté"}
                   </div>
+                  <SuiviEnvoi m={i} />
                   <StatutInterventionPill statut={i.statut} />
                 </div>
                 <div className="flex items-center gap-3 flex-wrap text-xs text-ink-soft">

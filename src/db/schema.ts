@@ -240,6 +240,13 @@ export const interventions = pgTable("interventions", {
   dateFin: timestamp("date_fin"),
   // Phase 16 : date de la notification « mission en retard » (une seule fois).
   retardNotifieLe: timestamp("retard_notifie_le"),
+  // Phase 17 : suivi de l'envoi au technicien (accusé de réception).
+  envoyeeLe: timestamp("envoyee_le"),
+  vueLe: timestamp("vue_le"),
+  accepteeLe: timestamp("acceptee_le"),
+  envoiEmail: varchar("envoi_email", { length: 20 }), // ok | echec | non_configure
+  envoiPush: integer("envoi_push"), // nb de téléphones notifiés
+  alerteNonVueLe: timestamp("alerte_non_vue_le"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

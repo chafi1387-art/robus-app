@@ -82,14 +82,13 @@ export default async function TechnicienDetailPage({
   const { tab: tabParam } = await searchParams;
   const tab = (ONGLETS.map((o) => o.id) as string[]).includes(tabParam ?? "") ? (tabParam as string) : "apercu";
 
-  const [userRow] = await db.select().from(users).where(eq(users.id, id)).limit(1);
-  if (!userRow || userRow.role !== "technicien") notFound();
-
-  const [fiche] = await db.select().from(technicienFiches).where(eq(technicienFiches.technicienId, id)).limit(1);
-  const ancien = fiche?.statutRh === "sorti_effectifs";
   const debutMois = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-  const [habilitations, documents, projetsAffectes, sitesOptions, missions, heuresMois, [stats], consultations, journal] = await Promise.all([
+  // Phase 17 : une seule vague de requêtes en parallèle (avant : 3 vagues
+  // successives) — la fiche s'ouvre nettement plus vite.
+  const [[userRow], [fiche], habilitations, documents, projetsAffectes, sitesOptions, missions, heuresMois, [stats], consultations, journal] = await Promise.all([
+    db.select().from(users).where(eq(users.id, id)).limit(1),
+    db.select().from(technicienFiches).where(eq(technicienFiches.technicienId, id)).limit(1),
     db
       .select({
         id: habilitationsTechnicien.id,
@@ -166,6 +165,9 @@ export default async function TechnicienDetailPage({
           .limit(tab === "historique" ? 300 : 6)
       : Promise.resolve([]),
   ]);
+
+  if (!userRow || userRow.role !== "technicien") notFound();
+  const ancien = fiche?.statutRh === "sorti_effectifs";
 
   const siteRattache = fiche?.siteRattachementId ? sitesOptions.find((s) => s.id === fiche.siteRattachementId) : undefined;
   const habValides = habilitations.filter((h) => !h.dateExpiration || h.dateExpiration.getTime() > Date.now());

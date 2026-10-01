@@ -1,3 +1,4 @@
+import { SuiviEnvoi } from "@/components/suivi-envoi";
 import {
   Card,
   Btn,
@@ -37,6 +38,11 @@ export default async function InterventionsPage() {
         raisonSociale: clients.raisonSociale,
         technicien: users.nom,
         technicienId: interventions.technicienId,
+        envoyeeLe: interventions.envoyeeLe,
+        vueLe: interventions.vueLe,
+        accepteeLe: interventions.accepteeLe,
+        envoiEmail: interventions.envoiEmail,
+        envoiPush: interventions.envoiPush,
         projetId: interventions.projetId,
         projetReference: projets.reference,
         projetTitre: projets.titre,
@@ -177,6 +183,15 @@ export default async function InterventionsPage() {
                         {modifiable ? (
                           <form action={assignerIntervention} className="flex items-center gap-1.5">
                             <input type="hidden" name="interventionId" value={i.id} />
+                            {!i.dateProgrammee && (
+                              <input
+                                type="datetime-local"
+                                name="dateProgrammee"
+                                required
+                                title="Date obligatoire avant d'envoyer la mission"
+                                className={`${inputClass} !py-1 !text-xs w-44`}
+                              />
+                            )}
                             <select
                               name="technicienId"
                               defaultValue={i.technicienId ?? ""}
@@ -201,7 +216,10 @@ export default async function InterventionsPage() {
                         )}
                       </td>
                       <td className="py-2.5 pr-3">
-                        <StatutInterventionPill statut={i.statut} />
+                        <div className="flex flex-col items-start gap-1">
+                          <StatutInterventionPill statut={i.statut} />
+                          <SuiviEnvoi m={i} />
+                        </div>
                       </td>
                     </tr>
                   );

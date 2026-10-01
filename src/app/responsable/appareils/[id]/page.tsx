@@ -378,8 +378,8 @@ export default async function AppareilDetailPage({
                   ))}
                 </select>
               </Field>
-              <Field label="Date programmée (optionnel)">
-                <input type="datetime-local" name="dateProgrammee" className={inputClass} />
+              <Field label="Date et heure *">
+                <input type="datetime-local" name="dateProgrammee" required className={inputClass} />
               </Field>
             </div>
 

@@ -1,7 +1,7 @@
 import { TypeInterventionPill, StatutInterventionPill } from "@/components/ui";
 import { db } from "@/db";
 import { appareils, clients, interventions, projets } from "@/db/schema";
-import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import Link from "next/link";
 import { CarteApplication } from "@/components/app-installable";
 import { clePubliqueVapid } from "@/lib/push";
@@ -19,6 +19,8 @@ function baseQuery() {
       statut: interventions.statut,
       description: interventions.description,
       dateProgrammee: interventions.dateProgrammee,
+      vueLe: interventions.vueLe,
+      accepteeLe: interventions.accepteeLe,
       numeroInterne: appareils.numeroInterne,
       projetReference: projets.reference,
       adresse: projets.adresse,
@@ -107,7 +109,28 @@ export default async function MesInterventionsPage({
     return `/technicien?vue=${v}&date=${toDateParam(d)}`;
   }
 
-  const [enRetard, periode, ajourdhuiCount] = await Promise.all([
+  const [nouvelles, sansDate, enRetard, periode, ajourdhuiCount] = await Promise.all([
+    // Phase 17 : toute mission envoyée et pas encore acceptée apparaît ici,
+    // quelle que soit sa date (une mission du 14 du mois prochain ne doit
+    // pas rester cachée dans la vue « Jour »).
+    baseQuery()
+      .where(
+        and(
+          eq(interventions.technicienId, user.id),
+          inArray(interventions.statut, ["creee", "planifiee", "affectee"]),
+          isNull(interventions.accepteeLe)
+        )
+      )
+      .orderBy(asc(interventions.dateProgrammee)),
+    // Filet de sécurité : anciennes missions sans date (invisibles sinon).
+    baseQuery()
+      .where(
+        and(
+          eq(interventions.technicienId, user.id),
+          isNull(interventions.dateProgrammee),
+          sql`${interventions.statut} not in ('terminee', 'validee', 'cloturee')`
+        )
+      ),
     // "En retard" : seulement ce qui attend encore une action du technicien
     // (pas déjà terminé/validé/clôturé) — sinon une mission déjà bouclée
     // remonterait à tort comme "en retard".
@@ -199,6 +222,32 @@ export default async function MesInterventionsPage({
 
       <CarteApplication cleVapid={clePubliqueVapid()} seulementSiAction compact />
 
+      {nouvelles.length > 0 && (
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-wide text-blue mb-2 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue animate-pulse" /> Nouvelles missions ({nouvelles.length})
+          </h2>
+          <div className="flex flex-col gap-3">
+            {nouvelles.map((i) => (
+              <InterventionCard key={i.id} i={i} nouvelle />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {sansDate.filter((i) => !nouvelles.some((n) => n.id === i.id)).length > 0 && (
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-wide text-orange-ink mb-2">Date à confirmer avec le bureau</h2>
+          <div className="flex flex-col gap-3">
+            {sansDate
+              .filter((i) => !nouvelles.some((n) => n.id === i.id))
+              .map((i) => (
+                <InterventionCard key={i.id} i={i} />
+              ))}
+          </div>
+        </div>
+      )}
+
       {enRetard.length > 0 && (
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wide text-red-ink mb-2">En retard ({enRetard.length})</h2>
@@ -271,17 +320,23 @@ function Section({ rows, empty }: { rows: Row[]; empty: string }) {
   );
 }
 
-function InterventionCard({ i, retard = false }: { i: Row; retard?: boolean }) {
-  const heure = formatDateTime(i.dateProgrammee).split(" ")[1] ?? "—";
+function InterventionCard({ i, retard = false, nouvelle = false }: { i: Row; retard?: boolean; nouvelle?: boolean }) {
+  const heure = i.dateProgrammee ? (formatDateTime(i.dateProgrammee).split(" ")[1] ?? "—") : "Date à confirmer";
   const itineraire = i.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(i.adresse)}` : null;
-  const action = i.statut === "en_cours" ? "Continuer le rapport" : ["terminee", "validee", "cloturee"].includes(i.statut) ? "Voir la mission" : "Ouvrir la mission";
+  const action = nouvelle ? "Voir et accepter" : i.statut === "en_cours" ? "Continuer le rapport" : ["terminee", "validee", "cloturee"].includes(i.statut) ? "Voir la mission" : "Ouvrir la mission";
   return (
-    <div className={`bg-surface rounded-2xl p-4 flex flex-col gap-2 shadow-[0_1px_2px_rgba(16,24,40,0.05)] ${retard ? "border-[1.5px] border-[#f3b8b0]" : "border border-line"}`}>
+    <div className={`bg-surface rounded-2xl p-4 flex flex-col gap-2 shadow-[0_1px_2px_rgba(16,24,40,0.05)] ${retard ? "border-[1.5px] border-[#f3b8b0]" : nouvelle ? "border-[1.5px] border-blue" : "border border-line"}`}>
       <div className="flex items-center justify-between gap-2">
         <span className={`font-display font-extrabold text-[17px] tabular ${retard ? "text-red-ink" : "text-navy"}`}>
-          {retard ? `${formatDate(i.dateProgrammee)} · ${heure}` : heure}
+          {(retard || nouvelle) && i.dateProgrammee ? `${formatDate(i.dateProgrammee)} · ${heure}` : heure}
         </span>
-        <StatutInterventionPill statut={i.statut} />
+        {nouvelle ? (
+          <span className="text-[11px] font-bold uppercase tracking-wide text-white bg-blue rounded-full px-2.5 py-1">
+            {i.vueLe ? "À accepter" : "Nouveau"}
+          </span>
+        ) : (
+          <StatutInterventionPill statut={i.statut} />
+        )}
       </div>
       <div className="flex items-center gap-2">
         <TypeInterventionPill type={i.type} />

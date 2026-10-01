@@ -289,8 +289,12 @@ export async function createIntervention(formData: FormData) {
     .where(eq(projets.id, parsed.data.projetId))
     .limit(1);
   if (!projetExists) throw new Error("Projet introuvable — impossible de créer l'intervention.");
+  // Phase 17 : une mission envoyée a toujours un technicien ET une date.
+  if (parsed.data.technicienId && !parsed.data.dateProgrammee) {
+    throw new Error("Choisissez la date et l'heure de la mission avant de l'envoyer au technicien.");
+  }
 
-  await db.insert(interventions).values({
+  const [creee] = await db.insert(interventions).values({
     appareilId: parsed.data.appareilId,
     projetId: parsed.data.projetId,
     type: parsed.data.type,
@@ -299,7 +303,7 @@ export async function createIntervention(formData: FormData) {
     technicienId: parsed.data.technicienId ?? null,
     statut: parsed.data.technicienId ? "affectee" : "creee",
     dateProgrammee: parsed.data.dateProgrammee ? new Date(parsed.data.dateProgrammee) : null,
-  });
+  }).returning({ id: interventions.id });
 
   // Phase 10 : même règle que assignerIntervention — si un technicien est
   // choisi dès la création, l'ordre de mission part immédiatement.
@@ -307,6 +311,7 @@ export async function createIntervention(formData: FormData) {
     await envoyerEtJournaliserOrdreMission({
       projetId: parsed.data.projetId,
       technicienId: parsed.data.technicienId,
+      interventionIds: [creee.id],
       envoyeParId: user.id,
     });
   }
@@ -346,11 +351,16 @@ export async function assignerIntervention(formData: FormData) {
       statut: interventions.statut,
       technicienId: interventions.technicienId,
       projetId: interventions.projetId,
+      dateProgrammee: interventions.dateProgrammee,
     })
     .from(interventions)
     .where(eq(interventions.id, parsed.data.interventionId))
     .limit(1);
   if (!existing) throw new Error("Intervention introuvable.");
+  // Phase 17 : pas d'envoi sans date.
+  if (parsed.data.technicienId && !parsed.data.dateProgrammee && !existing.dateProgrammee) {
+    throw new Error("Cette mission n'a pas de date : choisissez la date et l'heure avant de l'affecter.");
+  }
   if (STATUTS_INTERVENTION_VERROUILLES.has(existing.statut)) {
     throw new Error("Cette intervention est déjà engagée — le technicien ne peut plus être changé.");
   }
@@ -371,14 +381,19 @@ export async function assignerIntervention(formData: FormData) {
   // les doublons si on reclique sur "OK" sans rien modifier), ni si
   // l'intervention n'est rattachée à aucun Projet (pas de contexte à
   // envoyer — cas des anciennes interventions "Sans projet").
+  // Phase 17 : on renvoie aussi si la date change (le technicien doit le savoir).
+  const dateChangee =
+    !!parsed.data.dateProgrammee &&
+    new Date(parsed.data.dateProgrammee).getTime() !== (existing.dateProgrammee?.getTime() ?? 0);
   if (
     parsed.data.technicienId &&
-    parsed.data.technicienId !== existing.technicienId &&
+    (parsed.data.technicienId !== existing.technicienId || dateChangee) &&
     existing.projetId
   ) {
     await envoyerEtJournaliserOrdreMission({
       projetId: existing.projetId,
       technicienId: parsed.data.technicienId,
+      interventionIds: [parsed.data.interventionId],
       envoyeParId: user.id,
     });
   }

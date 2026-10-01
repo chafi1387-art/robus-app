@@ -1,7 +1,7 @@
 import { db } from "@/db";
-import { appareils, interventions, projets } from "@/db/schema";
+import { appareils, interventions, projets, users } from "@/db/schema";
 import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
-import { and, eq, isNotNull, isNull, lt, notInArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, notInArray } from "drizzle-orm";
 import { timingSafeEqual } from "node:crypto";
 
 // Phase 16 : appelée par le cron du serveur (en-tête X-Cron-Secret = CRON_SECRET
@@ -61,5 +61,52 @@ export async function POST(req: Request) {
       tag: "retards",
     });
   }
-  return Response.json({ notifiees: retards.length });
+  // Phase 17 : mission envoyée il y a plus de 30 min et toujours pas ouverte
+  // par le technicien -> rappel sur son téléphone + alerte au bureau (une fois).
+  const nonVues = await db
+    .select({
+      id: interventions.id,
+      technicienId: interventions.technicienId,
+      dateProgrammee: interventions.dateProgrammee,
+      numero: appareils.numeroInterne,
+      technicien: users.nom,
+    })
+    .from(interventions)
+    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .innerJoin(users, eq(interventions.technicienId, users.id))
+    .where(
+      and(
+        inArray(interventions.statut, ["creee", "planifiee", "affectee"]),
+        isNull(interventions.vueLe),
+        isNull(interventions.alerteNonVueLe),
+        isNotNull(interventions.envoyeeLe),
+        lt(interventions.envoyeeLe, new Date(Date.now() - 30 * 60 * 1000))
+      )
+    )
+    .limit(200);
+
+  for (const m of nonVues) {
+    if (m.technicienId) {
+      await notifierUtilisateurs([m.technicienId], {
+        titre: "📋 Rappel : nouvelle mission à consulter",
+        corps: `${m.numero}${m.dateProgrammee ? ` — prévue le ${m.dateProgrammee.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", dateStyle: "short", timeStyle: "short" })}` : ""}`,
+        url: `/technicien/interventions/${m.id}`,
+        tag: `mission-${m.id}`,
+      });
+    }
+    await db.update(interventions).set({ alerteNonVueLe: new Date() }).where(eq(interventions.id, m.id));
+  }
+  if (nonVues.length) {
+    await notifierBureau({
+      titre: `👀 ${nonVues.length} mission(s) pas encore vue(s) par le technicien`,
+      corps: nonVues
+        .slice(0, 3)
+        .map((m) => `${m.technicien} (${m.numero})`)
+        .join(", ") + (nonVues.length > 3 ? "…" : ""),
+      url: "/responsable/interventions",
+      tag: "non-vues",
+    });
+  }
+
+  return Response.json({ notifiees: retards.length, nonVues: nonVues.length });
 }

@@ -67,9 +67,17 @@ export type OrdreDeMissionParams = {
   // l'affectation initiale d'un technicien ou lors d'un renvoi manuel.
   message?: string;
   documents?: { titre: string; url: string }[];
+  // Phase 17 : missions précises envoyées (date réelle de chaque mission).
+  missions?: { date: Date | null; appareil: string; type: string }[];
 };
 
-export async function envoyerOrdreDeMission(params: OrdreDeMissionParams) {
+export type ResultatEmail = "ok" | "echec" | "non_configure";
+
+function formatDateHeure(d: Date) {
+  return d.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+export async function envoyerOrdreDeMission(params: OrdreDeMissionParams): Promise<ResultatEmail> {
   const transport = getTransport();
   if (!transport) {
     // Pas de SMTP configuré (ex. environnement de développement) : on ne
@@ -80,8 +88,14 @@ export async function envoyerOrdreDeMission(params: OrdreDeMissionParams) {
       action: "email_non_configure",
       details: `Ordre de mission non envoyé (SMTP non configuré) — ${params.destinataireEmail}`,
     });
-    return;
+    return "non_configure";
   }
+
+  const missions = params.missions ?? [];
+  const lienApp = new URL("/technicien", process.env.NEXTAUTH_URL || "https://robuswork.tech").toString();
+  const lignesMissions = missions.length
+    ? missions.map((m) => `- ${m.date ? formatDateHeure(m.date) : "date à confirmer"} — ${m.appareil} (${m.type})`).join("\n")
+    : "";
 
   const quand = params.dateDebutPrevue
     ? formatDate(params.dateDebutPrevue)
@@ -106,7 +120,7 @@ Projet : ${params.projetTitre}
 Client : ${params.clientNom}
 Adresse(s) : ${params.adresses.join(", ") || "à préciser"}
 Date prévue : ${quand}
-
+${lignesMissions ? `\nMission(s) :\n${lignesMissions}\n` : ""}
 Appareil(s) concerné(s) :
 ${lignesAppareils}
 
@@ -115,6 +129,8 @@ ${lignesPrestations}
 ${params.message ? `\nConsignes :\n${params.message}\n` : ""}${
     lignesDocuments ? `\nDocuments utiles :\n${lignesDocuments}\n` : ""
   }
+Ouvrir l'application ROBUS : ${lienApp}
+
 — ROBUS Liften Ascenseurs`;
 
   const ligneHtml = (label: string, valeur: string) =>
@@ -134,6 +150,19 @@ ${params.message ? `\nConsignes :\n${params.message}\n` : ""}${
         ${ligneHtml("Adresse(s)", params.adresses.join(", ") || "à préciser")}
         ${ligneHtml("Date prévue", quand)}
       </table>
+      ${
+        missions.length
+          ? `<p style="font-size:13px;color:#333333;margin:14px 0 4px;"><strong>Mission(s)</strong></p>
+             <table style="border-collapse:collapse;">${missions
+               .map(
+                 (m) =>
+                   `<tr><td style="padding:3px 12px 3px 0;font-size:13px;font-weight:bold;color:#003366;white-space:nowrap;">${echapperHtml(
+                     m.date ? formatDateHeure(m.date) : "Date à confirmer"
+                   )}</td><td style="padding:3px 0;font-size:13px;color:#333333;">${echapperHtml(`${m.appareil} — ${m.type}`)}</td></tr>`
+               )
+               .join("")}</table>`
+          : ""
+      }
       <p style="font-size:13px;color:#333333;margin:14px 0 4px;"><strong>Appareil(s) concerné(s)</strong></p>
       <p style="font-size:13px;color:#333333;margin:0;">${
         params.appareils.length
@@ -171,6 +200,7 @@ ${params.message ? `\nConsignes :\n${params.message}\n` : ""}${
              </div>`
           : ""
       }
+      <p style="margin-top:20px;"><a href="${lienApp}" style="display:inline-block;background:#0055a4;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:10px 18px;border-radius:8px;">Ouvrir mes missions</a></p>
       <p style="font-size:12px;color:#6b7482;margin-top:24px;">— ROBUS Liften Ascenseurs</p>
     </div>
   </div>`;
@@ -179,7 +209,9 @@ ${params.message ? `\nConsignes :\n${params.message}\n` : ""}${
     await transport.sendMail({
       from: process.env.MAIL_FROM || process.env.SMTP_USER,
       to: params.destinataireEmail,
-      subject: `Ordre de mission — ${params.projetReference} — ${params.clientNom}`,
+      subject: missions.length
+        ? `Nouvelle mission — ${missions[0].date ? formatDateHeure(missions[0].date) : params.projetReference} — ${params.clientNom}`
+        : `Ordre de mission — ${params.projetReference} — ${params.clientNom}`,
       text: texte,
       html,
       attachments: logoAttachment(),
@@ -190,6 +222,7 @@ ${params.message ? `\nConsignes :\n${params.message}\n` : ""}${
       action: "email_envoye",
       details: `Ordre de mission envoyé à ${params.destinataireEmail}`,
     });
+    return "ok";
   } catch (err) {
     // L'échec d'envoi ne doit jamais empêcher l'affectation du technicien —
     // on le trace pour que ce soit visible dans le journal d'activité.
@@ -201,6 +234,7 @@ ${params.message ? `\nConsignes :\n${params.message}\n` : ""}${
         err instanceof Error ? err.message : String(err)
       }`,
     });
+    return "echec";
   }
 }
 

@@ -28,7 +28,10 @@ import { notFound } from "next/navigation";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime, toDatetimeLocalValue } from "@/lib/format";
 import { peutModifierHeureReelle } from "@/lib/rapport-rules";
+import { after } from "next/server";
+import { CheckCircle2 } from "lucide-react";
 import {
+  accepterMission,
   commencerIntervention,
   declarerNonConformite,
   demanderAide,
@@ -108,7 +111,25 @@ export default async function InterventionDetailPage({
     notFound();
   }
 
-  const [rapport, listePieces] = await Promise.all([
+  // Phase 17 : accusé de réception — la mission est « vue » dès que son
+  // technicien l'ouvre (enregistré après l'affichage, sans le ralentir).
+  if (intervention.technicienId === user.id && !intervention.vueLe) {
+    after(async () => {
+      await db
+        .update(interventions)
+        .set({ vueLe: new Date() })
+        .where(and(eq(interventions.id, id), isNull(interventions.vueLe)));
+    });
+  }
+
+  const peutCommencer = ["creee", "planifiee", "affectee"].includes(intervention.statut);
+  const aAccepter = peutCommencer && !intervention.accepteeLe && intervention.technicienId === user.id;
+  const peutTerminer = intervention.statut === "en_cours";
+  const estTerminee = ["terminee", "validee", "cloturee"].includes(intervention.statut);
+
+  // Phase 17 : toutes les lectures en une seule vague parallèle (avant : 5
+  // vagues successives) — la mission s'ouvre plus vite sur le téléphone.
+  const [rapport, listePieces, checklist, documentsAppareil, documentsProjet, piecesUtilisees] = await Promise.all([
     db.select().from(rapports).where(eq(rapports.interventionId, id)).limit(1).then((r) => r[0]),
     db
       .select({
@@ -120,44 +141,35 @@ export default async function InterventionDetailPage({
       })
       .from(pieces)
       .orderBy(pieces.nom),
-  ]);
-  const photosRapport = rapport
-    ? await db.select().from(rapportPhotos).where(eq(rapportPhotos.rapportId, rapport.id))
-    : [];
-
-  const peutCommencer = ["creee", "planifiee", "affectee"].includes(intervention.statut);
-  const peutTerminer = intervention.statut === "en_cours";
-  const estTerminee = ["terminee", "validee", "cloturee"].includes(intervention.statut);
-
-  const checklist = peutTerminer
-    ? await getChecklistPourAppareil(intervention.type, appareil.marque, appareil.typeAppareil)
-    : null;
-
-  // Documentation (Phase 6) : union dédupliquée des documents rattachés à
-  // l'Appareil OU au Projet de cette intervention.
-  const [documentsAppareil, documentsProjet] = await Promise.all([
+    peutTerminer
+      ? getChecklistPourAppareil(intervention.type, appareil.marque, appareil.typeAppareil)
+      : Promise.resolve(null),
+    // Documentation (Phase 6) : union dédupliquée des documents rattachés à
+    // l'Appareil OU au Projet de cette intervention.
     db.select().from(documentsFormations).where(eq(documentsFormations.appareilId, appareil.id)),
     projet
       ? db.select().from(documentsFormations).where(eq(documentsFormations.projetId, projet.id))
       : Promise.resolve([]),
+    db
+      .select({
+        id: mouvementsStock.id,
+        quantite: mouvementsStock.quantite,
+        createdAt: mouvementsStock.createdAt,
+        pieceNom: pieces.nom,
+        pieceReference: pieces.reference,
+      })
+      .from(mouvementsStock)
+      .innerJoin(pieces, eq(mouvementsStock.pieceId, pieces.id))
+      .where(and(eq(mouvementsStock.interventionId, id), eq(mouvementsStock.type, "sortie")))
+      .orderBy(desc(mouvementsStock.createdAt)),
   ]);
+  const photosRapport = rapport
+    ? await db.select().from(rapportPhotos).where(eq(rapportPhotos.rapportId, rapport.id))
+    : [];
   const documentsParId = new Map(
     [...documentsAppareil, ...documentsProjet].map((d) => [d.id, d])
   );
   const documents = [...documentsParId.values()];
-
-  const piecesUtilisees = await db
-    .select({
-      id: mouvementsStock.id,
-      quantite: mouvementsStock.quantite,
-      createdAt: mouvementsStock.createdAt,
-      pieceNom: pieces.nom,
-      pieceReference: pieces.reference,
-    })
-    .from(mouvementsStock)
-    .innerJoin(pieces, eq(mouvementsStock.pieceId, pieces.id))
-    .where(and(eq(mouvementsStock.interventionId, id), eq(mouvementsStock.type, "sortie")))
-    .orderBy(desc(mouvementsStock.createdAt));
 
   return (
     <div className="flex flex-col gap-4">
@@ -188,6 +200,26 @@ export default async function InterventionDetailPage({
           </p>
         )}
       </div>
+
+      {aAccepter && (
+        <Card className="p-4 border-[1.5px] border-blue bg-blue-pale/40">
+          <div className="font-display font-bold text-[15px] text-navy">Nouvelle mission</div>
+          <p className="text-sm text-ink-soft mt-1">
+            Prévue le <span className="font-semibold text-ink">{formatDateTime(intervention.dateProgrammee)}</span>. Confirmez au bureau que vous l&apos;avez bien reçue.
+          </p>
+          <form action={accepterMission} className="mt-3">
+            <input type="hidden" name="interventionId" value={intervention.id} />
+            <Btn className="w-full justify-center">
+              <CheckCircle2 className="w-4 h-4" /> J&apos;accepte la mission
+            </Btn>
+          </form>
+        </Card>
+      )}
+      {peutCommencer && intervention.accepteeLe && (
+        <p className="text-xs font-semibold text-green-ink flex items-center gap-1.5">
+          <CheckCircle2 className="w-4 h-4" /> Mission acceptée le {formatDateTime(intervention.accepteeLe)}
+        </p>
+      )}
 
       <Card className="p-4">
         <h2 className="font-display font-bold text-sm mb-2">Détails</h2>

@@ -11,7 +11,6 @@ import {
   garanties,
   habilitationsTechnicien,
   mouvementsStock,
-  ordresMissionEnvois,
   pieces,
   prestations,
   prestationsCatalogue,
@@ -22,12 +21,11 @@ import {
 } from "@/db/schema";
 import { requireUser, Role, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
-import { envoyerOrdreDeMission } from "@/lib/mail";
+import { envoyerMissionsAuTechnicien } from "@/lib/envoi-mission";
 import { appliquerGarantie } from "@/lib/projet-garantie";
-import { notifierUtilisateurs } from "@/lib/push";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 // Statuts à partir desquels le Projet est considéré engagé : on ne remonte
 // jamais en arrière (même logique que STATUTS_INTERVENTION_VERROUILLES).
@@ -198,6 +196,7 @@ const ajouterTechnicienSchema = z.object({
 export async function envoyerEtJournaliserOrdreMission(params: {
   projetId: string;
   technicienId: string;
+  interventionIds?: string[];
   message?: string;
   documentsIds?: string[];
   envoyeParId: string;
@@ -205,90 +204,9 @@ export async function envoyerEtJournaliserOrdreMission(params: {
   // Phase 13 : fonction exportée d'un fichier "use server" = appelable
   // directement depuis le navigateur -> on vérifie la session ici aussi.
   await requireUser(ROLES_BUREAU);
-  // Phase 6 : l'adresse d'intervention est désormais celle portée par le
-  // Projet lui-même (l'Appareil n'étant plus nécessairement rattaché à un
-  // Site).
-  const [contexte] = await db
-    .select({
-      reference: projets.reference,
-      titre: projets.titre,
-      dateDebutPrevue: projets.dateDebutPrevue,
-      adresse: projets.adresse,
-      clientNom: clients.raisonSociale,
-    })
-    .from(projets)
-    .innerJoin(clients, eq(projets.clientId, clients.id))
-    .where(eq(projets.id, params.projetId))
-    .limit(1);
-
-  const [technicien] = await db
-    .select({ nom: users.nom, email: users.email })
-    .from(users)
-    .where(eq(users.id, params.technicienId))
-    .limit(1);
-
-  const [appareilsAttaches, prestationsAttachees] = await Promise.all([
-    db
-      .select({ numeroInterne: appareils.numeroInterne })
-      .from(projetAppareils)
-      .innerJoin(appareils, eq(projetAppareils.appareilId, appareils.id))
-      .where(eq(projetAppareils.projetId, params.projetId)),
-    db
-      .select({ type: prestations.type, description: prestations.description })
-      .from(prestations)
-      .where(eq(prestations.projetId, params.projetId)),
-  ]);
-
-  const documentsIdsDemandes = [...new Set((params.documentsIds ?? []).filter(Boolean))];
-  let documentsResolus: { id: string; titre: string; urlFichier: string }[] = [];
-  if (documentsIdsDemandes.length > 0) {
-    const rows = await db
-      .select({
-        id: documentsFormations.id,
-        titre: documentsFormations.titre,
-        urlFichier: documentsFormations.urlFichier,
-      })
-      .from(documentsFormations)
-      .where(inArray(documentsFormations.id, documentsIdsDemandes));
-    documentsResolus = rows
-      .filter((d): d is { id: string; titre: string; urlFichier: string } => !!d.urlFichier)
-      .map((d) => ({ id: d.id, titre: d.titre, urlFichier: d.urlFichier as string }));
-  }
-
-  if (contexte && technicien) {
-    await envoyerOrdreDeMission({
-      projetId: params.projetId,
-      destinataireEmail: technicien.email,
-      destinataireNom: technicien.nom,
-      projetReference: contexte.reference,
-      projetTitre: contexte.titre,
-      clientNom: contexte.clientNom,
-      adresses: contexte.adresse ? [contexte.adresse] : [],
-      appareils: appareilsAttaches.map((a) => a.numeroInterne),
-      prestations: prestationsAttachees.map((p) => p.description || p.type || "Prestation"),
-      dateDebutPrevue: contexte.dateDebutPrevue,
-      message: params.message,
-      documents: documentsResolus.map((d) => ({ titre: d.titre, url: d.urlFichier })),
-    });
-  }
-
-  // Phase 16 : notification sur le téléphone du technicien (en plus de l'email).
-  if (contexte) {
-    await notifierUtilisateurs([params.technicienId], {
-      titre: `📋 Nouvelle mission — ${contexte.reference}`,
-      corps: `${contexte.titre} · ${contexte.clientNom}${contexte.adresse ? ` · ${contexte.adresse}` : ""}`,
-      url: "/technicien",
-      tag: `mission-${params.projetId}`,
-    });
-  }
-
-  await db.insert(ordresMissionEnvois).values({
-    projetId: params.projetId,
-    technicienId: params.technicienId,
-    message: params.message?.trim() ? params.message.trim() : null,
-    documentsJointIds: documentsResolus.map((d) => d.id),
-    envoyeParId: params.envoyeParId,
-  });
+  // Phase 17 : logique unique d'envoi (application + téléphone + email, avec
+  // suivi envoyée / vue / acceptée) — voir src/lib/envoi-mission.ts.
+  return envoyerMissionsAuTechnicien(params);
 }
 
 export async function ajouterTechnicienProjet(formData: FormData) {
@@ -324,7 +242,23 @@ export async function ajouterTechnicienProjet(formData: FormData) {
     role: parsed.data.role,
   });
 
-  await envoyerEtJournaliserOrdreMission({
+  // Phase 17 : les missions « à affecter » (datées) du projet lui sont
+  // attribuées — il les voit tout de suite dans son application. Les
+  // missions sans date restent à affecter : une mission n'est envoyée
+  // qu'avec un technicien ET une date.
+  await db
+    .update(interventions)
+    .set({ technicienId: parsed.data.technicienId, statut: "affectee" })
+    .where(
+      and(
+        eq(interventions.projetId, parsed.data.projetId),
+        isNull(interventions.technicienId),
+        isNotNull(interventions.dateProgrammee),
+        inArray(interventions.statut, ["creee", "planifiee"])
+      )
+    );
+
+  await envoyerMissionsAuTechnicien({
     projetId: parsed.data.projetId,
     technicienId: parsed.data.technicienId,
     message: parsed.data.message,
