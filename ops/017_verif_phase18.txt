@@ -1,0 +1,24 @@
+== commit
+de56aea Phase 18 : historique technicien + correction 24 h, mission en direct, validation des rapports, espace Observateur (QR code) — migration 0015
+== tables (rôle robus)
+mission_journal 0
+observateurs 0
+observateur_appareils 0
+signalements_panne 0
+parametres 0
+== rôle observateur
+{administrateur,responsable_qualite,technicien,commercial,observateur}
+== colonnes
+7
+== pages
+/connexion 200 0.146705s
+/a/inconnu1234 200 0.113639s
+/observateur 307 0.007671s
+/responsable/observateurs 307 0.008075s
+== module qrcode
+qrcode OK
+== pm2
+robus-dashboard online
+== erreurs récentes
+Thu Oct  1 10:04:27 UTC 2026
+(code retour 0, 2026-10-01 10:04:27)

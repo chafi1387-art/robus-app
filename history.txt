@@ -1,54 +1,3 @@
-npm notice
---- curl /responsable/projets : 307
-STATUT: OK 6432c99
-=== 2026-09-25 16:33:02 : e83d4b9 (ops seulement, pas de build)
-STATUT: OK e83d4b9
-=== 2026-09-25 16:34:01 : 0704cb2 (ops seulement, pas de build)
-STATUT: OK 0704cb2
-=== 2026-09-25 16:35:02 : 8ae8113 (ops seulement, pas de build)
-STATUT: OK 8ae8113
-=== 2026-09-25 16:36:02 : a7ec1cd (ops seulement, pas de build)
-STATUT: OK a7ec1cd
-=== 2026-09-25 16:38:02 : 0c5e9fe (ops seulement, pas de build)
-STATUT: OK 0c5e9fe
-=== Deploiement 2026-09-25 16:46:02 : 0c5e9fe -> a288e5d
---- build
-├ ƒ /responsable/projets
-├ ƒ /responsable/projets/[id]
-├ ƒ /responsable/rapports
-├ ƒ /responsable/revues-direction
-├ ƒ /responsable/risques
-├ ƒ /responsable/satisfaction
-├ ƒ /responsable/score-iso
-├ ƒ /responsable/sites
-├ ƒ /responsable/sites/[id]
-├ ƒ /responsable/stock
-├ ƒ /responsable/stock/pieces/[id]
-├ ƒ /responsable/techniciens
-├ ƒ /responsable/techniciens/[id]
-├ ƒ /responsable/utilisateurs
-├ ƒ /technicien
-├ ƒ /technicien/formations
-├ ƒ /technicien/interventions/[id]
-└ ƒ /technicien/profil
-
-
-ƒ Proxy (Middleware)
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-
---- curl /responsable/projets : 307
-STATUT: OK a288e5d
-=== Deploiement 2026-09-25 17:05:02 : a288e5d -> 4b6d713
---- migration 0010_sous_traitance.sql
-ALTER TYPE
-CREATE TABLE
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
---- build
-├ ƒ /responsable/rapports
 ├ ƒ /responsable/revues-direction
 ├ ƒ /responsable/risques
 ├ ƒ /responsable/satisfaction
@@ -298,3 +247,54 @@ UPDATE 1
 STATUT: OK 43b2501
 === 2026-10-01 09:27:01 : 94ddbe7 (ops seulement, pas de build)
 STATUT: OK 94ddbe7
+=== Deploiement 2026-10-01 10:03:02 : 94ddbe7 -> de56aea
+--- npm install
+--- migration 0015_historique_direct_observateur.sql
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TYPE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+--- build
+├ ƒ /responsable/rapports
+├ ƒ /responsable/revues-direction
+├ ƒ /responsable/risques
+├ ƒ /responsable/satisfaction
+├ ƒ /responsable/score-iso
+├ ƒ /responsable/sites
+├ ƒ /responsable/sites/[id]
+├ ƒ /responsable/sous-traitance
+├ ƒ /responsable/stock
+├ ƒ /responsable/stock/pieces/[id]
+├ ƒ /responsable/techniciens
+├ ƒ /responsable/techniciens/[id]
+├ ƒ /responsable/utilisateurs
+├ ƒ /technicien
+├ ƒ /technicien/formations
+├ ƒ /technicien/heures
+├ ƒ /technicien/interventions/[id]
+└ ƒ /technicien/profil
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+--- curl /responsable/projets : 307
+STATUT: OK de56aea
