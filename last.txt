@@ -1,4 +1,22 @@
-=== Deploiement 2026-10-01 16:20:01 : dae0368 -> d4646c2
+=== Deploiement 2026-10-01 16:53:02 : d4646c2 -> 4f1175a
+--- migration 0017_documents_client_demandes.sql
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+INSERT 0 0
+INSERT 0 0
+UPDATE 0
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+INSERT 0 1
+ALTER TABLE
+ALTER TABLE
 --- build
 ├ ƒ /responsable/rapports
 ├ ƒ /responsable/revues-direction
@@ -26,4 +44,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK d4646c2
+STATUT: OK 4f1175a

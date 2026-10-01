@@ -1,0 +1,28 @@
+== commit
+4f1175a Phase 20 : documents client par appareil + demandes client (pannes…) avec suivi, emails et délais — migration 0017
+== tables
+documents_client 0
+documents_client_consultations 0
+demandes_client 1
+demandes_messages 0
+== documents internes encore « visibles » (doit être 0)
+0
+== demandes
+    numero    | type  |  statut  | origine |         created_at         
+--------------+-------+----------+---------+----------------------------
+ DC-2026-0001 | panne | nouvelle | espace  | 2026-10-01 16:02:31.802868
+(1 row)
+
+== cron
+{"notifiees":0,"nonVues":0,"passagesCrees":0,"alertesHabilitations":0,"demandesRelancees":1,"resumes":1}
+== pages
+/responsable/demandes 307
+/observateur/demandes 307
+/connexion 200
+== SMTP
+SMTP OK
+== pm2
+robus-dashboard online
+== erreurs récentes
+Thu Oct  1 16:54:25 UTC 2026
+(code retour 0, 2026-10-01 16:54:25)
