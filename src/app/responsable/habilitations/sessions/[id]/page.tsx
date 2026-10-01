@@ -34,6 +34,8 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     .orderBy(asc(users.nom));
   const gestion = user.role === "administrateur" || user.role === "responsable_qualite";
   const terminee = s.statut === "terminee";
+  // eslint-disable-next-line react-hooks/purity
+  const aVenir = s.dateDebut.getTime() > Date.now() + 12 * 3600 * 1000;
 
   return (
     <div className="flex flex-col gap-4">
@@ -52,7 +54,14 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
 
       <Card className="p-5">
         <h2 className="font-display font-bold text-sm mb-3">Participants ({participants.length})</h2>
-        {!terminee && gestion ? (
+        {!terminee && gestion && aVenir ? (
+          <div className="flex flex-col gap-2">
+            {participants.map(({ p, nom }) => (
+              <div key={p.id} className="flex items-center gap-3"><span className="font-semibold w-44">{nom}</span><Pill tone="neutral">Inscrit</Pill></div>
+            ))}
+            <p className="text-sm text-ink-soft mt-2">La présence et les résultats pourront être saisis à partir du {formatDate(s.dateDebut)}.</p>
+          </div>
+        ) : !terminee && gestion ? (
           <form action={cloturerSession} className="flex flex-col gap-3">
             <input type="hidden" name="sessionId" value={s.id} />
             {participants.map(({ p, nom }) => (

@@ -240,6 +240,10 @@ export async function cloturerSession(formData: FormData) {
   const retour = `/responsable/habilitations/sessions/${sessionId}`;
   const [s] = await db.select().from(formationsSessions).where(eq(formationsSessions.id, sessionId)).limit(1);
   if (!s) redirect("/responsable/habilitations?onglet=sessions");
+  // Phase 19b : pas de résultats avant le jour de la formation (sinon l'habilitation serait délivrée d'avance).
+  if (s!.dateDebut.getTime() > Date.now() + 12 * 3600 * 1000) {
+    redirect(avecMessage(retour, "erreur", "Les résultats ne peuvent être saisis qu'à partir du jour de la formation."));
+  }
   const [cat] = s!.catalogueId ? await db.select().from(habilitationsCatalogue).where(eq(habilitationsCatalogue.id, s!.catalogueId)).limit(1) : [];
   const participants = await db.select().from(formationsParticipants).where(eq(formationsParticipants.sessionId, sessionId));
   let habCreees = 0;
