@@ -141,7 +141,9 @@ export async function deciderCertificat(formData: FormData) {
   const id = String(formData.get("habilitationId") ?? "");
   const decision = String(formData.get("decision") ?? "");
   const motif = String(formData.get("motif") ?? "").trim().slice(0, 500);
-  const retour = String(formData.get("retour") ?? "/responsable/habilitations?onglet=a_valider");
+  const retourDemande = String(formData.get("retour") ?? "");
+  // Retour limité aux pages du bureau (pas de redirection externe).
+  const retour = /^\/responsable\/[\w\-/?=&]*$/.test(retourDemande) ? retourDemande : "/responsable/habilitations?onglet=a_valider";
   if (!uuid.safeParse(id).success || !["valider", "refuser"].includes(decision)) redirect(retour);
   const [h] = await db.select().from(habilitationsTechnicien).where(eq(habilitationsTechnicien.id, id)).limit(1);
   if (!h || h.statut !== "en_attente") redirect(retour);
@@ -160,7 +162,8 @@ export async function deciderCertificat(formData: FormData) {
     })
   );
   revalidatePath("/responsable/habilitations");
-  redirect(avecMessage(retour, "ok", decision === "valider" ? "Certificat validé." : "Certificat refusé."));
+  revalidatePath(`/responsable/techniciens/${h.technicienId}`);
+  redirect(avecMessage(retour, "ok", decision === "valider" ? "Certificat validé — l'ancienne habilitation est archivée." : "Certificat refusé — le technicien est prévenu."));
 }
 
 export async function retirerHabilitation(formData: FormData) {

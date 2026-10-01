@@ -3,7 +3,7 @@ import { FileField } from "@/components/file-field";
 import { HabilitationsCartes } from "@/components/habilitations-cartes";
 import { Pill } from "@/components/ui";
 import { STATUT_HAB, habilitationsCourantes } from "@/lib/habilitations";
-import { ajouterHabilitation, retirerHabilitation } from "../../habilitations/actions";
+import { ajouterHabilitation, deciderCertificat, retirerHabilitation } from "../../habilitations/actions";
 import { habilitationsCatalogue } from "@/db/schema";
 import { db } from "@/db";
 import {
@@ -337,10 +337,37 @@ export default async function TechnicienDetailPage({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <Card className="p-5">
             <h2 className="font-display font-bold text-[15px] mb-3">Habilitations ({habilitations.length})</h2>
+            {gestionHab && habilitations.some((h) => h.etat === "en_attente") && (
+              <div className="text-sm bg-orange-fill text-orange-ink rounded-lg px-3 py-2 mb-3">
+                {habilitations.filter((h) => h.etat === "en_attente").length} certificat(s) déposé(s) par le technicien à valider ci-dessous.
+              </div>
+            )}
             <HabilitationsCartes
               habilitations={habilitations}
               actions={(h) =>
                 gestionHab ? (
+                  <div className="flex flex-col gap-1.5">
+                  {h.etat === "en_attente" && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <form action={deciderCertificat}>
+                        <input type="hidden" name="habilitationId" value={h.id} />
+                        <input type="hidden" name="decision" value="valider" />
+                        <input type="hidden" name="retour" value={`/responsable/techniciens/${id}?tab=habilitations`} />
+                        <button type="submit" className="bg-green-ink text-white font-bold text-xs rounded-lg px-3 py-1.5">Valider le certificat</button>
+                      </form>
+                      <details className="text-xs">
+                        <summary className="font-bold text-red-ink cursor-pointer select-none">Refuser</summary>
+                        <form action={deciderCertificat} className="flex items-center gap-2 mt-1.5">
+                          <input type="hidden" name="habilitationId" value={h.id} />
+                          <input type="hidden" name="decision" value="refuser" />
+                          <input type="hidden" name="retour" value={`/responsable/techniciens/${id}?tab=habilitations`} />
+                          <input name="motif" required placeholder="Motif du refus" className={`${inputClass} !py-1 !text-xs w-40`} />
+                          <button type="submit" className="font-bold text-red-ink">OK</button>
+                        </form>
+                      </details>
+                    </div>
+                  )}
+                  {h.etat !== "en_attente" && (
                   <details className="text-xs">
                     <summary className="font-bold text-red-ink cursor-pointer select-none">Retirer</summary>
                     <form action={retirerHabilitation} className="flex items-center gap-2 mt-1.5">
@@ -350,6 +377,8 @@ export default async function TechnicienDetailPage({
                       <button type="submit" className="font-bold text-red-ink">OK</button>
                     </form>
                   </details>
+                  )}
+                  </div>
                 ) : null
               }
             />

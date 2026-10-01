@@ -232,7 +232,7 @@ export async function getNotifications(): Promise<Notification[]> {
     } else if (h.etat === "bientot") {
       notifications.push({ id: `habilitation-${h.id}`, gravite: "warn", titre: `Habilitation à renouveler — ${qui} (${h.nom}, ${h.dateExpiration?.toLocaleDateString("fr-BE")})`, href: `/responsable/techniciens/${h.technicienId}?tab=habilitations` });
     } else if (h.etat === "en_attente") {
-      notifications.push({ id: `habilitation-${h.id}`, gravite: "warn", titre: `Certificat à valider — ${qui} (${h.nom})`, href: "/responsable/habilitations?onglet=a_valider" });
+      notifications.push({ id: `habilitation-${h.id}`, gravite: "warn", titre: `Certificat à valider — ${qui} (${h.nom})`, href: `/responsable/techniciens/${h.technicienId}?tab=habilitations` });
     }
   }
 
