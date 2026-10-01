@@ -1,8 +1,11 @@
+import { basculerVisibiliteDocument } from "../../observateurs/actions";
+import { GaleriePhotos } from "@/components/galerie-photos";
 import { SuiviEnvoi } from "@/components/suivi-envoi";
 import { Card, Btn, Field, Pill, inputClass, StatutInterventionPill, TypeInterventionPill } from "@/components/ui";
 import { FileField } from "@/components/file-field";
 import { db } from "@/db";
 import {
+  missionJournal,
   appareils,
   clients,
   documentsFormations,
@@ -316,6 +319,17 @@ export default async function ProjetDetailPage({
     photosParRapport.set(p.rapportId, liste);
   }
 
+  // Phase 18 : photos envoyées en direct pendant les missions en cours.
+  const idsEnCours = interventionsListe.filter((i) => i.statut === "en_cours").map((i) => i.id);
+  const filRows = idsEnCours.length
+    ? await db
+        .select({ interventionId: missionJournal.interventionId, photos: missionJournal.photos })
+        .from(missionJournal)
+        .where(inArray(missionJournal.interventionId, idsEnCours))
+    : [];
+  const photosFilParMission = new Map<string, string[]>();
+  for (const f of filRows) photosFilParMission.set(f.interventionId, [...(photosFilParMission.get(f.interventionId) ?? []), ...f.photos]);
+
   const garantie = garantieRow[0];
   const indexEtapeActuelle = ETAPES_ISO.indexOf(projet.statut);
   const prochaineEtape = ETAPES_ISO[indexEtapeActuelle + 1];
@@ -606,47 +620,42 @@ export default async function ProjetDetailPage({
         </div>
         <div className="flex flex-col divide-y divide-line">
           {interventionsListe.map((i) => {
-            const photos = i.rapportId ? photosParRapport.get(i.rapportId) ?? [] : [];
+            const photos = i.rapportId
+              ? photosParRapport.get(i.rapportId) ?? []
+              : (photosFilParMission.get(i.id) ?? []).map((url) => ({ id: url, url }));
             return (
               <div key={i.id} className="py-3 flex flex-col gap-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <TypeInterventionPill type={i.type} />
-                  <div className="flex-1 min-w-0 text-sm">
-                    {i.numeroInterne} · {formatDateTime(i.dateProgrammee)} · {i.technicien ?? "Non affecté"}
-                  </div>
+                  <Link href={`/responsable/missions/${i.id}`} className="flex-1 min-w-0 text-sm hover:text-blue">
+                    <span className="font-semibold">{i.numeroInterne}</span> · {formatDateTime(i.dateProgrammee)} · {i.technicien ?? "Non affecté"}
+                  </Link>
+                  {i.statut === "en_cours" && (
+                    <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wide text-white bg-red-ink rounded-full px-2 py-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> En direct
+                    </span>
+                  )}
                   <SuiviEnvoi m={i} />
                   <StatutInterventionPill statut={i.statut} />
                 </div>
                 <div className="flex items-center gap-3 flex-wrap text-xs text-ink-soft">
                   <span className="flex-1 min-w-[10rem]">{truncate(i.travauxRealises, 100)}</span>
                   {i.tempsPasseMinutes != null && <span className="whitespace-nowrap">{i.tempsPasseMinutes} min</span>}
-                  <a
-                    href={`/api/rapports/pdf/intervention/${i.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue font-semibold hover:underline whitespace-nowrap"
-                  >
-                    Voir le rapport complet
-                  </a>
+                  <Link href={`/responsable/missions/${i.id}`} className="text-blue font-semibold hover:underline whitespace-nowrap">
+                    {i.statut === "en_cours" ? "Suivre en direct" : "Voir la mission"}
+                  </Link>
+                  {i.rapportId && (
+                    <a
+                      href={`/api/rapports/pdf/intervention/${i.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-ink-soft font-semibold hover:underline whitespace-nowrap"
+                    >
+                      PDF
+                    </a>
+                  )}
                 </div>
-                {photos.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    {photos.slice(0, 3).map((p) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={p.id}
-                        src={p.url}
-                        alt="Photo du rapport"
-                        className="w-12 h-12 rounded-lg object-cover bg-blue-pale"
-                      />
-                    ))}
-                    {photos.length > 3 && (
-                      <span className="w-12 h-12 rounded-lg bg-blue-pale flex items-center justify-center text-xs font-bold text-blue">
-                        +{photos.length - 3}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {photos.length > 0 && <GaleriePhotos photos={photos.map((p) => ({ url: p.url }))} taille="sm" />}
               </div>
             );
           })}
@@ -1111,6 +1120,17 @@ export default async function ProjetDetailPage({
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                  <form action={basculerVisibiliteDocument}>
+                    <input type="hidden" name="documentId" value={d.id} />
+                    <input type="hidden" name="retour" value={`/responsable/projets/${projet.id}`} />
+                    <button
+                      type="submit"
+                      title="Visible dans l'espace Observateur du client"
+                      className={`text-[11px] font-bold rounded-full px-2.5 py-1 border ${d.visibleObservateur ? "bg-green-fill text-green-ink border-transparent" : "border-line text-ink-soft hover:bg-blue-pale"}`}
+                    >
+                      {d.visibleObservateur ? "👁 Visible observateur" : "Masqué observateur"}
+                    </button>
+                  </form>
                   <span className="text-xs text-ink-soft whitespace-nowrap">{formatDate(d.createdAt)}</span>
                   <form action={supprimerDocument}>
                     <input type="hidden" name="documentId" value={d.id} />

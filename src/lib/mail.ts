@@ -343,3 +343,61 @@ export async function envoyerLienReinitialisation(params: { email: string; nom: 
     return false;
   }
 }
+
+// ==========================================================================
+// Phase 18 — Espace Observateur : invitation (création du mot de passe) et
+// avis (intervention planifiée, rapport disponible…). Jamais bloquant.
+// ==========================================================================
+export async function envoyerInvitationObservateur(params: {
+  email: string;
+  nom: string;
+  clientNom: string;
+  lien: string;
+  dateFin: Date | null;
+}): Promise<ResultatEmail> {
+  const transport = getTransport();
+  if (!transport) return "non_configure";
+  const fin = params.dateFin ? ` jusqu'au ${formatDate(params.dateFin)}` : "";
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: params.email,
+      subject: `ROBUS — Votre accès au suivi de vos ascenseurs (${params.clientNom})`,
+      text: `Bonjour ${params.nom},\n\nROBUS vous donne accès au suivi de vos ascenseurs (${params.clientNom})${fin}.\n\nPour activer votre accès, créez votre mot de passe avec ce lien (valable 7 jours) :\n${params.lien}\n\nEnsuite, connectez-vous avec votre email et ce mot de passe, ou scannez le QR code collé dans la cabine.\n\nROBUS`,
+      html: `${enteteHtml()}<div style="font-family:Arial,sans-serif;padding:20px;color:#1f2a37;">
+        <p>Bonjour ${echapperHtml(params.nom)},</p>
+        <p>ROBUS vous donne accès au suivi de vos ascenseurs (<strong>${echapperHtml(params.clientNom)}</strong>)${echapperHtml(fin)}.</p>
+        <p>Pour activer votre accès, créez votre mot de passe (lien valable <strong>7 jours</strong>) :</p>
+        <p><a href="${params.lien}" style="display:inline-block;background:#0055a4;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Créer mon mot de passe</a></p>
+        <p style="font-size:13px;color:#5b6675;">Ensuite, connectez-vous avec votre email et ce mot de passe, ou scannez le QR code collé dans la cabine de l'ascenseur.</p>
+      </div>`,
+      attachments: logoAttachment(),
+    });
+    return "ok";
+  } catch {
+    return "echec";
+  }
+}
+
+export async function envoyerAvisObservateur(params: { email: string; nom: string; titre: string; texte: string; lien: string }) {
+  const transport = getTransport();
+  if (!transport) return "non_configure" as const;
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: params.email,
+      subject: `ROBUS — ${params.titre.replace(/^[^\p{L}\p{N}]+/u, "")}`,
+      text: `Bonjour ${params.nom},\n\n${params.texte}\n\nVoir le détail : ${params.lien}\n\nROBUS`,
+      html: `${enteteHtml()}<div style="font-family:Arial,sans-serif;padding:20px;color:#1f2a37;">
+        <p>Bonjour ${echapperHtml(params.nom)},</p>
+        <p style="font-size:15px;"><strong>${echapperHtml(params.titre)}</strong></p>
+        <p>${echapperHtml(params.texte)}</p>
+        <p><a href="${params.lien}" style="display:inline-block;background:#0055a4;color:#ffffff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Voir le détail</a></p>
+      </div>`,
+      attachments: logoAttachment(),
+    });
+    return "ok" as const;
+  } catch {
+    return "echec" as const;
+  }
+}

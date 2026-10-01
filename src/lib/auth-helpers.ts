@@ -2,7 +2,15 @@ import "server-only";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 
-export type Role = "administrateur" | "responsable_qualite" | "technicien" | "commercial";
+export type Role = "administrateur" | "responsable_qualite" | "technicien" | "commercial" | "observateur";
+
+export const ROLE_HOME: Record<string, string> = {
+  administrateur: "/responsable",
+  responsable_qualite: "/responsable",
+  commercial: "/responsable",
+  technicien: "/technicien",
+  observateur: "/observateur",
+};
 
 /**
  * À appeler en tête de chaque Server Action et de chaque page serveur sensible.
@@ -16,7 +24,7 @@ export async function requireUser(allowedRoles?: Role[]) {
   }
   const role = session.user.role as Role;
   if (allowedRoles && !allowedRoles.includes(role)) {
-    redirect(role === "technicien" ? "/technicien" : "/responsable");
+    redirect(ROLE_HOME[role] ?? "/connexion");
   }
   return { ...session.user, role };
 }

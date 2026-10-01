@@ -16,6 +16,7 @@ import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { envoyerOrdreDeMission } from "@/lib/mail";
 import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
 import { journaliser } from "@/lib/journal";
+import { notifierObservateurs } from "@/lib/observateur";
 
 // Phase 17 : envoi d'une (ou plusieurs) mission(s) au technicien — logique
 // unique utilisée partout (création, affectation, ajout à un projet,
@@ -98,12 +99,13 @@ export async function envoyerMissionsAuTechnicien(params: {
             type: interventions.type,
             dateProgrammee: interventions.dateProgrammee,
             numero: appareils.numeroInterne,
+            appareilId: interventions.appareilId,
           })
           .from(interventions)
           .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
           .where(filtreMissions)
           .orderBy(interventions.dateProgrammee)
-      : Promise.resolve([] as { id: string; type: string; dateProgrammee: Date | null; numero: string }[]),
+      : Promise.resolve([] as { id: string; type: string; dateProgrammee: Date | null; numero: string; appareilId: string }[]),
   ]);
 
   const documentsIdsDemandes = [...new Set((params.documentsIds ?? []).filter(Boolean))];
@@ -180,6 +182,19 @@ export async function envoyerMissionsAuTechnicien(params: {
           url: `/responsable/projets/${params.projetId}?tab=missions`,
           tag: `email-echec-${params.projetId}`,
         });
+      }
+      // Phase 18 : l'observateur du client est prévenu de la date prévue.
+      for (const m of missions) {
+        await notifierObservateurs(
+          m.appareilId,
+          "temps_reel",
+          {
+            titre: "📅 Intervention planifiée",
+            corps: `Ascenseur ${m.numero}${m.dateProgrammee ? ` — prévue le ${formatCourt(m.dateProgrammee)}` : ""}.`,
+            url: `/observateur/appareils/${m.appareilId}`,
+          },
+          true
+        );
       }
       if (nbPush === 0) {
         await journaliser({

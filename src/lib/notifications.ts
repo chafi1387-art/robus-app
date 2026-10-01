@@ -9,6 +9,7 @@ import {
   nonConformites,
   pushAbonnements,
   reglesPlanification,
+  signalementsPanne,
   users,
 } from "@/db/schema";
 import { and, eq, inArray, isNotNull, isNull, lt, ne, notExists, sql } from "drizzle-orm";
@@ -45,6 +46,7 @@ export async function getNotifications(): Promise<Notification[]> {
     missionsNonVues,
     emailsEchec,
     techSansNotif,
+    pannesSignalees,
   ] = await Promise.all([
     db
       .select({ id: appareils.id, numeroInterne: appareils.numeroInterne })
@@ -134,7 +136,18 @@ export async function getNotifications(): Promise<Notification[]> {
           notExists(db.select({ x: sql`1` }).from(pushAbonnements).where(eq(pushAbonnements.userId, users.id)))
         )
       ),
+    // Phase 18 : panne signalée (observateur ou QR code) pas encore affectée.
+    db
+      .select({ id: interventions.id, numero: appareils.numeroInterne })
+      .from(signalementsPanne)
+      .innerJoin(interventions, eq(signalementsPanne.interventionId, interventions.id))
+      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .where(and(isNull(interventions.technicienId), inArray(interventions.statut, ["creee", "planifiee"]))),
   ]);
+
+  for (const p of pannesSignalees) {
+    notifications.push({ id: `panne-signalee-${p.id}`, gravite: "crit", titre: `Panne signalée par le client — ${p.numero} (à affecter)`, href: `/responsable/missions/${p.id}` });
+  }
 
   for (const a of appareilsEnPanne) {
     notifications.push({ id: `panne-${a.id}`, gravite: "crit", titre: `Appareil ${a.numeroInterne} en panne`, href: `/responsable/appareils/${a.id}` });

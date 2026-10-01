@@ -11,6 +11,7 @@ const ROLE_LABEL: Record<string, string> = {
   responsable_qualite: "Responsable Qualité",
   technicien: "Technicien",
   commercial: "Commercial",
+  observateur: "Observateur",
 };
 
 async function getUsers() {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Archive, ArrowUpDown, BookOpen, Building2, CalendarDays, ClipboardList, FileText, FolderKanban,
+  Archive, ArrowUpDown, Eye, BookOpen, Building2, CalendarDays, ClipboardList, FileText, FolderKanban,
   HardHat, LayoutDashboard, ListChecks, MapPin, OctagonAlert, Package, Presentation, Receipt, Ruler,
   ScrollText, ShieldCheck, Smile, Target, Timer, TriangleAlert, UserCog, UserSearch, Search,
 } from "lucide-react";
@@ -26,6 +26,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
     title: "Ressources",
     items: [
       { href: "/responsable/clients", label: "Clients", icon: Building2 },
+      { href: "/responsable/observateurs", label: "Observateurs", icon: Eye },
       { href: "/responsable/sites", label: "Sites", icon: MapPin },
       { href: "/responsable/appareils", label: "Appareils", icon: ArrowUpDown, badge: "panne" },
       { href: "/responsable/techniciens", label: "Équipe technique", icon: HardHat },

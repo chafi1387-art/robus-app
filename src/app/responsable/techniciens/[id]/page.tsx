@@ -631,7 +631,7 @@ function ListeMissions({
         const retard = m.dateProgrammee && m.dateProgrammee.getTime() < Date.now() && !FINIS.includes(m.statut);
         return (
           <div key={m.id} className="py-2.5 flex items-center gap-3 text-sm">
-            <span className={`w-32 shrink-0 tabular ${retard ? "text-red-ink font-semibold" : "text-ink-soft"}`}>{formatDateTime(m.dateProgrammee)}</span>
+            <Link href={`/responsable/missions/${m.id}`} className={`w-32 shrink-0 tabular hover:underline ${retard ? "text-red-ink font-semibold" : "text-blue font-semibold"}`}>{formatDateTime(m.dateProgrammee)}</Link>
             <span className="flex-1 min-w-0 truncate">
               {m.projetId ? (
                 <Link href={`/responsable/projets/${m.projetId}?tab=missions`} className="font-semibold hover:text-blue">

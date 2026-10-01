@@ -5,12 +5,8 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
-const ROLE_HOME: Record<string, string> = {
-  administrateur: "/responsable",
-  responsable_qualite: "/responsable",
-  commercial: "/responsable",
-  technicien: "/technicien",
-};
+import { ROLE_HOME } from "@/lib/auth-helpers";
+import { accesObservateurValide } from "@/lib/observateur-acces";
 
 export default async function ConnexionPage({
   searchParams,
@@ -35,13 +31,17 @@ export default async function ConnexionPage({
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) redirect(errRedirect);
+    // Phase 18 : un observateur dont l'accès a expiré ne peut plus se connecter.
+    if (user.role === "observateur" && !(await accesObservateurValide(user.id))) {
+      redirect(`/connexion?erreur=expire`);
+    }
 
     // Identifiants valides : on établit la session sans laisser next-auth
     // rediriger lui-même, puis on redirige nous-mêmes vers la bonne destination.
     await signIn("credentials", { email, password, redirect: false });
 
     const destination =
-      params.next && params.next.startsWith("/") ? params.next : (ROLE_HOME[user.role] ?? "/connexion");
+      params.next && params.next.startsWith("/") && !params.next.startsWith("//") ? params.next : (ROLE_HOME[user.role] ?? "/connexion");
     redirect(destination);
   }
 
@@ -85,12 +85,14 @@ export default async function ConnexionPage({
 
             {params.reinit && (
               <div className="mb-4 text-sm bg-green-fill text-green-ink rounded-lg px-3 py-2">
-                Mot de passe modifié. Connectez-vous avec le nouveau.
+                {params.reinit === "2" ? "Mot de passe créé. Connectez-vous avec votre email et ce mot de passe." : "Mot de passe modifié. Connectez-vous avec le nouveau."}
               </div>
             )}
             {params.erreur && (
               <div className="mb-4 text-sm bg-red-fill text-red-ink rounded-lg px-3 py-2">
-                Email ou mot de passe incorrect.
+                {params.erreur === "expire"
+                  ? "Votre accès observateur a expiré ou a été retiré. Contactez ROBUS pour le renouveler."
+                  : "Email ou mot de passe incorrect."}
               </div>
             )}
 

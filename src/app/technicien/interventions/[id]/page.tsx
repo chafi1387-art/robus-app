@@ -20,23 +20,28 @@ import {
   mouvementsStock,
   pieces,
   projets,
+  missionJournal,
   rapportPhotos,
   rapports,
 } from "@/db/schema";
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime, toDatetimeLocalValue } from "@/lib/format";
-import { peutModifierHeureReelle } from "@/lib/rapport-rules";
+import { finModificationRapport, peutModifierRapport, tempsRestantModification } from "@/lib/rapport-rules";
+import { Camera, Lock, Pencil } from "lucide-react";
 import { after } from "next/server";
 import { CheckCircle2 } from "lucide-react";
 import {
   accepterMission,
+  ajouterAuFil,
+  ajouterPhotosRapport,
   commencerIntervention,
   declarerNonConformite,
   demanderAide,
   enregistrerMouvementTechnicien,
-  modifierHeureReelleRapport,
+  modifierRapport,
+  retirerPhotoRapport,
   terminerIntervention,
 } from "../../actions";
 
@@ -86,11 +91,11 @@ export default async function InterventionDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ nc?: string; aide?: string }>;
+  searchParams: Promise<{ nc?: string; aide?: string; modifie?: string }>;
 }) {
   const user = await requireUser(ROLES_TECHNICIEN);
   const { id } = await params;
-  const { nc, aide } = await searchParams;
+  const { nc, aide, modifie } = await searchParams;
 
   // Phase 6 : l'Appareil n'est plus rattaché à un Site — le client, l'adresse
   // et les instructions d'accès d'une intervention se dérivent désormais du
@@ -129,7 +134,7 @@ export default async function InterventionDetailPage({
 
   // Phase 17 : toutes les lectures en une seule vague parallèle (avant : 5
   // vagues successives) — la mission s'ouvre plus vite sur le téléphone.
-  const [rapport, listePieces, checklist, documentsAppareil, documentsProjet, piecesUtilisees] = await Promise.all([
+  const [rapport, listePieces, checklist, documentsAppareil, documentsProjet, piecesUtilisees, fil] = await Promise.all([
     db.select().from(rapports).where(eq(rapports.interventionId, id)).limit(1).then((r) => r[0]),
     db
       .select({
@@ -162,7 +167,11 @@ export default async function InterventionDetailPage({
       .innerJoin(pieces, eq(mouvementsStock.pieceId, pieces.id))
       .where(and(eq(mouvementsStock.interventionId, id), eq(mouvementsStock.type, "sortie")))
       .orderBy(desc(mouvementsStock.createdAt)),
+    db.select().from(missionJournal).where(eq(missionJournal.interventionId, id)).orderBy(asc(missionJournal.createdAt)),
   ]);
+  const photosFil = fil.flatMap((f) => f.photos);
+  const modifiable = estTerminee && !!rapport && peutModifierRapport(intervention, user.role);
+  const resteModif = tempsRestantModification(intervention.dateFin);
   const photosRapport = rapport
     ? await db.select().from(rapportPhotos).where(eq(rapportPhotos.rapportId, rapport.id))
     : [];
@@ -308,6 +317,45 @@ export default async function InterventionDetailPage({
       )}
 
       {peutTerminer && (
+        <Card className="p-4 border-[1.5px] border-blue/50">
+          <h2 className="font-display font-bold text-sm flex items-center gap-2">
+            <Camera className="w-4 h-4 text-blue" /> Photos &amp; notes en direct
+          </h2>
+          <p className="text-xs text-ink-soft mt-0.5 mb-3">Le bureau les voit tout de suite. Elles seront aussi jointes au rapport.</p>
+          <form action={ajouterAuFil} className="flex flex-col gap-2">
+            <input type="hidden" name="interventionId" value={intervention.id} />
+            <input
+              type="file"
+              name="photos"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue file:text-white file:font-bold file:px-3 file:py-2"
+            />
+            <input name="texte" maxLength={1000} placeholder="Note (ex. câble usé gaine 3)…" className={inputClass} />
+            <Btn variant="ghost" className="justify-center">Envoyer au bureau</Btn>
+          </form>
+          {fil.length > 0 && (
+            <ol className="mt-3 pt-3 border-t border-line flex flex-col gap-2.5">
+              {fil.map((f) => (
+                <li key={f.id} className="text-sm">
+                  <div className="text-xs text-ink-soft">{formatDateTime(f.createdAt).split(" ")[1]}</div>
+                  {f.texte && <div>{f.texte}</div>}
+                  {f.photos.length > 0 && (
+                    <div className="flex gap-1.5 mt-1 flex-wrap">
+                      {f.photos.map((u) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={u} src={u} alt="Photo envoyée" className="w-14 h-14 rounded-lg object-cover bg-blue-pale" />
+                      ))}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
+      )}
+
+      {peutTerminer && (
         <Card className="p-4">
           <h2 className="font-display font-bold text-sm mb-3">Pièces utilisées</h2>
           <div className="flex flex-col divide-y divide-line mb-3">
@@ -420,7 +468,7 @@ export default async function InterventionDetailPage({
               />
             </Field>
             <p className="text-xs text-ink-soft -mt-2">
-              Modifiable pendant 24h après l&apos;heure programmée, ensuite verrouillée.
+              Vous pourrez corriger le rapport pendant 24 h après l&apos;avoir envoyé.
             </p>
             <Field label="Statut final de l'appareil">
               <select name="statutFinalAppareil" className={inputClass} defaultValue="en_service">
@@ -432,12 +480,16 @@ export default async function InterventionDetailPage({
               </select>
             </Field>
             <FileField
-              label="Photo(s) de la mission — au moins 1 obligatoire (JPEG / PNG / WEBP, 8 Mo max chacune)"
+              label={
+                photosFil.length > 0
+                  ? `Photo(s) supplémentaire(s) — ${photosFil.length} photo(s) déjà envoyée(s) en direct seront jointes`
+                  : "Photo(s) de la mission — au moins 1 obligatoire (JPEG / PNG / WEBP, 8 Mo max chacune)"
+              }
               name="photos"
               accept="image/jpeg,image/png,image/webp"
               maxBytes={8 * 1024 * 1024}
               multiple
-              required
+              required={photosFil.length === 0}
             />
             <Btn className="w-full justify-center">Terminer &amp; envoyer le rapport</Btn>
           </form>
@@ -509,18 +561,36 @@ export default async function InterventionDetailPage({
 
       {estTerminee && rapport && (
         <Card className="p-4">
-          <h2 className="font-display font-bold text-sm mb-2">Rapport envoyé</h2>
+          {modifie === "1" && (
+            <div className="mb-3 text-xs bg-green-fill text-green-ink rounded-lg px-3 py-2">Rapport corrigé — le bureau voit la nouvelle version.</div>
+          )}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h2 className="font-display font-bold text-sm">Rapport envoyé</h2>
+            {modifiable && user.role !== "administrateur" && resteModif ? (
+              <span className="text-[11px] font-bold rounded-full px-2.5 py-1 bg-green-fill text-green-ink">Modifiable encore {resteModif}</span>
+            ) : modifiable ? (
+              <span className="text-[11px] font-bold rounded-full px-2.5 py-1 bg-blue-pale text-blue">Modification administrateur</span>
+            ) : (
+              <span className="text-[11px] font-bold rounded-full px-2.5 py-1 bg-[#eef1f5] text-ink-soft inline-flex items-center gap-1">
+                <Lock className="w-3 h-3" /> Verrouillé
+              </span>
+            )}
+          </div>
           <dl className="text-sm flex flex-col gap-1.5">
             <div>
               <dt className="text-ink-soft text-xs">Travaux réalisés</dt>
-              <dd>{rapport.travauxRealises}</dd>
+              <dd className="whitespace-pre-wrap">{rapport.travauxRealises}</dd>
             </div>
             {rapport.observations && (
               <div>
                 <dt className="text-ink-soft text-xs">Observations</dt>
-                <dd>{rapport.observations}</dd>
+                <dd className="whitespace-pre-wrap">{rapport.observations}</dd>
               </div>
             )}
+            <div className="flex justify-between">
+              <dt className="text-ink-soft">Temps passé</dt>
+              <dd>{rapport.tempsPasseMinutes != null ? `${rapport.tempsPasseMinutes} min` : "—"}</dd>
+            </div>
             <div className="flex justify-between">
               <dt className="text-ink-soft">Heure réelle</dt>
               <dd>{formatDateTime(rapport.heureReelle)}</dd>
@@ -529,52 +599,74 @@ export default async function InterventionDetailPage({
               <dt className="text-ink-soft">Envoyé le</dt>
               <dd>{formatDateTime(rapport.dateEnvoi)}</dd>
             </div>
+            {rapport.modifieLe && (
+              <div className="flex justify-between">
+                <dt className="text-ink-soft">Corrigé le</dt>
+                <dd>{formatDateTime(rapport.modifieLe)}</dd>
+              </div>
+            )}
           </dl>
-
-          {/* Phase 10 : correction de l'heure réelle — 24h après l'heure
-              programmée pour le technicien, sans limite pour l'admin. */}
-          {peutModifierHeureReelle(intervention.dateProgrammee, user.role) ? (
-            <details className="mt-3 pt-3 border-t border-line">
-              <summary className="text-xs font-bold text-blue cursor-pointer select-none">
-                Corriger l&apos;heure réelle
-              </summary>
-              <form
-                action={modifierHeureReelleRapport}
-                className="flex items-end gap-2 mt-2 flex-wrap"
-              >
-                <input type="hidden" name="interventionId" value={intervention.id} />
-                <Field label="Nouvelle heure réelle">
-                  <input
-                    name="heureReelle"
-                    type="datetime-local"
-                    required
-                    defaultValue={toDatetimeLocalValue(rapport.heureReelle ?? intervention.dateProgrammee)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Btn variant="ghost" className="!text-xs">
-                  Enregistrer
-                </Btn>
-              </form>
-            </details>
-          ) : (
-            <p className="text-xs text-ink-soft mt-3 pt-3 border-t border-line">
-              Le délai de 24h pour corriger l&apos;heure réelle est dépassé.
+          {!modifiable && intervention.statut === "terminee" && (
+            <p className="text-xs text-ink-soft mt-2">
+              Délai de correction dépassé ({formatDateTime(finModificationRapport(intervention.dateFin))}). Pour une correction, contactez le bureau.
             </p>
+          )}
+          {!modifiable && intervention.statut !== "terminee" && (
+            <p className="text-xs text-ink-soft mt-2">Rapport validé par le bureau — verrouillé.</p>
           )}
 
           {photosRapport.length > 0 && (
             <div className="mt-3 grid grid-cols-3 gap-2">
               {photosRapport.map((p) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={p.id}
-                  src={p.url}
-                  alt="Photo de la mission"
-                  className="w-full aspect-square object-cover rounded-lg bg-blue-pale"
-                />
+                <div key={p.id} className="relative">
+                  <a href={p.url} target="_blank" rel="noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.url} alt="Photo de la mission" className="w-full aspect-square object-cover rounded-lg bg-blue-pale" />
+                  </a>
+                  {modifiable && photosRapport.length > 1 && (
+                    <form action={retirerPhotoRapport} className="absolute top-1 right-1">
+                      <input type="hidden" name="interventionId" value={intervention.id} />
+                      <input type="hidden" name="photoId" value={p.id} />
+                      <button type="submit" aria-label="Retirer la photo" className="w-7 h-7 rounded-full bg-white/90 text-red-ink font-bold text-sm shadow">×</button>
+                    </form>
+                  )}
+                </div>
               ))}
             </div>
+          )}
+
+          {modifiable && (
+            <details className="mt-3 pt-3 border-t border-line">
+              <summary className="text-sm font-bold text-blue cursor-pointer select-none flex items-center gap-2">
+                <Pencil className="w-4 h-4" /> Corriger le rapport
+              </summary>
+              <form action={modifierRapport} className="flex flex-col gap-3 mt-3">
+                <input type="hidden" name="interventionId" value={intervention.id} />
+                <Field label="Travaux réalisés">
+                  <textarea name="travauxRealises" required rows={3} defaultValue={rapport.travauxRealises ?? ""} className={inputClass} />
+                </Field>
+                <Field label="Observations">
+                  <textarea name="observations" rows={2} defaultValue={rapport.observations ?? ""} className={inputClass} />
+                </Field>
+                <Field label="Temps passé (minutes)">
+                  <input name="tempsPasseMinutes" type="number" min={0} defaultValue={rapport.tempsPasseMinutes ?? ""} className={inputClass} />
+                </Field>
+                <Field label="Heure réelle de l'intervention">
+                  <input
+                    name="heureReelle"
+                    type="datetime-local"
+                    defaultValue={toDatetimeLocalValue(rapport.heureReelle ?? intervention.dateProgrammee)}
+                    className={inputClass}
+                  />
+                </Field>
+                <Btn className="justify-center">Enregistrer les corrections</Btn>
+              </form>
+              <form action={ajouterPhotosRapport} className="flex flex-col gap-2 mt-4 pt-3 border-t border-line">
+                <input type="hidden" name="interventionId" value={intervention.id} />
+                <FileField label="Ajouter des photos" name="photos" accept="image/jpeg,image/png,image/webp" maxBytes={8 * 1024 * 1024} multiple required />
+                <Btn variant="ghost" className="justify-center">Ajouter au rapport</Btn>
+              </form>
+            </details>
           )}
         </Card>
       )}

@@ -1,7 +1,10 @@
 import { TypeInterventionPill, StatutInterventionPill } from "@/components/ui";
 import { db } from "@/db";
 import { appareils, clients, interventions, projets } from "@/db/schema";
-import { and, asc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { rapportPhotos, rapports } from "@/db/schema";
+import { tempsRestantModification } from "@/lib/rapport-rules";
+import { Lock, Search } from "lucide-react";
 import Link from "next/link";
 import { CarteApplication } from "@/components/app-installable";
 import { clePubliqueVapid } from "@/lib/push";
@@ -67,10 +70,14 @@ function dayKey(d: Date) {
 export default async function MesInterventionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vue?: string; date?: string }>;
+  searchParams: Promise<{ vue?: string; date?: string; onglet?: string; q?: string; n?: string }>;
 }) {
   const user = await requireUser(ROLES_TECHNICIEN);
-  const { vue: vueParam, date: dateParam } = await searchParams;
+  const { vue: vueParam, date: dateParam, onglet, q, n } = await searchParams;
+  // Phase 18 : onglet « Terminées » = historique complet du technicien.
+  if (onglet === "terminees") {
+    return <HistoriqueTechnicien userId={user.id} q={q ?? ""} limite={Math.min(Math.max(Number(n) || 30, 30), 600)} />;
+  }
   const vue: Vue = (VUES as readonly string[]).includes(vueParam ?? "") ? (vueParam as Vue) : "jour";
 
   const aujourdhui = startOfDay(new Date());
@@ -220,6 +227,8 @@ export default async function MesInterventionsPage({
         </div>
       </div>
 
+      <OngletsMissions actif="afaire" />
+
       <CarteApplication cleVapid={clePubliqueVapid()} seulementSiAction compact />
 
       {nouvelles.length > 0 && (
@@ -356,6 +365,141 @@ function InterventionCard({ i, retard = false, nouvelle = false }: { i: Row; ret
           </a>
         )}
       </div>
+    </div>
+  );
+}
+
+
+// ==========================================================================
+// Phase 18 — « À faire | Terminées » + historique du technicien
+// ==========================================================================
+function OngletsMissions({ actif }: { actif: "afaire" | "terminees" }) {
+  const cls = (on: boolean) =>
+    `flex-1 text-center text-[14px] font-bold py-2.5 rounded-lg ${on ? "bg-navy text-white shadow-sm" : "text-ink-soft"}`;
+  return (
+    <div className="flex rounded-xl bg-[#e9eef4] p-1">
+      <Link href="/technicien" className={cls(actif === "afaire")}>À faire</Link>
+      <Link href="/technicien?onglet=terminees" className={cls(actif === "terminees")}>Terminées</Link>
+    </div>
+  );
+}
+
+const MOIS_FMT = new Intl.DateTimeFormat("fr-BE", { month: "long", year: "numeric", timeZone: "Europe/Brussels" });
+
+async function HistoriqueTechnicien({ userId, q, limite }: { userId: string; q: string; limite: number }) {
+  const recherche = q.trim().slice(0, 80);
+  const nbPhotos = db
+    .select({ rapportId: rapportPhotos.rapportId, n: sql<number>`count(*)::int`.as("n") })
+    .from(rapportPhotos)
+    .groupBy(rapportPhotos.rapportId)
+    .as("nb_photos");
+  const rows = await db
+    .select({
+      id: interventions.id,
+      type: interventions.type,
+      statut: interventions.statut,
+      dateProgrammee: interventions.dateProgrammee,
+      dateFin: interventions.dateFin,
+      numeroInterne: appareils.numeroInterne,
+      raisonSociale: clients.raisonSociale,
+      adresse: projets.adresse,
+      photos: nbPhotos.n,
+      modifieLe: rapports.modifieLe,
+    })
+    .from(interventions)
+    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(projets, eq(interventions.projetId, projets.id))
+    .leftJoin(clients, eq(projets.clientId, clients.id))
+    .leftJoin(rapports, eq(rapports.interventionId, interventions.id))
+    .leftJoin(nbPhotos, eq(nbPhotos.rapportId, rapports.id))
+    .where(
+      and(
+        eq(interventions.technicienId, userId),
+        inArray(interventions.statut, ["terminee", "validee", "cloturee"]),
+        recherche
+          ? or(
+              ilike(appareils.numeroInterne, `%${recherche}%`),
+              ilike(clients.raisonSociale, `%${recherche}%`),
+              ilike(projets.adresse, `%${recherche}%`)
+            )
+          : undefined
+      )
+    )
+    .orderBy(desc(sql`coalesce(${interventions.dateFin}, ${interventions.dateProgrammee})`))
+    .limit(limite + 1);
+  const plus = rows.length > limite;
+  const liste = rows.slice(0, limite);
+
+  const groupes: { mois: string; rows: typeof liste }[] = [];
+  for (const r of liste) {
+    const d = r.dateFin ?? r.dateProgrammee;
+    const mois = d ? MOIS_FMT.format(d) : "Sans date";
+    const g = groupes[groupes.length - 1];
+    if (g && g.mois === mois) g.rows.push(r);
+    else groupes.push({ mois, rows: [r] });
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <OngletsMissions actif="terminees" />
+      <form className="relative">
+        <input type="hidden" name="onglet" value="terminees" />
+        <Search className="w-4 h-4 text-ink-soft absolute left-3 top-1/2 -translate-y-1/2" />
+        <input
+          name="q"
+          defaultValue={recherche}
+          placeholder="Rechercher un appareil, un client, une adresse…"
+          className="w-full rounded-xl border border-line bg-surface pl-9 pr-3 py-3 text-[15px]"
+        />
+      </form>
+      {groupes.map((g) => (
+        <div key={g.mois}>
+          <h2 className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-2 capitalize">{g.mois}</h2>
+          <div className="flex flex-col gap-2.5">
+            {g.rows.map((r) => {
+              const reste = r.statut === "terminee" ? tempsRestantModification(r.dateFin) : null;
+              return (
+                <Link
+                  key={r.id}
+                  href={`/technicien/interventions/${r.id}`}
+                  className="bg-surface border border-line rounded-2xl p-3.5 flex flex-col gap-1.5 active:bg-blue-pale"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-display font-extrabold text-[15px] text-navy">{r.numeroInterne}</span>
+                    {reste ? (
+                      <span className="text-[11px] font-bold rounded-full px-2.5 py-1 bg-green-fill text-green-ink">Modifiable encore {reste}</span>
+                    ) : (
+                      <span className="text-[11px] font-bold rounded-full px-2.5 py-1 bg-[#eef1f5] text-ink-soft inline-flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> {r.statut === "terminee" ? "Verrouillée" : "Validée"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[13px] text-ink-soft truncate">
+                    {[r.raisonSociale, r.adresse].filter(Boolean).join(" — ") || "Projet non renseigné"}
+                  </div>
+                  <div className="flex items-center gap-2 text-[12.5px] text-ink-soft flex-wrap">
+                    <TypeInterventionPill type={r.type} />
+                    <span>{formatDateTime(r.dateFin ?? r.dateProgrammee)}</span>
+                    <span>· 📷 {r.photos ?? 0}</span>
+                    {r.modifieLe && <span>· corrigé</span>}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {liste.length === 0 && (
+        <p className="text-sm text-ink-soft">{recherche ? "Aucune intervention trouvée." : "Aucune intervention terminée pour l'instant."}</p>
+      )}
+      {plus && (
+        <Link
+          href={`/technicien?onglet=terminees&n=${limite + 30}${recherche ? `&q=${encodeURIComponent(recherche)}` : ""}`}
+          className="text-center text-sm font-bold text-blue py-3"
+        >
+          Voir plus
+        </Link>
+      )}
     </div>
   );
 }

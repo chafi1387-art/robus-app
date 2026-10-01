@@ -6,7 +6,9 @@ const ROLE_HOME: Record<string, string> = {
   responsable_qualite: "/responsable",
   commercial: "/responsable",
   technicien: "/technicien",
+  observateur: "/observateur",
 };
+const BUREAU = new Set(["administrateur", "responsable_qualite", "commercial"]);
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -20,11 +22,14 @@ export default auth((req) => {
     pathname === "/api/cron/retards" ||
     pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/icons/") ||
+    // Phase 18 : étiquette QR d'un appareil (page publique, sans donnée sensible).
+    pathname.startsWith("/a/") ||
     pathname.startsWith("/api/auth");
   const session = req.auth;
 
   if (isPublic) {
-    if (session?.user?.role && pathname === "/connexion") {
+    // Avec ?erreur= (ex. accès observateur expiré) on reste sur la page de connexion.
+    if (session?.user?.role && pathname === "/connexion" && !req.nextUrl.searchParams.has("erreur")) {
       return NextResponse.redirect(
         new URL(ROLE_HOME[session.user.role] ?? "/", req.nextUrl)
       );
@@ -40,11 +45,20 @@ export default auth((req) => {
 
   const role = session.user.role;
 
-  if (pathname.startsWith("/responsable") && role === "technicien") {
-    return NextResponse.redirect(new URL("/technicien", req.nextUrl));
+  const home = new URL(ROLE_HOME[role] ?? "/connexion", req.nextUrl);
+  if (pathname.startsWith("/responsable") && !BUREAU.has(role)) {
+    return NextResponse.redirect(home);
   }
   if (pathname.startsWith("/technicien") && role !== "technicien" && role !== "administrateur") {
-    return NextResponse.redirect(new URL("/responsable", req.nextUrl));
+    return NextResponse.redirect(home);
+  }
+  // Phase 18 : l'espace Observateur est réservé aux observateurs, et un
+  // observateur n'accède qu'à son espace (+ notifications / API d'auth).
+  if (pathname.startsWith("/observateur") && role !== "observateur") {
+    return NextResponse.redirect(home);
+  }
+  if (role === "observateur" && !pathname.startsWith("/observateur") && !pathname.startsWith("/api/auth") && pathname !== "/api/auth-check" && !pathname.startsWith("/notifications")) {
+    return NextResponse.redirect(home);
   }
   if (pathname === "/") {
     return NextResponse.redirect(new URL(ROLE_HOME[role] ?? "/connexion", req.nextUrl));

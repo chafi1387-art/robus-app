@@ -30,7 +30,7 @@ export default async function ResponsableLayout({ children }: { children: React.
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden lg:flex w-[264px] shrink-0 bg-navy text-blue-pale flex-col sticky top-0 h-screen">
+      <aside className="print:hidden hidden lg:flex w-[264px] shrink-0 bg-navy text-blue-pale flex-col sticky top-0 h-screen">
         <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-robus.png" alt="ROBUS" className="h-9 w-auto object-contain" />
@@ -50,7 +50,7 @@ export default async function ResponsableLayout({ children }: { children: React.
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-20 bg-surface/95 backdrop-blur border-b border-line flex items-center gap-2 sm:gap-4 px-3 sm:px-8 h-16">
+        <header className="print:hidden sticky top-0 z-20 bg-surface/95 backdrop-blur border-b border-line flex items-center gap-2 sm:gap-4 px-3 sm:px-8 h-16">
           <MenuMobile role={user.role} badges={{ panne: badges.retard, nonAffectees: badges.nonAffectees }} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-robus.png" alt="ROBUS" className="lg:hidden h-7 w-auto object-contain" />

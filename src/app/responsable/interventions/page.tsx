@@ -167,7 +167,14 @@ export default async function InterventionsPage() {
                   const modifiable = STATUTS_MODIFIABLES.has(i.statut);
                   return (
                     <tr key={i.id} className="border-b border-line last:border-0">
-                      <td className="py-2.5 pr-3 whitespace-nowrap">{formatDateTime(i.dateProgrammee)}</td>
+                      <td className="py-2.5 pr-3 whitespace-nowrap">
+                        <Link href={`/responsable/missions/${i.id}`} className="font-semibold text-blue hover:underline">
+                          {formatDateTime(i.dateProgrammee)}
+                        </Link>
+                        {i.statut === "en_cours" && (
+                          <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] font-extrabold uppercase text-white bg-red-ink rounded-full px-1.5 py-0.5">● Direct</span>
+                        )}
+                      </td>
                       <td className="py-2.5 pr-3">
                         <Link href={`/responsable/appareils/${i.appareilId}`} className="font-semibold text-blue">
                           {i.numeroInterne}

@@ -1,3 +1,5 @@
+import { QrCode } from "lucide-react";
+import { basculerVisibiliteDocument } from "../../observateurs/actions";
 import {
   Card,
   Btn,
@@ -114,9 +116,15 @@ export default async function AppareilDetailPage({
             Appareil indépendant — rattaché à un Client via un Projet
           </div>
         )}
-        <div className="flex items-center gap-3 mt-1">
+        <div className="flex items-center gap-3 mt-1 flex-wrap">
           <h1 className="text-2xl font-extrabold font-display">{appareil.numeroInterne}</h1>
           <StatutAppareilPill statut={appareil.statut} />
+          <Link
+            href={`/responsable/appareils/${appareil.id}/qr`}
+            className="ml-auto inline-flex items-center gap-1.5 text-sm font-bold border border-line rounded-lg px-3 py-1.5 hover:bg-blue-pale"
+          >
+            <QrCode className="w-4 h-4" /> Étiquette QR
+          </Link>
         </div>
         <p className="text-sm text-ink-soft">
           {[appareil.marque, appareil.modele, appareil.typeAppareil].filter(Boolean).join(" · ") ||
@@ -303,9 +311,22 @@ export default async function AppareilDetailPage({
                     </div>
                     <div className="text-xs text-ink-soft mt-0.5 capitalize">{d.typeContenu}</div>
                   </div>
-                  <span className="text-xs text-ink-soft whitespace-nowrap">
-                    {formatDate(d.createdAt)}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <form action={basculerVisibiliteDocument}>
+                      <input type="hidden" name="documentId" value={d.id} />
+                      <input type="hidden" name="retour" value={`/responsable/appareils/${appareil.id}`} />
+                      <button
+                        type="submit"
+                        title="Visible dans l'espace Observateur du client"
+                        className={`text-[11px] font-bold rounded-full px-2.5 py-1 border ${d.visibleObservateur ? "bg-green-fill text-green-ink border-transparent" : "border-line text-ink-soft hover:bg-blue-pale"}`}
+                      >
+                        {d.visibleObservateur ? "👁 Visible observateur" : "Masqué observateur"}
+                      </button>
+                    </form>
+                    <span className="text-xs text-ink-soft whitespace-nowrap">
+                      {formatDate(d.createdAt)}
+                    </span>
+                  </div>
                 </div>
               ))}
               {documents.length === 0 && (

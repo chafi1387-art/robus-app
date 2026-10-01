@@ -1,6 +1,8 @@
 import { Card, Btn, Field, inputClass } from "@/components/ui";
 import { db } from "@/db";
-import { appareils, clients, contactsClient, heuresSousTraitance, sites } from "@/db/schema";
+import { appareils, clients, contactsClient, heuresSousTraitance, observateurs, sites, users } from "@/db/schema";
+import { Eye } from "lucide-react";
+import { MODELES } from "@/lib/observateur";
 import { count, desc, eq, sql } from "drizzle-orm";
 import { formatMinutes, libelleMois } from "@/lib/sous-traitance";
 import Link from "next/link";
@@ -25,9 +27,14 @@ export default async function ClientDetailPage({
   const [client] = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
   if (!client) notFound();
 
-  const [contacts, siteRows] = await Promise.all([
+  const [contacts, siteRows, observateursClient] = await Promise.all([
     db.select().from(contactsClient).where(eq(contactsClient.clientId, id)),
     db.select().from(sites).where(eq(sites.clientId, id)).orderBy(sites.adresse),
+    db
+      .select({ id: observateurs.id, nom: users.nom, email: users.email, actif: users.actif, modele: observateurs.modele })
+      .from(observateurs)
+      .innerJoin(users, eq(observateurs.userId, users.id))
+      .where(eq(observateurs.clientId, id)),
   ]);
 
   // Sous-traitance : historique des heures par mois (12 derniers mois saisis)
@@ -102,6 +109,29 @@ export default async function ClientDetailPage({
           )}
         </Card>
       )}
+
+      <Card className="p-5">
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <div>
+            <h2 className="font-display font-bold text-sm flex items-center gap-2"><Eye className="w-4 h-4 text-blue" /> Observateurs ({observateursClient.length})</h2>
+            <p className="text-xs text-ink-soft">Personnes du client qui suivent leurs ascenseurs en lecture seule (QR code, historique, interventions en cours…).</p>
+          </div>
+          <Btn href={`/responsable/observateurs/nouveau?client=${client.id}`} variant="ghost" className="!text-xs">
+            + Ajouter un observateur
+          </Btn>
+        </div>
+        <div className="flex flex-col divide-y divide-line">
+          {observateursClient.map((o) => (
+            <Link key={o.id} href={`/responsable/observateurs/${o.id}`} className="py-2.5 flex items-center justify-between gap-3 hover:bg-blue-pale rounded-lg px-2 -mx-2">
+              <span className="text-sm">
+                <span className="font-semibold">{o.nom}</span> <span className="text-ink-soft">· {o.email}</span>
+              </span>
+              <span className="text-xs text-ink-soft">{MODELES[o.modele ?? ""]?.label ?? "Personnalisé"}{o.actif !== 1 ? " · accès retiré" : ""}</span>
+            </Link>
+          ))}
+          {observateursClient.length === 0 && <p className="text-sm text-ink-soft py-1">Aucun observateur pour ce client.</p>}
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 flex flex-col gap-4">

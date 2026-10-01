@@ -12,8 +12,9 @@ export async function reinitialiserMotDePasse(formData: FormData) {
   const jeton = String(formData.get("jeton") ?? "");
   const mdp = String(formData.get("password") ?? "");
   const confirmation = String(formData.get("confirmation") ?? "");
-  const retour = (e: string) => redirect(`/reinitialiser?jeton=${encodeURIComponent(jeton)}&erreur=${e}`);
-  if (!/^[0-9a-f]{64}$/.test(jeton)) redirect("/reinitialiser?erreur=lien");
+  const inv = formData.get("invitation") === "1" ? "&invitation=1" : "";
+  const retour = (e: string) => redirect(`/reinitialiser?jeton=${encodeURIComponent(jeton)}&erreur=${e}${inv}`);
+  if (!/^[0-9a-f]{64}$/.test(jeton)) redirect(`/reinitialiser?erreur=lien${inv}`);
   if (mdp.length < 8) retour("court");
   if (mdp !== confirmation) retour("different");
 
@@ -23,11 +24,11 @@ export async function reinitialiserMotDePasse(formData: FormData) {
     .from(reinitialisationsMotDePasse)
     .where(and(eq(reinitialisationsMotDePasse.jetonHash, hash), isNull(reinitialisationsMotDePasse.utiliseLe), gt(reinitialisationsMotDePasse.expireLe, new Date())))
     .limit(1);
-  if (!demande) redirect("/reinitialiser?erreur=lien");
+  if (!demande) redirect(`/reinitialiser?erreur=lien${inv}`);
 
   await db.update(users).set({ passwordHash: await bcrypt.hash(mdp, 10) }).where(eq(users.id, demande.userId));
   // Tous les liens encore ouverts de ce compte deviennent inutilisables.
   await db.update(reinitialisationsMotDePasse).set({ utiliseLe: new Date() }).where(and(eq(reinitialisationsMotDePasse.userId, demande.userId), isNull(reinitialisationsMotDePasse.utiliseLe)));
   await journaliser({ entite: "utilisateur", entiteId: demande.userId, action: "mot_de_passe_reinitialise", utilisateurId: demande.userId });
-  redirect("/connexion?reinit=1");
+  redirect(inv ? "/connexion?reinit=2" : "/connexion?reinit=1");
 }

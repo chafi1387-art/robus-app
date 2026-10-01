@@ -6,6 +6,7 @@ import {
   appareils,
   demandesAide,
   interventions,
+  missionJournal,
   mouvementsStock,
   nonConformites,
   pieces,
@@ -21,9 +22,11 @@ import { notifierBureau } from "@/lib/push";
 import { peutModifierHeureReelle } from "@/lib/rapport-rules";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, isNull } from "drizzle-orm";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { after } from "next/server";
+import { enregistrerPhotos, photosDuFormulaire } from "@/lib/photos";
+import { peutModifierRapport } from "@/lib/rapport-rules";
+import { notifierObservateurs } from "@/lib/observateur";
 
 async function assertOwnIntervention(interventionId: string, userId: string, role: string) {
   const [row] = await db
@@ -56,6 +59,23 @@ export async function commencerIntervention(formData: FormData) {
     .update(interventions)
     .set({ vueLe: maintenant })
     .where(and(eq(interventions.id, interventionId), isNull(interventions.vueLe)));
+
+  // Phase 18 : l'observateur suit en temps réel (« Technicien sur place »).
+  const [m] = await db
+    .select({ appareilId: interventions.appareilId, numero: appareils.numeroInterne })
+    .from(interventions)
+    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .where(eq(interventions.id, interventionId))
+    .limit(1);
+  if (m) {
+    after(() =>
+      notifierObservateurs(m.appareilId, "temps_reel", {
+        titre: "🔧 Technicien sur place",
+        corps: `L'intervention sur l'ascenseur ${m.numero} a commencé.`,
+        url: `/observateur/appareils/${m.appareilId}`,
+      })
+    );
+  }
 
   revalidatePath("/technicien");
   revalidatePath(`/technicien/interventions/${interventionId}`);
@@ -107,15 +127,6 @@ const rapportSchema = z.object({
   heureReelle: z.string().optional(),
 });
 
-// Phase 5 : "un vrai suivi de fin de mission" — au moins une photo est
-// obligatoire en plus du commentaire (travauxRealises, déjà obligatoire).
-const PHOTO_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
-
 export async function terminerIntervention(formData: FormData) {
   const user = await requireUser(ROLES_TECHNICIEN);
   const raw = {
@@ -132,19 +143,16 @@ export async function terminerIntervention(formData: FormData) {
 
   await assertOwnIntervention(parsed.data.interventionId, user.id, user.role);
 
-  const fichiers = formData
-    .getAll("photos")
-    .filter((f): f is File => f instanceof File && f.size > 0);
-  if (fichiers.length === 0) {
+  // Phase 18 : les photos envoyées pendant la mission (fil) comptent.
+  const fichiers = photosDuFormulaire(formData);
+  const fil = await db
+    .select({ photos: missionJournal.photos })
+    .from(missionJournal)
+    .where(eq(missionJournal.interventionId, parsed.data.interventionId))
+    .orderBy(asc(missionJournal.createdAt));
+  const photosFil = fil.flatMap((f) => f.photos);
+  if (fichiers.length === 0 && photosFil.length === 0) {
     throw new Error("Merci d'ajouter au moins une photo pour clôturer la mission.");
-  }
-  for (const f of fichiers) {
-    if (f.size > PHOTO_MAX_BYTES) {
-      throw new Error(`La photo "${f.name}" dépasse la taille maximale de 8 Mo.`);
-    }
-    if (!PHOTO_TYPES[f.type]) {
-      throw new Error("Format de photo non supporté — utilisez JPEG, PNG ou WEBP.");
-    }
   }
 
   const [rapport] = await db
@@ -183,22 +191,29 @@ export async function terminerIntervention(formData: FormData) {
     );
   }
 
-  const uploadsDir = path.join(process.cwd(), "public", "uploads", "rapports");
-  await mkdir(uploadsDir, { recursive: true });
-  const urls: string[] = [];
-  for (const f of fichiers) {
-    const ext = PHOTO_TYPES[f.type];
-    const filename = `${rapport.id}-${Date.now()}-${Math.round(Math.random() * 1e6)}.${ext}`;
-    const buffer = Buffer.from(await f.arrayBuffer());
-    await writeFile(path.join(uploadsDir, filename), buffer);
-    urls.push(`/uploads/rapports/${filename}`);
-  }
-  await db.insert(rapportPhotos).values(urls.map((url) => ({ rapportId: rapport.id, url })));
+  const urls = [...photosFil, ...(await enregistrerPhotos(fichiers, rapport.id))];
+  if (urls.length) await db.insert(rapportPhotos).values(urls.map((url) => ({ rapportId: rapport.id, url })));
 
   await db
     .update(interventions)
     .set({ statut: "terminee", dateFin: new Date() })
     .where(eq(interventions.id, parsed.data.interventionId));
+
+  const [fin] = await db
+    .select({ appareilId: interventions.appareilId, numero: appareils.numeroInterne })
+    .from(interventions)
+    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .where(eq(interventions.id, parsed.data.interventionId))
+    .limit(1);
+  if (fin) {
+    after(() =>
+      notifierObservateurs(fin.appareilId, "temps_reel", {
+        titre: "✅ Intervention terminée",
+        corps: `L'intervention sur l'ascenseur ${fin.numero} est terminée. Le rapport sera disponible après validation par ROBUS.`,
+        url: `/observateur/appareils/${fin.appareilId}`,
+      })
+    );
+  }
 
   revalidatePath("/technicien");
   revalidatePath(`/technicien/interventions/${parsed.data.interventionId}`);
@@ -427,4 +442,151 @@ export async function enregistrerMouvementTechnicien(formData: FormData) {
   });
 
   revalidatePath(`/technicien/interventions/${parsed.data.interventionId}`);
+}
+
+
+// ==========================================================================
+// Phase 18 — Fil de mission en direct, corrections du rapport (24 h)
+// ==========================================================================
+
+async function lireMission(interventionId: string) {
+  const [m] = await db
+    .select({
+      technicienId: interventions.technicienId,
+      statut: interventions.statut,
+      dateFin: interventions.dateFin,
+    })
+    .from(interventions)
+    .where(eq(interventions.id, interventionId))
+    .limit(1);
+  if (!m) throw new Error("Mission introuvable.");
+  return m;
+}
+
+/** Photos et/ou note envoyées pendant la mission : le bureau les voit en direct. */
+export async function ajouterAuFil(formData: FormData) {
+  const user = await requireUser(ROLES_TECHNICIEN);
+  const interventionId = String(formData.get("interventionId") ?? "");
+  if (!z.string().uuid().safeParse(interventionId).success) throw new Error("Mission introuvable.");
+  await assertOwnIntervention(interventionId, user.id, user.role);
+  const m = await lireMission(interventionId);
+  if (m.statut !== "en_cours") throw new Error("Commencez la mission avant d'envoyer des photos.");
+  const texte = String(formData.get("texte") ?? "").trim().slice(0, 1000);
+  const fichiers = photosDuFormulaire(formData);
+  if (!texte && fichiers.length === 0) throw new Error("Ajoutez une photo ou une note.");
+  const photos = await enregistrerPhotos(fichiers, `fil-${interventionId}`);
+  await db.insert(missionJournal).values({ interventionId, auteurId: user.id, texte: texte || null, photos });
+  revalidatePath(`/technicien/interventions/${interventionId}`);
+}
+
+const modifierRapportSchema = z.object({
+  interventionId: z.string().uuid(),
+  travauxRealises: z.string().trim().min(1, "Merci de décrire les travaux réalisés."),
+  observations: z.string().optional(),
+  tempsPasseMinutes: z.coerce.number().int().min(0).max(100000).optional(),
+  heureReelle: z.string().optional(),
+});
+
+async function controlerModification(interventionId: string, user: { id: string; role: string }) {
+  await assertOwnIntervention(interventionId, user.id, user.role);
+  const m = await lireMission(interventionId);
+  if (!peutModifierRapport(m, user.role)) {
+    throw new Error(
+      m.statut === "terminee"
+        ? "Le délai de 24 h après la fin de l'intervention est dépassé — le rapport est verrouillé."
+        : "Ce rapport a été validé par le bureau — il est verrouillé."
+    );
+  }
+  const [rapport] = await db.select().from(rapports).where(eq(rapports.interventionId, interventionId)).limit(1);
+  if (!rapport) throw new Error("Aucun rapport pour cette intervention.");
+  return rapport;
+}
+
+export async function modifierRapport(formData: FormData) {
+  const user = await requireUser(ROLES_TECHNICIEN);
+  const parsed = modifierRapportSchema.safeParse({
+    interventionId: formData.get("interventionId"),
+    travauxRealises: formData.get("travauxRealises"),
+    observations: formData.get("observations") || undefined,
+    tempsPasseMinutes: formData.get("tempsPasseMinutes") || undefined,
+    heureReelle: formData.get("heureReelle") || undefined,
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
+  const rapport = await controlerModification(parsed.data.interventionId, user);
+
+  const nouveau = {
+    travauxRealises: parsed.data.travauxRealises,
+    observations: parsed.data.observations?.trim() || null,
+    tempsPasseMinutes: parsed.data.tempsPasseMinutes ?? null,
+    heureReelle: parsed.data.heureReelle ? new Date(parsed.data.heureReelle) : rapport.heureReelle,
+  };
+  const changes: string[] = [];
+  if (nouveau.travauxRealises !== rapport.travauxRealises) changes.push("travaux réalisés");
+  if (nouveau.observations !== rapport.observations) changes.push("observations");
+  if (nouveau.tempsPasseMinutes !== rapport.tempsPasseMinutes) changes.push("temps passé");
+  if ((nouveau.heureReelle?.getTime() ?? 0) !== (rapport.heureReelle?.getTime() ?? 0)) changes.push("heure réelle");
+  if (changes.length) {
+    await db
+      .update(rapports)
+      .set({ ...nouveau, modifieLe: new Date(), nbModifications: sql`${rapports.nbModifications} + 1` })
+      .where(eq(rapports.id, rapport.id));
+    await journaliser({
+      entite: "intervention",
+      entiteId: parsed.data.interventionId,
+      action: "rapport_modifie",
+      utilisateurId: user.id,
+      details: `Modifié : ${changes.join(", ")}`,
+    });
+  }
+  revalidatePath(`/technicien/interventions/${parsed.data.interventionId}`);
+  redirect(`/technicien/interventions/${parsed.data.interventionId}?modifie=1`);
+}
+
+export async function ajouterPhotosRapport(formData: FormData) {
+  const user = await requireUser(ROLES_TECHNICIEN);
+  const interventionId = String(formData.get("interventionId") ?? "");
+  if (!z.string().uuid().safeParse(interventionId).success) throw new Error("Mission introuvable.");
+  const rapport = await controlerModification(interventionId, user);
+  const fichiers = photosDuFormulaire(formData);
+  if (!fichiers.length) throw new Error("Choisissez au moins une photo.");
+  const urls = await enregistrerPhotos(fichiers, rapport.id);
+  await db.insert(rapportPhotos).values(urls.map((url) => ({ rapportId: rapport.id, url })));
+  await db
+    .update(rapports)
+    .set({ modifieLe: new Date(), nbModifications: sql`${rapports.nbModifications} + 1` })
+    .where(eq(rapports.id, rapport.id));
+  await journaliser({
+    entite: "intervention",
+    entiteId: interventionId,
+    action: "rapport_photos_ajoutees",
+    utilisateurId: user.id,
+    details: `${urls.length} photo(s) ajoutée(s)`,
+  });
+  revalidatePath(`/technicien/interventions/${interventionId}`);
+}
+
+export async function retirerPhotoRapport(formData: FormData) {
+  const user = await requireUser(ROLES_TECHNICIEN);
+  const interventionId = String(formData.get("interventionId") ?? "");
+  const photoId = String(formData.get("photoId") ?? "");
+  if (!z.string().uuid().safeParse(interventionId).success || !z.string().uuid().safeParse(photoId).success) {
+    throw new Error("Photo introuvable.");
+  }
+  const rapport = await controlerModification(interventionId, user);
+  const photos = await db.select({ id: rapportPhotos.id }).from(rapportPhotos).where(eq(rapportPhotos.rapportId, rapport.id));
+  if (!photos.some((p) => p.id === photoId)) throw new Error("Photo introuvable.");
+  if (photos.length <= 1) throw new Error("Le rapport doit garder au moins une photo.");
+  // Le fichier reste sur le serveur (traçabilité ISO) : seule la liaison au rapport est retirée.
+  await db.delete(rapportPhotos).where(and(eq(rapportPhotos.id, photoId), eq(rapportPhotos.rapportId, rapport.id)));
+  await db
+    .update(rapports)
+    .set({ modifieLe: new Date(), nbModifications: sql`${rapports.nbModifications} + 1` })
+    .where(eq(rapports.id, rapport.id));
+  await journaliser({
+    entite: "intervention",
+    entiteId: interventionId,
+    action: "rapport_photo_retiree",
+    utilisateurId: user.id,
+  });
+  revalidatePath(`/technicien/interventions/${interventionId}`);
 }

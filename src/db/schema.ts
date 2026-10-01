@@ -11,7 +11,7 @@ import {
   date,
   index,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 /**
  * Schéma Phase 1 — Fondations
@@ -25,6 +25,7 @@ export const roleEnum = pgEnum("role", [
   "responsable_qualite",
   "technicien",
   "commercial",
+  "observateur",
 ]);
 
 export const typeClientEnum = pgEnum("type_client", [
@@ -213,9 +214,11 @@ export const appareils = pgTable(
     typePortes: varchar("type_portes", { length: 80 }),
     statut: statutAppareilEnum("statut").notNull().default("en_service"),
     photoUrl: text("photo_url"),
+    // Phase 18 : code de l'étiquette QR (aléatoire, impossible à deviner).
+    qrCode: varchar("qr_code", { length: 32 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("appareils_numero_interne_idx").on(t.numeroInterne)]
+  (t) => [uniqueIndex("appareils_numero_interne_idx").on(t.numeroInterne), uniqueIndex("appareils_qr_code_idx").on(t.qrCode)]
 );
 
 // ---------- Interventions ----------
@@ -247,6 +250,9 @@ export const interventions = pgTable("interventions", {
   envoiEmail: varchar("envoi_email", { length: 20 }), // ok | echec | non_configure
   envoiPush: integer("envoi_push"), // nb de téléphones notifiés
   alerteNonVueLe: timestamp("alerte_non_vue_le"),
+  // Phase 18 : validation du rapport par le bureau (verrouille la modification).
+  valideeLe: timestamp("validee_le"),
+  valideeParId: uuid("validee_par_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -264,6 +270,9 @@ export const rapports = pgTable(
     travauxRealises: text("travaux_realises"),
     observations: text("observations"),
     tempsPasseMinutes: integer("temps_passe_minutes"),
+    // Phase 18 : corrections du technicien (24 h après la fin).
+    modifieLe: timestamp("modifie_le"),
+    nbModifications: integer("nb_modifications").notNull().default(0),
     statutFinalAppareil: statutAppareilEnum("statut_final_appareil"),
     dateEnvoi: timestamp("date_envoi"),
     // Phase 10 : heure réelle de l'intervention (peut différer de l'heure
@@ -387,6 +396,8 @@ export const documentsFormations = pgTable("documents_formations", {
   // Phase 11 : ou à une Pièce de stock (ex. certificat fournisseur ISO 9001).
   pieceId: uuid("piece_id").references(() => pieces.id, { onDelete: "set null" }),
   estFormation: integer("est_formation").notNull().default(0),
+  // Phase 18 : document visible dans l'espace Observateur (contrat, attestation…).
+  visibleObservateur: integer("visible_observateur").notNull().default(0),
   dureeValiditeMois: integer("duree_validite_mois"),
   lieuFormation: lieuFormationEnum("lieu_formation"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -567,6 +578,8 @@ export const enquetesSatisfaction = pgTable("enquetes_satisfaction", {
   }),
   note: integer("note").notNull(),
   commentaire: text("commentaire"),
+  // Phase 18 : note donnée par un observateur depuis son espace.
+  auteurId: uuid("auteur_id").references(() => users.id, { onDelete: "set null" }),
   dateEnquete: timestamp("date_enquete").notNull().defaultNow(),
 });
 
@@ -1175,3 +1188,71 @@ export const pushAbonnements = pgTable(
   },
   (t) => [uniqueIndex("push_abonnements_endpoint_idx").on(t.endpoint)]
 );
+
+
+// ==========================================================================
+// PHASE 18 — Fil de mission, rapports modifiables, Observateur
+// ==========================================================================
+export const missionJournal = pgTable("mission_journal", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  interventionId: uuid("intervention_id")
+    .notNull()
+    .references(() => interventions.id, { onDelete: "cascade" }),
+  auteurId: uuid("auteur_id").references(() => users.id, { onDelete: "set null" }),
+  texte: text("texte"),
+  photos: text("photos").array().notNull().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const observateurs = pgTable(
+  "observateurs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "restrict" }),
+    modele: varchar("modele", { length: 40 }),
+    droits: text("droits").array().notNull().default(sql`'{}'::text[]`),
+    dateFin: timestamp("date_fin"),
+    creeParId: uuid("cree_par_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("observateurs_user_idx").on(t.userId)]
+);
+
+export const observateurAppareils = pgTable(
+  "observateur_appareils",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    observateurId: uuid("observateur_id")
+      .notNull()
+      .references(() => observateurs.id, { onDelete: "cascade" }),
+    appareilId: uuid("appareil_id")
+      .notNull()
+      .references(() => appareils.id, { onDelete: "cascade" }),
+  },
+  (t) => [uniqueIndex("observateur_appareils_idx").on(t.observateurId, t.appareilId)]
+);
+
+export const signalementsPanne = pgTable("signalements_panne", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  appareilId: uuid("appareil_id")
+    .notNull()
+    .references(() => appareils.id, { onDelete: "restrict" }),
+  auteurId: uuid("auteur_id").references(() => users.id, { onDelete: "set null" }),
+  nom: varchar("nom", { length: 160 }),
+  telephone: varchar("telephone", { length: 40 }),
+  description: text("description").notNull(),
+  interventionId: uuid("intervention_id").references(() => interventions.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const parametres = pgTable("parametres", {
+  cle: varchar("cle", { length: 80 }).primaryKey(),
+  valeur: text("valeur"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

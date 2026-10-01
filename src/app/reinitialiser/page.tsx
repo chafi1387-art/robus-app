@@ -7,20 +7,32 @@ const ERREURS: Record<string, string> = {
   different: "Les deux mots de passe ne sont pas identiques.",
 };
 
-export default async function ReinitialiserPage({ searchParams }: { searchParams: Promise<{ jeton?: string; erreur?: string }> }) {
-  const { jeton = "", erreur } = await searchParams;
+export default async function ReinitialiserPage({ searchParams }: { searchParams: Promise<{ jeton?: string; erreur?: string; invitation?: string }> }) {
+  const { jeton = "", erreur, invitation } = await searchParams;
+  // Phase 18 : même page pour l'invitation d'un observateur (création du mot de passe).
+  const estInvitation = invitation === "1";
   const lienInvalide = erreur === "lien" || !/^[0-9a-f]{64}$/.test(jeton);
   const champ = "w-full rounded-lg border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-accent";
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-bg">
       <div className="w-full max-w-sm bg-surface border border-line rounded-2xl shadow-sm p-8 flex flex-col gap-4">
-        <h1 className="font-display text-xl font-bold">Nouveau mot de passe</h1>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-robus.png" alt="ROBUS" className="h-9 w-auto object-contain self-start" />
+        <h1 className="font-display text-xl font-bold">{estInvitation ? "Créez votre mot de passe" : "Nouveau mot de passe"}</h1>
+        {estInvitation && !lienInvalide && (
+          <p className="text-sm text-ink-soft -mt-2">Choisissez un mot de passe (8 caractères minimum). Vous l&apos;utiliserez avec votre email pour suivre vos ascenseurs.</p>
+        )}
         {erreur && ERREURS[erreur] && <div className="text-sm bg-red-fill text-red-ink rounded-lg px-3 py-2">{ERREURS[erreur]}</div>}
         {lienInvalide ? (
-          <Link href="/mot-de-passe-oublie" className="text-sm font-semibold text-blue">Demander un nouveau lien</Link>
+          estInvitation ? (
+            <p className="text-sm text-ink-soft">Demandez à ROBUS de vous renvoyer l&apos;invitation.</p>
+          ) : (
+            <Link href="/mot-de-passe-oublie" className="text-sm font-semibold text-blue">Demander un nouveau lien</Link>
+          )
         ) : (
           <form action={reinitialiserMotDePasse} className="flex flex-col gap-3">
             <input type="hidden" name="jeton" value={jeton} />
+            {estInvitation && <input type="hidden" name="invitation" value="1" />}
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Nouveau mot de passe</span>
               <input name="password" type="password" required minLength={8} autoComplete="new-password" className={champ} />

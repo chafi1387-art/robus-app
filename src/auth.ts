@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { accesObservateurValide } from "@/lib/observateur-acces";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
@@ -28,6 +29,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
+        if (user.role === "observateur" && !(await accesObservateurValide(user.id))) return null;
 
         return {
           id: user.id,
