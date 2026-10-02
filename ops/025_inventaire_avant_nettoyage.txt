@@ -1,0 +1,58 @@
+== comptes
+          email          |      role      | actif | created_at 
+-------------------------+----------------+-------+------------
+ chafi.amine@outlook.com | administrateur |     1 | 2026-09-02
+ chafi1387@gmail.com     | technicien     |     1 | 2026-09-26
+ robuslift@gmail.com     | technicien     |     1 | 2026-09-26
+ rtclean.pr@gmail.com    | observateur    |     1 | 2026-10-01
+(4 rows)
+
+== lignes par table (non vides)
+appareils 2
+checklist_items 1
+checklist_modeles 1
+clients 2
+contacts_client 1
+demandes_aide 1
+demandes_client 2
+demandes_messages 12
+documents_formations 1
+enquetes_satisfaction 2
+formations_consultations 4
+formations_participants 3
+formations_sessions 2
+garantie_formules 3
+garantie_passages 30
+garanties 3
+habilitations_catalogue 8
+habilitations_technicien 15
+heures_sous_traitance 1
+interventions 6
+journal_activite 78
+mission_journal 1
+mouvements_stock 2
+observateur_appareils 2
+observateurs 1
+ordres_mission_envois 8
+pieces 1
+prestations 5
+prestations_catalogue 3
+projet_appareils 5
+projet_techniciens 4
+projets 3
+push_abonnements 1
+rapport_photos 4
+rapports 4
+regles_planification 2
+reinitialisations_mot_de_passe 2
+signalements_panne 1
+sites 1
+technicien_fiches 2
+users 4
+== fichiers envoyés
+17M	public/uploads
+8
+== place disque
+/dev/sda1        48G  3.3G   45G   7% /
+Fri Oct  2 12:43:05 UTC 2026
+(code retour 0, 2026-10-02 12:43:05)

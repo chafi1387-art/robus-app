@@ -1,5 +1,3 @@
-├ ƒ /technicien/interventions/[id]
-└ ƒ /technicien/profil
 
 
 ƒ Proxy (Middleware)
@@ -298,3 +296,5 @@ CREATE INDEX
 
 --- curl /responsable/projets : 307
 STATUT: OK bd3c31f
+=== 2026-10-02 12:43:02 : d141c6e (ops seulement, pas de build)
+STATUT: OK d141c6e
