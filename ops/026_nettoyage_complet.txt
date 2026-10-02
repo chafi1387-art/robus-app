@@ -1,0 +1,26 @@
+== 1. Sauvegarde
+drwx------ 11 root root     4096 Oct  2 12:48 ..
+-rw-r--r--  1 root root    25590 Oct  2 12:48 base-avant-nettoyage-20261002-124802.sql.gz
+-rw-r--r--  1 root root 17084383 Oct  2 12:48 uploads-avant-nettoyage-20261002-124802.tar.gz
+== 2. Comptes conservés
+chafi.amine@outlook.com (administrateur)
+== 3. Suppression des données
+BEGIN
+TRUNCATE TABLE
+DELETE 1
+DELETE 3
+COMMIT
+== 4. Fichiers envoyés (photos, certificats, documents)
+0
+== 5. Contrôle
+          email          |      role      
+-------------------------+----------------
+ chafi.amine@outlook.com | administrateur
+(1 row)
+
+reste : users 1
+== pages
+/connexion 200
+/responsable 307
+Fri Oct  2 12:48:07 UTC 2026
+(code retour 0, 2026-10-02 12:48:07)
