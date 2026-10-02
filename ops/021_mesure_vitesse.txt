@@ -1,0 +1,41 @@
+== commit
+3c47cfc Outil de mesure de la vitesse du serveur + ops 021 (référence avant optimisation)
+== machine
+1
+               total        used        free      shared  buff/cache   available
+Mem:            3915         547        2008          20        1662        3367
+ 10:16:27 up 32 days, 12:44,  1 user,  load average: 1.29, 0.39, 0.14
+== pm2
+robus-dashboard online mem 60Mo cpu 0% restarts 48 mode fork_mode
+== base
+interventions|6
+journal|73
+users|4
+== pages (temps serveur médian, sans réseau)
+== Bureau (amine)
+  244 ms  200  /responsable
+   91 ms  200  /responsable/projets
+   98 ms  200  /responsable/interventions
+   76 ms  200  /responsable/techniciens
+   74 ms  200  /responsable/habilitations
+   61 ms  200  /responsable/sous-traitance
+   69 ms  200  /responsable/demandes
+   86 ms  200  /responsable/techniciens/ac581064-87bb-4b20-82a7-d8fc077e3d76
+   75 ms  200  /responsable/techniciens/ac581064-87bb-4b20-82a7-d8fc077e3d76?tab=habilitations
+   84 ms  200  /responsable/techniciens/ac581064-87bb-4b20-82a7-d8fc077e3d76?tab=missions
+   79 ms  200  /responsable/projets/b624ce85-2511-442f-b875-ae8936d47230
+   58 ms  200  /responsable/missions/5a9f1f34-5a9d-4613-a478-cbbcd9511ad5
+== Technicien (chafi)
+   44 ms  200  /technicien
+   37 ms  200  /technicien?vue=semaine
+   26 ms  200  /technicien/heures
+   42 ms  200  /technicien/formations
+   52 ms  200  /technicien/profil
+== via nginx + https (depuis le serveur)
+/connexion 200 ttfb=0.067663s total=0.067730s taille=14925
+/logo-robus.png 307 ttfb=0.030765s total=0.030839s taille=55
+== compression nginx
+Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+Content-Encoding: gzip
+Fri Oct  2 10:16:33 UTC 2026
+(code retour 0, 2026-10-02 10:16:33)

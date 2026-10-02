@@ -1,4 +1,4 @@
-=== Deploiement 2026-10-01 17:36:02 : 4f1175a -> 2ec2e3e
+=== Deploiement 2026-10-02 10:15:03 : 2ec2e3e -> 3c47cfc
 --- build
 ├ ƒ /responsable/rapports
 ├ ƒ /responsable/revues-direction
@@ -26,4 +26,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK 2ec2e3e
+STATUT: OK 3c47cfc
