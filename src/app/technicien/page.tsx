@@ -4,7 +4,7 @@ import { appareils, clients, interventions, projets } from "@/db/schema";
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { formationsParticipants, formationsSessions, rapportPhotos, rapports, signalements } from "@/db/schema";
 import { tempsRestantModification } from "@/lib/rapport-rules";
-import { Lock, Search } from "lucide-react";
+import { Lock, QrCode, Search } from "lucide-react";
 import Link from "next/link";
 import { CarteApplication } from "@/components/app-installable";
 import { clePubliqueVapid } from "@/lib/push";
@@ -280,6 +280,14 @@ export default async function MesInterventionsPage({
       </div>
 
       <OngletsMissions actif="afaire" />
+
+      <Link href="/technicien/appareils" className="rounded-2xl border border-line bg-surface px-4 py-3 flex items-center gap-3 active:bg-blue-pale">
+        <QrCode className="w-6 h-6 text-navy shrink-0" />
+        <span className="min-w-0 text-sm">
+          <span className="block font-bold text-navy">Trouver un appareil</span>
+          <span className="block text-ink-soft text-[12.5px]">Scanner le QR code ou taper le numéro — fiche et historique complets</span>
+        </span>
+      </Link>
 
       {formationsAConfirmer.map((f) => (
         <FormationCarte key={f.id} f={f} enAvant />

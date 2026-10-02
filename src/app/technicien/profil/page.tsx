@@ -165,6 +165,10 @@ export default async function ProfilPage({ searchParams }: { searchParams: Promi
           <span className="block font-bold text-sm">Mes formations</span>
           <span className="block text-xs text-ink-soft">Dates, présence, attestations</span>
         </Link>
+        <Link href="/technicien/appareils" className="col-span-2 rounded-2xl border border-line bg-surface px-4 py-3">
+          <span className="block font-bold text-sm">🔍 Trouver un appareil</span>
+          <span className="block text-xs text-ink-soft">Scanner le QR code ou taper le numéro / la référence</span>
+        </Link>
       </section>
 
       <section>

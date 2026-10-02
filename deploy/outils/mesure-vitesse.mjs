@@ -53,6 +53,6 @@ if (admin) {
 if (tech) {
   const ck = await cookie(tech);
   console.log(`== Technicien (${tech.nom})`);
-  for (const p of ["/technicien", "/technicien?vue=semaine", "/technicien/heures", "/technicien/formations", "/technicien/profil", "/technicien/signaler", "/technicien/signalements"]) await mesurer(p, ck);
+  for (const p of ["/technicien", "/technicien?vue=semaine", "/technicien/heures", "/technicien/formations", "/technicien/profil", "/technicien/signaler", "/technicien/signalements", "/technicien/appareils"]) await mesurer(p, ck);
 }
 await sql.end();

@@ -4,7 +4,7 @@ import { habilitationsTechnicien, interventions, technicienFiches, users } from 
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { eq, sql } from "drizzle-orm";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, QrCode } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { createTechnicien } from "./actions";
 import { getSitesForSelect } from "../actions";
@@ -69,11 +69,16 @@ export default async function TechniciensPage({ searchParams }: { searchParams: 
           <h1 className="text-[28px] font-extrabold font-display text-[#0b2545]">Équipe technique</h1>
           <p className="text-sm text-ink-soft">{actifs.length} technicien(s) en poste · {anciens.length} ancien(s) — profils complets, historique conservé.</p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap">
+        <Link href="/responsable/techniciens/acces-appareils" className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm font-bold hover:bg-blue-pale">
+          <QrCode className="w-4 h-4" /> Accès aux appareils (QR)
+        </Link>
         {estAdmin && (
           <Link href="/responsable/techniciens?nouveau=1#nouveau" className="inline-flex items-center gap-2 rounded-xl bg-blue hover:bg-blue-light text-white px-5 py-3 text-sm font-bold shadow-sm">
             <Plus className="w-4 h-4" /> Nouveau technicien
           </Link>
         )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">

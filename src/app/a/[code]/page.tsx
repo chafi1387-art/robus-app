@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, eq, inArray, desc } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { MapPin, Phone } from "lucide-react";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { appareils, interventions, observateurAppareils, observateurs } from "@/db/schema";
+import { appareils, observateurAppareils, observateurs } from "@/db/schema";
 import { ROLE_HOME } from "@/lib/auth-helpers";
 import { PARAM_TELEPHONE, adressesAppareils, getParametre } from "@/lib/observateur";
 import { connexionQr, signalerPanneQr } from "./actions";
@@ -48,19 +48,9 @@ export default async function QrPage({
       if (lien) redirect(`/observateur/appareils/${a.id}`);
       refuse = true;
     } else if (role === "technicien") {
-      const [m] = await db
-        .select({ id: interventions.id })
-        .from(interventions)
-        .where(
-          and(
-            eq(interventions.appareilId, a.id),
-            eq(interventions.technicienId, session.user.id),
-            inArray(interventions.statut, ["en_cours", "affectee", "planifiee", "creee"])
-          )
-        )
-        .orderBy(desc(interventions.dateProgrammee))
-        .limit(1);
-      redirect(m ? `/technicien/interventions/${m.id}` : "/technicien");
+      // Phase 22 : le technicien arrive sur la fiche complète de l'appareil
+      // (sa mission en cours y est accessible en un clic).
+      redirect(`/technicien/appareils/${a.id}`);
     } else {
       redirect(`/responsable/appareils/${a.id}`);
     }
