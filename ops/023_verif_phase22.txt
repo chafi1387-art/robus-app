@@ -1,0 +1,28 @@
+== commit
+a128dfa Phase 22 : QR code unique — le technicien scanne l'étiquette (ou cherche un appareil) et voit la fiche complète : fiche technique, adresse, garantie, prochaine visite, historique complet (photos, pièces), techniciens passés, documents, pannes ; réglages dynamiques du bureau (blocs visibles, portée), consultations journalisées
+== jsqr installé
+node_modules/jsqr/package.json
+1.4.0
+== appareils avec QR
+1/2
+== réglages
+défaut : tous les appareils, toutes les informations sauf notes internes
+== pages
+/technicien/appareils 307
+/responsable/techniciens/acces-appareils 307
+== vitesse
+   76 ms  200  /responsable/techniciens
+   78 ms  200  /responsable/techniciens/ac581064-87bb-4b20-82a7-d8fc077e3d76
+   83 ms  200  /responsable/techniciens/ac581064-87bb-4b20-82a7-d8fc077e3d76?tab=habilitations
+   62 ms  200  /responsable/techniciens/ac581064-87bb-4b20-82a7-d8fc077e3d76?tab=missions
+== Technicien (chafi)
+   49 ms  200  /technicien
+   52 ms  200  /technicien?vue=semaine
+   36 ms  200  /technicien/heures
+   36 ms  200  /technicien/formations
+   69 ms  200  /technicien/profil
+   29 ms  200  /technicien/signaler
+   25 ms  200  /technicien/signalements
+== erreurs récentes
+Fri Oct  2 11:45:11 UTC 2026
+(code retour 0, 2026-10-02 11:45:11)

@@ -1,15 +1,16 @@
-=== Deploiement 2026-10-02 11:31:01 : 0a3c3b0 -> 3e0682c
+=== Deploiement 2026-10-02 11:44:01 : 3e0682c -> a128dfa
+--- npm install
 --- build
-├ ƒ /responsable/signalements/[id]
-├ ƒ /responsable/sites
-├ ƒ /responsable/sites/[id]
 ├ ƒ /responsable/sous-traitance
 ├ ƒ /responsable/stock
 ├ ƒ /responsable/stock/pieces/[id]
 ├ ƒ /responsable/techniciens
 ├ ƒ /responsable/techniciens/[id]
+├ ƒ /responsable/techniciens/acces-appareils
 ├ ƒ /responsable/utilisateurs
 ├ ƒ /technicien
+├ ƒ /technicien/appareils
+├ ƒ /technicien/appareils/[id]
 ├ ƒ /technicien/formations
 ├ ƒ /technicien/formations/[id]
 ├ ƒ /technicien/heures
@@ -26,4 +27,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK 3e0682c
+STATUT: OK a128dfa
