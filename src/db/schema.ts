@@ -86,6 +86,8 @@ export const categorieDocumentEnum = pgEnum("categorie_document", [
   // Phase 11 : documents fournisseurs (certificats, fiches techniques...)
   // liés à une Pièce de stock, dans une optique de traçabilité ISO 9001.
   "fournisseur_iso",
+  // Phase 21 : supports et documents des formations internes.
+  "formation",
 ]);
 export const typeMouvementStockEnum = pgEnum("type_mouvement_stock", ["entree", "sortie"]);
 export const typeAuditEnum = pgEnum("type_audit", ["interne", "externe"]);
@@ -251,6 +253,10 @@ export const interventions = pgTable("interventions", {
   envoiEmail: varchar("envoi_email", { length: 20 }), // ok | echec | non_configure
   envoiPush: integer("envoi_push"), // nb de téléphones notifiés
   alerteNonVueLe: timestamp("alerte_non_vue_le"),
+  // Phase 21 : le technicien peut refuser une mission (motif) — l'admin décide.
+  refuseeLe: timestamp("refusee_le"),
+  refusMotif: varchar("refus_motif", { length: 30 }),
+  refusCommentaire: text("refus_commentaire"),
   // Phase 18 : validation du rapport par le bureau (verrouille la modification).
   valideeLe: timestamp("validee_le"),
   valideeParId: uuid("validee_par_id").references(() => users.id, { onDelete: "set null" }),
@@ -404,6 +410,8 @@ export const documentsFormations = pgTable("documents_formations", {
   visibleObservateur: integer("visible_observateur").notNull().default(0),
   dureeValiditeMois: integer("duree_validite_mois"),
   lieuFormation: lieuFormationEnum("lieu_formation"),
+  // Phase 21 : document rattaché à une formation interne (support, émargement…).
+  sessionId: uuid("session_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1153,6 +1161,10 @@ export const heuresSousTraitance = pgTable(
       .references(() => clients.id, { onDelete: "restrict" }),
     dateTravail: date("date_travail", { mode: "string" }).notNull(),
     minutes: integer("minutes").notNull(),
+    // Phase 21 : horaire (HH:MM) — la durée est calculée (fin − début − pause).
+    heureDebut: varchar("heure_debut", { length: 5 }),
+    heureFin: varchar("heure_fin", { length: 5 }),
+    pauseMinutes: integer("pause_minutes").notNull().default(0),
     commentaire: text("commentaire"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1337,8 +1349,11 @@ export const formationsSessions = pgTable("formations_sessions", {
   lieu: varchar("lieu", { length: 20 }).notNull().default("bureau"),
   organisme: varchar("organisme", { length: 160 }),
   programme: text("programme"),
-  statut: varchar("statut", { length: 20 }).notNull().default("planifiee"), // planifiee | terminee
+  statut: varchar("statut", { length: 20 }).notNull().default("planifiee"), // planifiee | terminee | annulee
   creeParId: uuid("cree_par_id").references(() => users.id, { onDelete: "set null" }),
+  motifAnnulation: text("motif_annulation"),
+  clotureeParId: uuid("cloturee_par_id").references(() => users.id, { onDelete: "set null" }),
+  clotureeLe: timestamp("cloturee_le"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1358,6 +1373,13 @@ export const formationsParticipants = pgTable(
     efficaciteCommentaire: text("efficacite_commentaire"),
     efficaciteLe: timestamp("efficacite_le"),
     habilitationId: uuid("habilitation_id").references(() => habilitationsTechnicien.id, { onDelete: "set null" }),
+    // Phase 21 : réponse du technicien, émargement le jour J, rappel la veille.
+    reponse: varchar("reponse", { length: 20 }), // confirme | indisponible
+    reponseLe: timestamp("reponse_le"),
+    reponseMotif: text("reponse_motif"),
+    emargeLe: timestamp("emarge_le"),
+    rappelLe: timestamp("rappel_le"),
+    inscritLe: timestamp("inscrit_le").defaultNow(),
   },
   (t) => [uniqueIndex("formations_participants_idx").on(t.sessionId, t.technicienId)]
 );
@@ -1466,3 +1488,45 @@ export const demandesMessages = pgTable("demandes_messages", {
   fichiers: jsonb("fichiers").$type<FichierJoint[]>().notNull().default(sql`'[]'::jsonb`),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// ==========================================================================
+// PHASE 21 — Signalements du technicien (accident, véhicule, météo…)
+// ==========================================================================
+export const signalements = pgTable(
+  "signalements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    numero: varchar("numero", { length: 20 }).notNull(),
+    technicienId: uuid("technicien_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    type: varchar("type", { length: 30 }).notNull(),
+    description: text("description").notNull(),
+    lieu: varchar("lieu", { length: 200 }),
+    blesse: integer("blesse").notNull().default(0),
+    bloquant: integer("bloquant").notNull().default(0),
+    gravite: varchar("gravite", { length: 20 }).notNull().default("normale"), // critique | elevee | normale
+    photos: text("photos").array().notNull().default(sql`'{}'::text[]`),
+    fichiers: jsonb("fichiers").$type<FichierJoint[]>().notNull().default(sql`'[]'::jsonb`),
+    interventionId: uuid("intervention_id").references(() => interventions.id, { onDelete: "set null" }),
+    projetId: uuid("projet_id").references(() => projets.id, { onDelete: "set null" }),
+    appareilId: uuid("appareil_id").references(() => appareils.id, { onDelete: "set null" }),
+    statut: varchar("statut", { length: 20 }).notNull().default("nouveau"), // nouveau | pris_en_charge | cloture
+    prisEnChargeLe: timestamp("pris_en_charge_le"),
+    prisEnChargeParId: uuid("pris_en_charge_par_id").references(() => users.id, { onDelete: "set null" }),
+    reponse: text("reponse"),
+    reponseLe: timestamp("reponse_le"),
+    clotureLe: timestamp("cloture_le"),
+    clotureParId: uuid("cloture_par_id").references(() => users.id, { onDelete: "set null" }),
+    nonConformiteId: uuid("non_conformite_id").references(() => nonConformites.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("signalements_numero_idx").on(t.numero),
+    index("signalements_technicien_idx").on(t.technicienId, t.createdAt),
+    index("signalements_statut_idx").on(t.statut),
+    index("signalements_intervention_idx").on(t.interventionId),
+    index("signalements_projet_idx").on(t.projetId),
+  ]
+);

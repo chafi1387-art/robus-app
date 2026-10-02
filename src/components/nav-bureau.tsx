@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import {
   Archive, ArrowUpDown, Eye, GraduationCap, Inbox, BookOpen, Building2, CalendarDays, ClipboardList, FileText, FolderKanban,
   HardHat, LayoutDashboard, ListChecks, MapPin, OctagonAlert, Package, Presentation, Receipt, Ruler,
-  ScrollText, ShieldCheck, Smile, Target, Timer, TriangleAlert, UserCog, UserSearch, Search,
+  ScrollText, ShieldCheck, Siren, Smile, Target, Timer, TriangleAlert, UserCog, UserSearch, Search,
 } from "lucide-react";
 
-type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; adminOnly?: boolean; badge?: "panne" | "nonAffectees" | "demandes" };
+type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; adminOnly?: boolean; badge?: "panne" | "nonAffectees" | "demandes" | "signalements" };
 
 // Refonte Phase 13 : plus d'entrée « Interventions » — les missions vivent
 // dans chaque Projet ; « Planning des missions » les montre toutes.
@@ -18,6 +18,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
     items: [
       { href: "/responsable", label: "Tableau de bord", icon: LayoutDashboard },
       { href: "/responsable/demandes", label: "Demandes clients", icon: Inbox, badge: "demandes" },
+      { href: "/responsable/signalements", label: "Signalements", icon: Siren, badge: "signalements" },
       { href: "/responsable/projets", label: "Projets", icon: FolderKanban },
       { href: "/responsable/interventions", label: "Planning des missions", icon: CalendarDays, badge: "nonAffectees" },
       { href: "/responsable/sous-traitance", label: "Sous-traitance", icon: Timer },
@@ -35,7 +36,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
       { href: "/responsable/prestations-catalogue", label: "Catalogue prestations", icon: ClipboardList },
       { href: "/responsable/garanties", label: "Garanties", icon: ShieldCheck },
       { href: "/responsable/devis", label: "Devis", icon: Receipt },
-      { href: "/responsable/documents", label: "Documents & formations", icon: BookOpen },
+      { href: "/responsable/documents", label: "Bibliothèque documents", icon: BookOpen },
     ],
   },
   {
@@ -43,7 +44,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
     items: [
       { href: "/responsable/score-iso", label: "Score ISO 9001", icon: Target },
       { href: "/responsable/non-conformites", label: "Non-conformités", icon: OctagonAlert },
-      { href: "/responsable/habilitations", label: "Habilitations & formations", icon: GraduationCap },
+      { href: "/responsable/habilitations", label: "Formations & habilitations", icon: GraduationCap },
       { href: "/responsable/checklists", label: "Checklists", icon: ListChecks },
       { href: "/responsable/audits", label: "Audits", icon: Search },
       { href: "/responsable/auditeurs", label: "Auditeurs", icon: UserSearch },
@@ -64,7 +65,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
   },
 ];
 
-export function NavBureau({ role, badges }: { role: string; badges: { panne: number; nonAffectees: number; demandes?: number } }) {
+export function NavBureau({ role, badges }: { role: string; badges: { panne: number; nonAffectees: number; demandes?: number; signalements?: number } }) {
   const pathname = usePathname();
   const actif = (href: string) => (href === "/responsable" ? pathname === href : pathname === href || pathname.startsWith(href + "/"));
   return (
@@ -92,7 +93,7 @@ export function NavBureau({ role, badges }: { role: string; badges: { panne: num
                   {n > 0 && (
                     <span
                       className={`min-w-5 h-5 px-1.5 rounded-full text-white text-[11px] font-bold flex items-center justify-center ${
-                        item.badge === "panne" || item.badge === "demandes" ? "bg-red" : "bg-orange"
+                        item.badge === "panne" || item.badge === "demandes" || item.badge === "signalements" ? "bg-red" : "bg-orange"
                       }`}
                     >
                       {n}

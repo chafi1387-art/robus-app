@@ -15,11 +15,14 @@ export async function GET(req: Request) {
     technicienId: uuidOk(url.searchParams.get("technicien")),
   });
   const csv = toCsv(
-    ["Client", "Date", "Technicien", "Heures (décimal)", "Minutes", "Commentaire"],
+    ["Client", "Date", "Technicien", "Début", "Fin", "Pause (min)", "Heures (décimal)", "Minutes", "Commentaire"],
     lignes.map((l) => [
       l.client,
       formatDateJour(l.dateTravail),
       l.technicien,
+      l.heureDebut ?? "",
+      l.heureFin ?? "",
+      l.pauseMinutes ?? 0,
       minutesEnHeuresDecimales(l.minutes),
       l.minutes,
       l.commentaire ?? "",

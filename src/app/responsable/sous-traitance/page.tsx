@@ -9,6 +9,7 @@ import {
   aujourdhuiBruxelles,
   formatDateJour,
   formatMinutes,
+  libelleHoraire,
   libelleMois,
   minutesEnHeuresDecimales,
   moisDecale,
@@ -156,6 +157,7 @@ export default async function SousTraitancePage({
                   <th className="py-2 pr-3">Date</th>
                   <th className="py-2 pr-3">Client</th>
                   <th className="py-2 pr-3">Technicien</th>
+                  <th className="py-2 pr-3">Horaire</th>
                   <th className="py-2 pr-3 text-right">Durée</th>
                   <th className="py-2 pr-3">Commentaire</th>
                   {estAdmin && <th className="py-2"></th>}
@@ -167,6 +169,7 @@ export default async function SousTraitancePage({
                     <td className="py-2 pr-3 whitespace-nowrap">{formatDateJour(l.dateTravail)}</td>
                     <td className="py-2 pr-3">{l.client}</td>
                     <td className="py-2 pr-3">{l.technicien}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap tabular text-ink-soft">{libelleHoraire(l) ?? "—"}</td>
                     <td className="py-2 pr-3 text-right font-semibold tabular whitespace-nowrap">{formatMinutes(l.minutes)}</td>
                     <td className="py-2 pr-3 text-ink-soft whitespace-pre-line">{l.commentaire ?? "—"}</td>
                     {estAdmin && (

@@ -1,4 +1,5 @@
 import { Pill } from "@/components/ui";
+import { libelleRefus } from "@/lib/missions";
 
 // Phase 17 : accusé de réception d'une mission, côté bureau.
 // Envoyée → Vue par le technicien → Acceptée, + alertes email / téléphone.
@@ -24,11 +25,21 @@ export type SuiviEnvoiData = {
   accepteeLe: Date | null;
   envoiEmail: string | null;
   envoiPush: number | null;
+  refuseeLe?: Date | null;
+  refusMotif?: string | null;
 };
 
 export function SuiviEnvoi({ m }: { m: SuiviEnvoiData }) {
   if (!m.technicienId || !NON_COMMENCES.has(m.statut)) return null;
   const pills: React.ReactNode[] = [];
+  if (m.refuseeLe) {
+    // Phase 21 : refus motivé du technicien — décision du bureau attendue.
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        <Pill tone="crit">Refusée {heure(m.refuseeLe)} · {libelleRefus(m.refusMotif)}</Pill>
+      </span>
+    );
+  }
   if (m.accepteeLe) {
     pills.push(<Pill key="s" tone="ok">Acceptée {heure(m.accepteeLe)}</Pill>);
   } else if (m.vueLe) {

@@ -14,6 +14,7 @@ import {
   libelleMois,
   moisDecale,
   moisOuCourant,
+  libelleHoraire,
   peutModifierHeures,
 } from "@/lib/sous-traitance";
 import {
@@ -47,6 +48,9 @@ export default async function HeuresTechnicienPage({
         client: clients.raisonSociale,
         dateTravail: heuresSousTraitance.dateTravail,
         minutes: heuresSousTraitance.minutes,
+        heureDebut: heuresSousTraitance.heureDebut,
+        heureFin: heuresSousTraitance.heureFin,
+        pauseMinutes: heuresSousTraitance.pauseMinutes,
         commentaire: heuresSousTraitance.commentaire,
         createdAt: heuresSousTraitance.createdAt,
       })
@@ -70,7 +74,7 @@ export default async function HeuresTechnicienPage({
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="font-display font-extrabold text-xl">Heures de sous-traitance</h1>
-        <p className="text-sm text-ink-soft">Déclarez le temps passé pour un client en sous-traitance.</p>
+        <p className="text-sm text-ink-soft">Indiquez l&apos;heure de début et de fin : la durée est calculée automatiquement.</p>
       </div>
 
       {params.ok && MESSAGES_OK[params.ok] && (
@@ -130,7 +134,10 @@ export default async function HeuresTechnicienPage({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-semibold text-sm truncate">{s.client}</div>
-                    <div className="text-xs text-ink-soft">{formatDateJour(s.dateTravail)}</div>
+                    <div className="text-xs text-ink-soft">
+                      {formatDateJour(s.dateTravail)}
+                      {libelleHoraire(s) ? ` · ${libelleHoraire(s)}` : ""}
+                    </div>
                     {s.commentaire && <div className="text-xs text-ink mt-1 whitespace-pre-line">{s.commentaire}</div>}
                   </div>
                   <div className="font-display font-extrabold tabular text-sm shrink-0">{formatMinutes(s.minutes)}</div>

@@ -9,8 +9,9 @@ import {
   aujourdhuiBruxelles,
   formatMinutes,
   JOURS_ARRIERE_MAX,
+  horaireEnMinutes,
   peutModifierHeures,
-  saisieEnMinutes,
+  plagesSeChevauchent,
 } from "@/lib/sous-traitance";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -54,19 +55,31 @@ function lireSaisie(formData: FormData) {
     dateTravail: formData.get("dateTravail"),
     commentaire: String(formData.get("commentaire") ?? "").trim() || undefined,
   });
-  const minutes = saisieEnMinutes(formData.get("heures"), formData.get("minutes"));
-  return { parsed, minutes };
+  // Phase 21 : heure de début / fin (+ pause) -> durée calculée.
+  const horaire = horaireEnMinutes(formData.get("heureDebut"), formData.get("heureFin"), formData.get("pauseMinutes"));
+  return { parsed, horaire };
+}
+
+/** Phase 21 : pas deux saisies qui se chevauchent le même jour pour un technicien. */
+async function chevauchement(technicienId: string, dateTravail: string, plage: { heureDebut: string; heureFin: string }, sauf?: string) {
+  const autres = await db
+    .select({ id: heuresSousTraitance.id, heureDebut: heuresSousTraitance.heureDebut, heureFin: heuresSousTraitance.heureFin })
+    .from(heuresSousTraitance)
+    .where(and(eq(heuresSousTraitance.technicienId, technicienId), eq(heuresSousTraitance.dateTravail, dateTravail)));
+  return autres.some((a) => a.id !== sauf && plagesSeChevauchent(a, plage));
 }
 
 export async function creerHeuresSousTraitance(formData: FormData) {
   const user = await requireUser(ROLES_TECHNICIEN);
   const base = retour(formData, "/technicien/heures");
-  const { parsed, minutes } = lireSaisie(formData);
+  const { parsed, horaire } = lireSaisie(formData);
   if (!parsed.success) redirect(avecParam(base, "erreur", "champs"));
-  if (minutes === null) redirect(avecParam(base, "erreur", "duree"));
+  if (!horaire.ok) redirect(avecParam(base, "erreur", horaire.erreur));
   if (!dateAutorisee(parsed.data.dateTravail, user.role)) redirect(avecParam(base, "erreur", "date"));
   const client = await verifierClientSousTraitance(parsed.data.clientId);
   if (!client) redirect(avecParam(base, "erreur", "client"));
+  if (await chevauchement(user.id, parsed.data.dateTravail, horaire)) redirect(avecParam(base, "erreur", "chevauchement"));
+  const { minutes, heureDebut, heureFin, pauseMinutes } = horaire;
 
   const [row] = await db
     .insert(heuresSousTraitance)
@@ -75,6 +88,9 @@ export async function creerHeuresSousTraitance(formData: FormData) {
       clientId: client.id,
       dateTravail: parsed.data.dateTravail,
       minutes,
+      heureDebut,
+      heureFin,
+      pauseMinutes,
       commentaire: parsed.data.commentaire ?? null,
     })
     .returning({ id: heuresSousTraitance.id });
@@ -84,7 +100,7 @@ export async function creerHeuresSousTraitance(formData: FormData) {
     entiteId: row.id,
     action: "creation",
     utilisateurId: user.id,
-    details: `${client.nom} — ${parsed.data.dateTravail} — ${formatMinutes(minutes)}`,
+    details: `${client.nom} — ${parsed.data.dateTravail} ${heureDebut}–${heureFin} — ${formatMinutes(minutes)}`,
   });
   revalidatePath("/technicien/heures");
   revalidatePath("/responsable/sous-traitance");
@@ -107,12 +123,14 @@ export async function modifierHeuresSousTraitance(formData: FormData) {
   const { row, erreur } = await chargerPourModif(id, user.id, user.role);
   if (!row) redirect(avecParam(base, "erreur", erreur));
 
-  const { parsed, minutes } = lireSaisie(formData);
+  const { parsed, horaire } = lireSaisie(formData);
   if (!parsed.success) redirect(avecParam(base, "erreur", "champs"));
-  if (minutes === null) redirect(avecParam(base, "erreur", "duree"));
+  if (!horaire.ok) redirect(avecParam(base, "erreur", horaire.erreur));
   if (!dateAutorisee(parsed.data.dateTravail, user.role)) redirect(avecParam(base, "erreur", "date"));
   const client = await verifierClientSousTraitance(parsed.data.clientId);
   if (!client) redirect(avecParam(base, "erreur", "client"));
+  if (await chevauchement(row.technicienId, parsed.data.dateTravail, horaire, row.id)) redirect(avecParam(base, "erreur", "chevauchement"));
+  const { minutes, heureDebut, heureFin, pauseMinutes } = horaire;
 
   await db
     .update(heuresSousTraitance)
@@ -120,6 +138,9 @@ export async function modifierHeuresSousTraitance(formData: FormData) {
       clientId: client.id,
       dateTravail: parsed.data.dateTravail,
       minutes,
+      heureDebut,
+      heureFin,
+      pauseMinutes,
       commentaire: parsed.data.commentaire ?? null,
       updatedAt: new Date(),
     })
@@ -130,7 +151,7 @@ export async function modifierHeuresSousTraitance(formData: FormData) {
     entiteId: row.id,
     action: "modification",
     utilisateurId: user.id,
-    details: `Avant : ${row.dateTravail} — ${formatMinutes(row.minutes)} / Après : ${client.nom} — ${parsed.data.dateTravail} — ${formatMinutes(minutes)}`,
+    details: `Avant : ${row.dateTravail} ${row.heureDebut ?? ""}–${row.heureFin ?? ""} — ${formatMinutes(row.minutes)} / Après : ${client.nom} — ${parsed.data.dateTravail} ${heureDebut}–${heureFin} — ${formatMinutes(minutes)}`,
   });
   revalidatePath("/technicien/heures");
   revalidatePath("/responsable/sous-traitance");

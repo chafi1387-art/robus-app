@@ -125,7 +125,7 @@ export async function envoyerMissionsAuTechnicien(params: {
     // Nouvel envoi = nouvel accusé de réception attendu.
     await db
       .update(interventions)
-      .set({ envoyeeLe: maintenant, vueLe: null, accepteeLe: null, alerteNonVueLe: null, envoiEmail: null, envoiPush: null })
+      .set({ envoyeeLe: maintenant, vueLe: null, accepteeLe: null, alerteNonVueLe: null, envoiEmail: null, envoiPush: null, refuseeLe: null, refusMotif: null, refusCommentaire: null })
       .where(inArray(interventions.id, missionIds));
   }
 

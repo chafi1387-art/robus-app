@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { formationsParticipants, formationsSessions, habilitationsCatalogue, habilitationsTechnicien, users } from "@/db/schema";
+import { documentsFormations, formationsParticipants, formationsSessions, habilitationsCatalogue, habilitationsTechnicien, users } from "@/db/schema";
+import { LIEUX_FORMATION, avertirTechniciens, conflitsMissions, dateFormation } from "@/lib/formations";
 import { requireUser } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { enregistrerFichiers, fichiersDuFormulaire } from "@/lib/fichiers";
@@ -207,6 +208,11 @@ export async function creerSession(formData: FormData) {
   if (!dateDebut) redirect(avecMessage(retour, "erreur", "Date de la formation requise."));
   const techIds = formData.getAll("technicienIds").map(String).filter((t) => uuid.safeParse(t).success);
   if (!techIds.length) redirect(avecMessage(retour, "erreur", "Inscrivez au moins un technicien."));
+  try {
+    fichiersDuFormulaire(formData, "documents", 10);
+  } catch (e) {
+    redirect(avecMessage(retour, "erreur", (e as Error).message));
+  }
   const valides = await db.select({ id: users.id }).from(users).where(and(inArray(users.id, techIds), eq(users.role, "technicien")));
   const [s] = await db
     .insert(formationsSessions)
@@ -221,18 +227,164 @@ export async function creerSession(formData: FormData) {
     })
     .returning({ id: formationsSessions.id });
   await db.insert(formationsParticipants).values(valides.map((t) => ({ sessionId: s.id, technicienId: t.id })));
+  // Phase 21 : documents de la formation (support, programme…) dès la création.
+  const nbDocs = await enregistrerDocumentsSession(formData, s.id, parsed.data.titre);
   await journaliser({ entite: "formation_session", entiteId: s.id, action: "planifiee", utilisateurId: user.id, details: `${parsed.data.titre} — ${valides.length} participant(s)` });
-  after(() =>
-    notifierUtilisateurs(
-      valides.map((t) => t.id),
-      {
-        titre: "🎓 Formation planifiée",
-        corps: `${parsed.data.titre} — ${dateDebut!.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", dateStyle: "full", timeStyle: "short" })}`,
-        url: "/technicien/formations#sessions",
-      }
-    )
+  avertirTechniciens(
+    valides.map((t) => t.id),
+    s.id,
+    "🎓 Formation planifiée",
+    `${parsed.data.titre} — ${dateFormation(dateDebut!)} (${LIEUX_FORMATION[parsed.data.lieu] ?? parsed.data.lieu}). Confirmez votre présence dans l'application.`
   );
-  redirect(`/responsable/habilitations/sessions/${s.id}`);
+  const conflits = await conflitsMissions(valides.map((t) => t.id), dateDebut!);
+  const page = `/responsable/habilitations/sessions/${s.id}`;
+  if (conflits.length) {
+    redirect(avecMessage(page, "erreur", `Formation planifiée et techniciens prévenus — attention : ${conflits.map((c) => `${c.nom} a ${c.n} mission(s) ce jour-là`).join(", ")}.`));
+  }
+  redirect(avecMessage(page, "ok", `Formation planifiée — ${valides.length} technicien(s) prévenu(s) (notification + email)${nbDocs ? `, ${nbDocs} document(s) joint(s)` : ""}.`));
+}
+
+/** Enregistre les fichiers « documents » d'un formulaire comme documents de la formation (bibliothèque, catégorie Formations internes). */
+async function enregistrerDocumentsSession(formData: FormData, sessionId: string, titreSession: string) {
+  let fichiers: File[] = [];
+  try {
+    fichiers = fichiersDuFormulaire(formData, "documents", 10);
+  } catch (e) {
+    redirect(avecMessage(`/responsable/habilitations/sessions/${sessionId}`, "erreur", (e as Error).message));
+  }
+  if (!fichiers.length) return 0;
+  const enregistres = await enregistrerFichiers(fichiers, "formations", `form-${sessionId.slice(0, 8)}`);
+  const titreSaisi = String(formData.get("titreDocument") ?? "").trim().slice(0, 200);
+  await db.insert(documentsFormations).values(
+    enregistres.map((f, i) => ({
+      titre: (titreSaisi && enregistres.length === 1 ? titreSaisi : f.nom.replace(/\.[a-z0-9]+$/i, "")) || `${titreSession} — document ${i + 1}`,
+      categorie: "formation" as const,
+      typeContenu: "document",
+      urlFichier: f.url,
+      estFormation: formData.get("lectureObligatoire") === "off" ? 0 : 1,
+      sessionId,
+    }))
+  );
+  revalidatePath("/responsable/documents");
+  return enregistres.length;
+}
+
+async function chargerSession(sessionId: string) {
+  if (!uuid.safeParse(sessionId).success) redirect("/responsable/habilitations?onglet=sessions");
+  const [s] = await db.select().from(formationsSessions).where(eq(formationsSessions.id, sessionId)).limit(1);
+  if (!s) redirect("/responsable/habilitations?onglet=sessions");
+  return s!;
+}
+
+async function participantsIds(sessionId: string) {
+  return (await db.select({ id: formationsParticipants.technicienId }).from(formationsParticipants).where(eq(formationsParticipants.sessionId, sessionId))).map((p) => p.id);
+}
+
+/** Phase 21 : ajouter des documents à une formation existante. */
+export async function ajouterDocumentsSession(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const s = await chargerSession(String(formData.get("sessionId") ?? ""));
+  const page = `/responsable/habilitations/sessions/${s.id}`;
+  const n = await enregistrerDocumentsSession(formData, s.id, s.titre);
+  if (!n) redirect(avecMessage(page, "erreur", "Choisissez au moins un fichier."));
+  await journaliser({ entite: "formation_session", entiteId: s.id, action: "documents_ajoutes", utilisateurId: user.id, details: `${n} document(s)` });
+  if (s.statut === "planifiee" && formData.get("prevenir") === "on") {
+    avertirTechniciens(await participantsIds(s.id), s.id, "📄 Nouveau document de formation", `${s.titre} — ${n} document(s) à consulter avant la formation.`);
+  }
+  revalidatePath(page);
+  redirect(avecMessage(page, "ok", `${n} document(s) ajouté(s) — visibles par les participants et dans la Bibliothèque.`));
+}
+
+/** Phase 21 : détacher un document de la formation (il reste dans la bibliothèque). */
+export async function detacherDocumentSession(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const s = await chargerSession(String(formData.get("sessionId") ?? ""));
+  const documentId = String(formData.get("documentId") ?? "");
+  if (uuid.safeParse(documentId).success) {
+    await db.update(documentsFormations).set({ sessionId: null }).where(and(eq(documentsFormations.id, documentId), eq(documentsFormations.sessionId, s.id)));
+    await journaliser({ entite: "formation_session", entiteId: s.id, action: "document_detache", utilisateurId: user.id, details: documentId });
+  }
+  const page = `/responsable/habilitations/sessions/${s.id}`;
+  revalidatePath(page);
+  redirect(avecMessage(page, "ok", "Document retiré de la formation (il reste dans la Bibliothèque)."));
+}
+
+/** Phase 21 : changer la date / le lieu — les participants doivent reconfirmer. */
+export async function reporterSession(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const s = await chargerSession(String(formData.get("sessionId") ?? ""));
+  const page = `/responsable/habilitations/sessions/${s.id}`;
+  if (s.statut !== "planifiee") redirect(avecMessage(page, "erreur", "Seule une formation planifiée peut être reportée."));
+  const date = dateDuChamp(formData.get("dateDebut"));
+  if (!date) redirect(avecMessage(page, "erreur", "Nouvelle date requise."));
+  const lieu = String(formData.get("lieu") ?? s.lieu);
+  await db
+    .update(formationsSessions)
+    .set({ dateDebut: date!, lieu: ["terrain", "bureau", "ecole"].includes(lieu) ? lieu : s.lieu })
+    .where(eq(formationsSessions.id, s.id));
+  await db
+    .update(formationsParticipants)
+    .set({ reponse: null, reponseLe: null, reponseMotif: null, emargeLe: null, rappelLe: null })
+    .where(eq(formationsParticipants.sessionId, s.id));
+  await journaliser({ entite: "formation_session", entiteId: s.id, action: "reportee", utilisateurId: user.id, details: `${dateFormation(s.dateDebut)} → ${dateFormation(date!)}` });
+  avertirTechniciens(await participantsIds(s.id), s.id, "📅 Formation déplacée", `${s.titre} — nouvelle date : ${dateFormation(date!)}. Merci de reconfirmer votre présence.`);
+  revalidatePath(page);
+  redirect(avecMessage(page, "ok", "Formation déplacée — les participants sont prévenus et doivent reconfirmer."));
+}
+
+/** Phase 21 : annuler une formation (motif) — les participants sont prévenus. */
+export async function annulerSession(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const s = await chargerSession(String(formData.get("sessionId") ?? ""));
+  const page = `/responsable/habilitations/sessions/${s.id}`;
+  const motif = String(formData.get("motif") ?? "").trim().slice(0, 500);
+  if (s.statut !== "planifiee") redirect(avecMessage(page, "erreur", "Cette formation n'est plus planifiée."));
+  if (!motif) redirect(avecMessage(page, "erreur", "Indiquez le motif de l'annulation."));
+  await db.update(formationsSessions).set({ statut: "annulee", motifAnnulation: motif }).where(eq(formationsSessions.id, s.id));
+  await journaliser({ entite: "formation_session", entiteId: s.id, action: "annulee", utilisateurId: user.id, details: motif });
+  avertirTechniciens(await participantsIds(s.id), s.id, "❌ Formation annulée", `${s.titre} du ${dateFormation(s.dateDebut)} est annulée : ${motif}`);
+  revalidatePath(page);
+  revalidatePath("/responsable/habilitations");
+  redirect(avecMessage(page, "ok", "Formation annulée — les participants sont prévenus."));
+}
+
+/** Phase 21 : inscrire un ou plusieurs techniciens (depuis la formation ou la fiche technicien). */
+export async function inscrireTechniciens(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const s = await chargerSession(String(formData.get("sessionId") ?? ""));
+  const retourDemande = String(formData.get("retour") ?? "");
+  const retour = /^\/responsable\/[\w\-/?=&]*$/.test(retourDemande) ? retourDemande : `/responsable/habilitations/sessions/${s.id}`;
+  if (s.statut !== "planifiee") redirect(avecMessage(retour, "erreur", "Cette formation n'est plus planifiée."));
+  const ids = formData.getAll("technicienIds").map(String).filter((t) => uuid.safeParse(t).success);
+  if (!ids.length) redirect(avecMessage(retour, "erreur", "Choisissez au moins un technicien."));
+  const valides = await db.select({ id: users.id }).from(users).where(and(inArray(users.id, ids), eq(users.role, "technicien")));
+  const deja = new Set(await participantsIds(s.id));
+  const nouveaux = valides.map((v) => v.id).filter((v) => !deja.has(v));
+  if (nouveaux.length) {
+    await db.insert(formationsParticipants).values(nouveaux.map((technicienId) => ({ sessionId: s.id, technicienId })));
+    await journaliser({ entite: "formation_session", entiteId: s.id, action: "participants_ajoutes", utilisateurId: user.id, details: `${nouveaux.length}` });
+    avertirTechniciens(nouveaux, s.id, "🎓 Formation planifiée", `${s.titre} — ${dateFormation(s.dateDebut)} (${LIEUX_FORMATION[s.lieu] ?? s.lieu}). Confirmez votre présence dans l'application.`);
+  }
+  revalidatePath(`/responsable/habilitations/sessions/${s.id}`);
+  const conflits = await conflitsMissions(nouveaux, s.dateDebut);
+  if (conflits.length) redirect(avecMessage(retour, "erreur", `Inscrit et prévenu — attention : ${conflits.map((c) => `${c.nom} a ${c.n} mission(s) ce jour-là`).join(", ")}.`));
+  redirect(avecMessage(retour, "ok", nouveaux.length ? `${nouveaux.length} technicien(s) inscrit(s) et prévenu(s).` : "Déjà inscrit."));
+}
+
+/** Phase 21 : retirer un participant avant la formation (il est prévenu). */
+export async function retirerParticipant(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const s = await chargerSession(String(formData.get("sessionId") ?? ""));
+  const page = `/responsable/habilitations/sessions/${s.id}`;
+  const participantId = String(formData.get("participantId") ?? "");
+  if (s.statut !== "planifiee" || !uuid.safeParse(participantId).success) redirect(page);
+  const [p] = await db.delete(formationsParticipants).where(and(eq(formationsParticipants.id, participantId), eq(formationsParticipants.sessionId, s.id))).returning({ technicienId: formationsParticipants.technicienId });
+  if (p) {
+    await journaliser({ entite: "formation_session", entiteId: s.id, action: "participant_retire", utilisateurId: user.id, details: p.technicienId });
+    avertirTechniciens([p.technicienId], s.id, "🎓 Formation retirée de votre planning", `${s.titre} du ${dateFormation(s.dateDebut)} ne vous concerne plus.`);
+  }
+  revalidatePath(page);
+  redirect(avecMessage(page, "ok", "Participant retiré."));
 }
 
 /** Présence + résultat de chaque participant ; « réussi » crée l'habilitation liée. */
@@ -278,8 +430,20 @@ export async function cloturerSession(formData: FormData) {
     }
     await db.update(formationsParticipants).set({ present, resultat: res, habilitationId }).where(eq(formationsParticipants.id, p.id));
   }
-  await db.update(formationsSessions).set({ statut: "terminee" }).where(eq(formationsSessions.id, sessionId));
+  await db.update(formationsSessions).set({ statut: "terminee", clotureeParId: user.id, clotureeLe: new Date() }).where(eq(formationsSessions.id, sessionId));
   await journaliser({ entite: "formation_session", entiteId: sessionId, action: "cloturee", utilisateurId: user.id, details: `${habCreees} habilitation(s) créée(s)` });
+  // Phase 21 : chaque participant reçoit son résultat (et son attestation s'il était présent).
+  after(async () => {
+    const res = await db.select({ technicienId: formationsParticipants.technicienId, present: formationsParticipants.present, resultat: formationsParticipants.resultat }).from(formationsParticipants).where(eq(formationsParticipants.sessionId, sessionId));
+    for (const r of res) {
+      await notifierUtilisateurs([r.technicienId], {
+        titre: "🎓 Formation validée par le bureau",
+        corps: `${s!.titre} — ${!r.present ? "absent" : r.resultat === "reussi" ? "réussie, attestation disponible" : r.resultat === "a_refaire" ? "à refaire" : "présence enregistrée"}`,
+        url: `/technicien/formations/${sessionId}`,
+        tag: `formation-${sessionId}`,
+      });
+    }
+  });
   revalidatePath(retour);
   redirect(avecMessage(retour, "ok", `Résultats enregistrés${habCreees ? ` — ${habCreees} habilitation(s) créée(s)` : ""}.`));
 }

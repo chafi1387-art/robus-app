@@ -4,6 +4,7 @@ import { creerMissionsPassagesProches } from "@/lib/garantie-passages";
 import { habilitationsCourantes } from "@/lib/habilitations";
 import { relancerDemandesEnRetard } from "@/lib/demandes";
 import { envoyerResumesMensuels } from "@/lib/resume-mensuel";
+import { rappelerFormations } from "@/lib/formations";
 import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
 import { and, eq, inArray, isNotNull, isNull, lt, notInArray } from "drizzle-orm";
 import { timingSafeEqual } from "node:crypto";
@@ -142,6 +143,8 @@ export async function POST(req: Request) {
   // Phase 20 : demandes client non prises en charge dans le délai + résumé mensuel.
   const demandesRelancees = await relancerDemandesEnRetard();
   const resumes = await envoyerResumesMensuels(new URL(req.url).searchParams.get("resume") === "forcer");
+  // Phase 21 : rappel des formations du lendemain / du jour.
+  const rappelsFormations = await rappelerFormations();
 
-  return Response.json({ notifiees: retards.length, nonVues: nonVues.length, passagesCrees: passages.length, alertesHabilitations: alertesHab, demandesRelancees, resumes });
+  return Response.json({ notifiees: retards.length, nonVues: nonVues.length, passagesCrees: passages.length, alertesHabilitations: alertesHab, demandesRelancees, resumes, rappelsFormations });
 }

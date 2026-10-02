@@ -1,4 +1,5 @@
 import { Field, inputClass } from "@/components/ui";
+import { PAUSES_MINUTES } from "@/lib/sous-traitance";
 
 type Props = {
   action: (formData: FormData) => Promise<void>;
@@ -7,7 +8,7 @@ type Props = {
   dateMin?: string;
   dateMax: string;
   submitLabel: string;
-  valeurs?: { id: string; clientId: string; dateTravail: string; minutes: number; commentaire: string | null };
+  valeurs?: { id: string; clientId: string; dateTravail: string; minutes: number; commentaire: string | null; heureDebut?: string | null; heureFin?: string | null; pauseMinutes?: number | null };
 };
 
 export function HeuresSousTraitanceForm({ action, clients, retour, dateMin, dateMax, submitLabel, valeurs }: Props) {
@@ -40,32 +41,27 @@ export function HeuresSousTraitanceForm({ action, clients, retour, dateMin, date
           className={inputClass}
         />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Heures">
-          <input
-            type="number"
-            name="heures"
-            inputMode="numeric"
-            min={0}
-            max={24}
-            step={1}
-            required
-            defaultValue={h}
-            placeholder="ex. 3"
-            className={inputClass}
-          />
+      {/* Phase 21 : heure de début et de fin — la durée est calculée (moins la pause). */}
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Début">
+          <input type="time" name="heureDebut" required step={300} defaultValue={valeurs?.heureDebut ?? ""} className={inputClass} />
         </Field>
-        <Field label="Minutes">
-          <select name="minutes" className={inputClass} defaultValue={String(m)}>
-            {[0, 15, 30, 45].map((v) => (
+        <Field label="Fin">
+          <input type="time" name="heureFin" required step={300} defaultValue={valeurs?.heureFin ?? ""} className={inputClass} />
+        </Field>
+        <Field label="Pause">
+          <select name="pauseMinutes" className={inputClass} defaultValue={String(valeurs?.pauseMinutes ?? 0)}>
+            {PAUSES_MINUTES.map((v) => (
               <option key={v} value={v}>
-                {String(v).padStart(2, "0")}
+                {v === 0 ? "Aucune" : `${v} min`}
               </option>
             ))}
-            {![0, 15, 30, 45].includes(m) && <option value={m}>{String(m).padStart(2, "0")}</option>}
           </select>
         </Field>
       </div>
+      {valeurs && !valeurs.heureDebut && (
+        <p className="text-xs text-ink-soft -mt-1">Ancienne saisie ({Math.floor(valeurs.minutes / 60)} h {String(valeurs.minutes % 60).padStart(2, "0")}) : indiquez le début et la fin pour la corriger.</p>
+      )}
       <Field label="Commentaire (facultatif)">
         <textarea
           name="commentaire"
@@ -88,7 +84,9 @@ export function HeuresSousTraitanceForm({ action, clients, retour, dateMin, date
 
 export const MESSAGES_ERREUR: Record<string, string> = {
   champs: "Merci de remplir le client et la date.",
-  duree: "Durée invalide : entre 15 min et 24 h.",
+  duree: "Durée invalide : entre 15 min et 14 h (pause déduite).",
+  horaire: "Horaire invalide : l'heure de fin doit être après l'heure de début (même jour).",
+  chevauchement: "Ces horaires chevauchent une autre saisie le même jour.",
   date: "Date non autorisée (pas de date future, ni plus d'un mois en arrière).",
   client: "Ce client n'est pas un client de sous-traitance.",
   introuvable: "Saisie introuvable.",

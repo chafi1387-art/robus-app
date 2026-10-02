@@ -1,4 +1,5 @@
 "use server";
+import { REINIT_ENVOI } from "@/lib/missions";
 
 import { z } from "zod";
 import { db } from "@/db";
@@ -390,6 +391,8 @@ export async function assignerIntervention(formData: FormData) {
     .set({
       technicienId: parsed.data.technicienId ?? null,
       statut: parsed.data.technicienId ? "affectee" : "creee",
+      // Phase 21 : désaffectée -> plus de suivi d'envoi ni de refus en attente.
+      ...(parsed.data.technicienId ? {} : REINIT_ENVOI),
       // Phase 16 : une mission reprogrammée pourra de nouveau être signalée en retard.
       ...(parsed.data.dateProgrammee ? { dateProgrammee: new Date(parsed.data.dateProgrammee), retardNotifieLe: null } : {}),
     })

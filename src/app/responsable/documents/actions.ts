@@ -2,7 +2,8 @@
 
 import { z } from "zod";
 import { db } from "@/db";
-import { appareils, audits, documentsFormations, pieces, projets } from "@/db/schema";
+import { appareils, audits, documentsFormations, formationsSessions, pieces, projets } from "@/db/schema";
+import { CATEGORIES_DOCUMENT } from "@/lib/documents";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -25,16 +26,7 @@ import { FICHIER_MAX_BYTES, FICHIER_TYPES } from "@/lib/document-file-rules";
 
 const documentSchema = z.object({
   titre: z.string().min(2, "Titre requis"),
-  categorie: z.enum([
-    "securite",
-    "installation",
-    "maintenance",
-    "depannage",
-    "marques",
-    "procedures_robus",
-    "videos",
-    "fournisseur_iso",
-  ]),
+  categorie: z.enum(CATEGORIES_DOCUMENT),
   typeContenu: z.enum(["document", "video"]),
   urlFichier: z.string().optional(),
   marque: z.string().optional(),
@@ -45,9 +37,10 @@ const documentSchema = z.object({
   auditId: z.string().uuid().optional(),
   // Phase 11 : ou à une Pièce de stock (certificat fournisseur ISO 9001).
   pieceId: z.string().uuid().optional(),
+  // Phase 21 : « lecture obligatoire » — le technicien atteste l'avoir lu.
   estFormation: z.boolean(),
-  dureeValiditeMois: z.coerce.number().int().positive().optional(),
-  lieuFormation: z.enum(["terrain", "bureau", "ecole"]).optional(),
+  // Phase 21 : rattaché à une formation interne (session).
+  sessionId: z.string().uuid().optional(),
 });
 
 export async function createDocument(formData: FormData) {
@@ -58,6 +51,7 @@ export async function createDocument(formData: FormData) {
   const projetId = formData.get("projetId");
   const auditId = formData.get("auditId");
   const pieceId = formData.get("pieceId");
+  const sessionId = formData.get("sessionId");
   const parsed = documentSchema.safeParse({
     titre: formData.get("titre"),
     categorie: formData.get("categorie"),
@@ -70,8 +64,7 @@ export async function createDocument(formData: FormData) {
     auditId: auditId && auditId !== "" ? auditId : undefined,
     pieceId: pieceId && pieceId !== "" ? pieceId : undefined,
     estFormation,
-    dureeValiditeMois: estFormation ? formData.get("dureeValiditeMois") || undefined : undefined,
-    lieuFormation: estFormation ? formData.get("lieuFormation") || undefined : undefined,
+    sessionId: sessionId && sessionId !== "" ? sessionId : undefined,
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
 
@@ -98,6 +91,14 @@ export async function createDocument(formData: FormData) {
       .where(eq(audits.id, parsed.data.auditId))
       .limit(1);
     if (!exists) throw new Error("Audit introuvable.");
+  }
+  if (parsed.data.sessionId) {
+    const [exists] = await db
+      .select({ id: formationsSessions.id })
+      .from(formationsSessions)
+      .where(eq(formationsSessions.id, parsed.data.sessionId))
+      .limit(1);
+    if (!exists) throw new Error("Formation introuvable.");
   }
   if (parsed.data.pieceId) {
     const [exists] = await db
@@ -140,14 +141,14 @@ export async function createDocument(formData: FormData) {
     auditId: parsed.data.auditId ?? null,
     pieceId: parsed.data.pieceId ?? null,
     estFormation: parsed.data.estFormation ? 1 : 0,
-    dureeValiditeMois: parsed.data.dureeValiditeMois ?? null,
-    lieuFormation: parsed.data.lieuFormation ?? null,
+    sessionId: parsed.data.sessionId ?? null,
   });
 
   revalidatePath("/responsable/documents");
   if (parsed.data.projetId) revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
   if (parsed.data.auditId) revalidatePath("/responsable/audits");
   if (parsed.data.pieceId) revalidatePath(`/responsable/stock/pieces/${parsed.data.pieceId}`);
+  if (parsed.data.sessionId) revalidatePath(`/responsable/habilitations/sessions/${parsed.data.sessionId}`);
 
   const redirectTo = formData.get("redirectTo");
   redirect(typeof redirectTo === "string" && redirectTo ? redirectTo : "/responsable/documents");

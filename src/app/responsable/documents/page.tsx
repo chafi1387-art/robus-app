@@ -1,40 +1,13 @@
 import { Card, Pill, Btn, Field, inputClass } from "@/components/ui";
 import { FileField } from "@/components/file-field";
 import { db } from "@/db";
-import { appareils, audits, documentsFormations, pieces, projets } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { appareils, audits, documentsFormations, formationsSessions, pieces, projets } from "@/db/schema";
+import { desc, eq, ne } from "drizzle-orm";
+import Link from "next/link";
+import { CATEGORIES_DOCUMENT, CATEGORIE_DOCUMENT_LABEL, estCategorie, libelleCategorie } from "@/lib/documents";
 import { formatDate } from "@/lib/format";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { createDocument } from "./actions";
-
-const CATEGORIES = [
-  "securite",
-  "installation",
-  "maintenance",
-  "depannage",
-  "marques",
-  "procedures_robus",
-  "videos",
-  "fournisseur_iso",
-] as const;
-type Categorie = (typeof CATEGORIES)[number];
-
-const CATEGORIE_LABEL: Record<Categorie, string> = {
-  securite: "Sécurité",
-  installation: "Installation",
-  maintenance: "Maintenance",
-  depannage: "Dépannage",
-  marques: "Marques",
-  procedures_robus: "Procédures Robus",
-  videos: "Vidéos",
-  fournisseur_iso: "Fournisseur / ISO 9001",
-};
-
-const LIEU_FORMATION_LABEL: Record<string, string> = {
-  terrain: "Sur le terrain",
-  bureau: "Au bureau",
-  ecole: "École / centre de formation",
-};
 
 export default async function DocumentsPage({
   searchParams,
@@ -44,17 +17,15 @@ export default async function DocumentsPage({
   await requireUser(ROLES_BUREAU);
   const { categorie } = await searchParams;
 
-  const categorieValide =
-    categorie && (CATEGORIES as readonly string[]).includes(categorie) ? (categorie as Categorie) : undefined;
+  const categorieValide = estCategorie(categorie) ? categorie : undefined;
 
-  const [rows, appareilsOptions, projetsOptions, auditsOptions, piecesOptions] = await Promise.all([
-    categorieValide
-      ? db
-          .select()
-          .from(documentsFormations)
-          .where(eq(documentsFormations.categorie, categorieValide))
-          .orderBy(desc(documentsFormations.createdAt))
-      : db.select().from(documentsFormations).orderBy(desc(documentsFormations.createdAt)),
+  const [rows, appareilsOptions, projetsOptions, auditsOptions, piecesOptions, sessionsOptions] = await Promise.all([
+    db
+      .select({ d: documentsFormations, session: formationsSessions.titre, sessionDate: formationsSessions.dateDebut })
+      .from(documentsFormations)
+      .leftJoin(formationsSessions, eq(documentsFormations.sessionId, formationsSessions.id))
+      .where(categorieValide ? eq(documentsFormations.categorie, categorieValide) : undefined)
+      .orderBy(desc(documentsFormations.createdAt)),
     db
       .select({ id: appareils.id, numeroInterne: appareils.numeroInterne, marque: appareils.marque, modele: appareils.modele })
       .from(appareils)
@@ -71,13 +42,22 @@ export default async function DocumentsPage({
       .select({ id: pieces.id, reference: pieces.reference, nom: pieces.nom })
       .from(pieces)
       .orderBy(pieces.nom),
+    db
+      .select({ id: formationsSessions.id, titre: formationsSessions.titre, dateDebut: formationsSessions.dateDebut })
+      .from(formationsSessions)
+      .where(ne(formationsSessions.statut, "annulee"))
+      .orderBy(desc(formationsSessions.dateDebut))
+      .limit(100),
   ]);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-extrabold font-display">Documents &amp; Formations</h1>
-        <p className="text-sm text-ink-soft">{rows.length} document(s) enregistré(s)</p>
+        <h1 className="text-2xl font-extrabold font-display">Bibliothèque documents</h1>
+        <p className="text-sm text-ink-soft">
+          Notices, procédures, vidéos et supports de formation — {rows.length} document(s). Pour planifier une formation :{" "}
+          <Link href="/responsable/habilitations?onglet=sessions" className="font-semibold text-blue">Formations &amp; habilitations →</Link>
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -91,7 +71,7 @@ export default async function DocumentsPage({
         >
           Toutes
         </a>
-        {CATEGORIES.map((c) => (
+        {CATEGORIES_DOCUMENT.map((c) => (
           <a
             key={c}
             href={`/responsable/documents?categorie=${c}`}
@@ -101,7 +81,7 @@ export default async function DocumentsPage({
                 : "border-line text-ink-soft hover:bg-blue-pale"
             }`}
           >
-            {CATEGORIE_LABEL[c]}
+            {CATEGORIE_DOCUMENT_LABEL[c]}
           </a>
         ))}
       </div>
@@ -116,12 +96,12 @@ export default async function DocumentsPage({
                   <th className="pb-2 pr-3">Catégorie</th>
                   <th className="pb-2 pr-3">Type</th>
                   <th className="pb-2 pr-3">Marque</th>
-                  <th className="pb-2 pr-3">Formation</th>
+                  <th className="pb-2 pr-3">Formation liée</th>
                   <th className="pb-2 pr-3">Ajouté le</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((d) => (
+                {rows.map(({ d, session, sessionDate }) => (
                   <tr key={d.id} className="border-b border-line last:border-0">
                     <td className="py-2.5 pr-3 font-semibold">
                       {d.urlFichier ? (
@@ -138,16 +118,17 @@ export default async function DocumentsPage({
                       )}
                     </td>
                     <td className="py-2.5 pr-3">
-                      <Pill tone="neutral">{CATEGORIE_LABEL[d.categorie] ?? d.categorie}</Pill>
+                      <Pill tone="neutral">{libelleCategorie(d.categorie)}</Pill>
+                      {d.estFormation === 1 && <span className="block text-[11px] text-green-ink font-semibold mt-0.5">Lecture obligatoire</span>}
                     </td>
                     <td className="py-2.5 pr-3 text-ink-soft capitalize">{d.typeContenu}</td>
                     <td className="py-2.5 pr-3 text-ink-soft">{d.marque ?? "—"}</td>
                     <td className="py-2.5 pr-3">
-                      {d.estFormation === 1 ? (
-                        <Pill tone="ok">
-                          Formation{d.dureeValiditeMois ? ` · ${d.dureeValiditeMois} mois` : ""}
-                          {d.lieuFormation ? ` · ${LIEU_FORMATION_LABEL[d.lieuFormation]}` : ""}
-                        </Pill>
+                      {d.sessionId && session ? (
+                        <Link href={`/responsable/habilitations/sessions/${d.sessionId}`} className="text-blue font-semibold hover:underline">
+                          🎓 {session}
+                          {sessionDate ? <span className="block text-[11px] text-ink-soft font-normal">{formatDate(sessionDate)}</span> : null}
+                        </Link>
                       ) : (
                         <span className="text-ink-soft">—</span>
                       )}
@@ -166,16 +147,16 @@ export default async function DocumentsPage({
         </Card>
 
         <Card className="p-5">
-          <h2 className="font-display font-bold text-sm mb-3">Nouveau document / formation</h2>
+          <h2 className="font-display font-bold text-sm mb-3">Ajouter un document</h2>
           <form action={createDocument} className="flex flex-col gap-3" encType="multipart/form-data">
             <Field label="Titre">
               <input name="titre" required className={inputClass} placeholder="Notice ascenseur X..." />
             </Field>
             <Field label="Catégorie">
-              <select name="categorie" className={inputClass} defaultValue="maintenance">
-                {CATEGORIES.map((c) => (
+              <select name="categorie" className={inputClass} defaultValue={categorieValide ?? "maintenance"}>
+                {CATEGORIES_DOCUMENT.map((c) => (
                   <option key={c} value={c}>
-                    {CATEGORIE_LABEL[c]}
+                    {CATEGORIE_DOCUMENT_LABEL[c]}
                   </option>
                 ))}
               </select>
@@ -251,27 +232,20 @@ export default async function DocumentsPage({
             <Field label="Type d'appareil concerné (optionnel)">
               <input name="typeAppareilConcerne" className={inputClass} placeholder="Traction, hydraulique..." />
             </Field>
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input type="checkbox" name="estFormation" className="rounded border-line" />
-              Formation certifiante (donne lieu à une habilitation)
-            </label>
-            <Field label="Durée de validité (mois) — si formation certifiante">
-              <input
-                type="number"
-                min={1}
-                name="dureeValiditeMois"
-                className={inputClass}
-                placeholder="Ex : 24"
-              />
-            </Field>
-            <Field label="Lieu de la formation — si formation certifiante">
-              <select name="lieuFormation" className={inputClass} defaultValue="">
-                <option value="">Non précisé</option>
-                <option value="terrain">Sur le terrain</option>
-                <option value="bureau">Au bureau</option>
-                <option value="ecole">École / centre de formation</option>
+            <Field label="Formation interne liée (optionnel)">
+              <select name="sessionId" className={inputClass} defaultValue="">
+                <option value="">Aucune</option>
+                {sessionsOptions.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {formatDate(x.dateDebut)} — {x.titre}
+                  </option>
+                ))}
               </select>
             </Field>
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" name="estFormation" className="rounded border-line" />
+              Lecture obligatoire (le technicien atteste « J&apos;ai lu et compris »)
+            </label>
             <Btn>Ajouter</Btn>
           </form>
         </Card>

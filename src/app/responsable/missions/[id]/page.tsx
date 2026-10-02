@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
-  CheckCircle2, Clock, Eye, FileText, HandHelping, Mail, MapPin, Octagon, PenLine, Play, Send, ShieldCheck, StickyNote, Wrench,
+  Ban, CheckCircle2, Clock, Eye, TriangleAlert, FileText, HandHelping, Mail, MapPin, Octagon, PenLine, Play, Send, ShieldCheck, StickyNote, Wrench,
 } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -19,8 +19,14 @@ import {
   rapportPhotos,
   rapports,
   rapportVersions,
+  technicienFiches,
   users,
 } from "@/db/schema";
+import { signalementsDe } from "@/lib/signalements";
+import { occupationsTechnicien } from "@/lib/disponibilite";
+import { TYPES_SIGNALEMENT } from "@/lib/signalements-types";
+import { STATUTS_NON_COMMENCES, libelleRefus } from "@/lib/missions";
+import { ListeSignalements } from "@/components/liste-signalements";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { formatDateTime, toDatetimeLocalValue } from "@/lib/format";
 import { piecesNettes } from "@/lib/pieces-mission";
@@ -33,6 +39,7 @@ import {
   ajouterNoteMission,
   ajouterPhotosBureau,
   corrigerPieceBureau,
+  deciderMissionRefusee,
   modifierRapportBureau,
   retirerOuRemplacerPhotoBureau,
   validerRapport,
@@ -132,12 +139,28 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
   ]);
   const gestion = user.role === "administrateur" || user.role === "responsable_qualite";
   const valide = ["validee", "cloturee"].includes(m.statut);
+  const nonCommencee = (STATUTS_NON_COMMENCES as readonly string[]).includes(m.statut);
+  // Phase 21 : signalements liés, disponibilité du technicien ce jour-là, choix pour une réaffectation.
+  const [sigs, occupation, techniciensActifs] = await Promise.all([
+    signalementsDe({ interventionId: id }),
+    m.technicienId && m.dateProgrammee && nonCommencee ? occupationsTechnicien(m.technicienId, m.dateProgrammee, id) : Promise.resolve(null),
+    m.refuseeLe && nonCommencee
+      ? db
+          .select({ id: users.id, nom: users.nom })
+          .from(users)
+          .leftJoin(technicienFiches, eq(technicienFiches.technicienId, users.id))
+          .where(sql`${users.role} = 'technicien' and ${users.actif} = 1 and coalesce(${technicienFiches.statutRh}::text, '') <> 'sorti_effectifs'`)
+          .orderBy(asc(users.nom))
+      : Promise.resolve([] as { id: string; nom: string }[]),
+  ]);
 
   const enDirect = m.statut === "en_cours";
   const ev: Evenement[] = [];
   if (m.envoyeeLe) ev.push({ quand: m.envoyeeLe, icone: <Send className="w-4 h-4" />, titre: `Envoyée à ${row.technicien ?? "—"}` });
   if (m.vueLe) ev.push({ quand: m.vueLe, icone: <Eye className="w-4 h-4" />, titre: "Vue par le technicien" });
   if (m.accepteeLe) ev.push({ quand: m.accepteeLe, icone: <CheckCircle2 className="w-4 h-4" />, titre: "Acceptée" });
+  if (m.refuseeLe) ev.push({ quand: m.refuseeLe, icone: <Ban className="w-4 h-4" />, titre: `Refusée : ${libelleRefus(m.refusMotif)}`, detail: m.refusCommentaire, ton: "crit" });
+  for (const sg of sigs) ev.push({ quand: sg.createdAt, icone: <TriangleAlert className="w-4 h-4" />, titre: `Signalement ${sg.numero} : ${TYPES_SIGNALEMENT[sg.type]?.label ?? sg.type}`, detail: sg.description, ton: "crit" });
   if (m.dateDebut) ev.push({ quand: m.dateDebut, icone: <Play className="w-4 h-4" />, titre: "Intervention commencée" });
   for (const f of fil) {
     ev.push({
@@ -219,7 +242,80 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
             <RafraichissementAuto secondes={15} />
           </div>
         )}
+        {occupation && (occupation.formations.length > 0 || occupation.signalementsBloquants.length > 0 || occupation.sousTraitance.length > 0 || occupation.autresMissions > 0) && (
+          <div className="mt-3 text-sm bg-orange-fill text-orange-ink rounded-lg px-3 py-2 flex flex-col gap-0.5">
+            <span className="font-bold">Ce jour-là, {row.technicien} a aussi :</span>
+            {occupation.formations.map((f) => (
+              <span key={f.id}>🎓 Formation « {f.titre} » à {formatDateTime(f.dateDebut).split(" ")[1]}</span>
+            ))}
+            {occupation.autresMissions > 0 && <span>🔧 {occupation.autresMissions} autre(s) mission(s)</span>}
+            {occupation.sousTraitance.length > 0 && <span>⏱ Sous-traitance déclarée ({occupation.sousTraitance.map((h) => (h.heureDebut ? `${h.heureDebut}–${h.heureFin}` : `${Math.round(h.minutes / 6) / 10} h`)).join(", ")})</span>}
+            {occupation.signalementsBloquants.map((b) => (
+              <Link key={b.id} href={`/responsable/signalements/${b.id}`} className="underline">⚠️ Signalement bloquant en cours ({b.numero})</Link>
+            ))}
+          </div>
+        )}
       </Card>
+
+      {m.refuseeLe && nonCommencee && (
+        <Card className="p-5 border-red border-[1.5px]">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="font-display font-bold text-[15px] text-red-ink flex items-center gap-2">
+                <Ban className="w-4 h-4" /> Mission refusée par {row.technicien}
+              </h2>
+              <p className="text-sm mt-1">
+                <span className="font-semibold">{libelleRefus(m.refusMotif)}</span>
+                {m.refusCommentaire ? ` — ${m.refusCommentaire}` : ""}
+              </p>
+              <p className="text-xs text-ink-soft mt-0.5">Le {formatDateTime(m.refuseeLe)}. La mission attend votre décision.</p>
+            </div>
+          </div>
+          {gestion ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+              <form action={deciderMissionRefusee} className="flex flex-col gap-2 rounded-xl border border-line p-3">
+                <input type="hidden" name="interventionId" value={m.id} />
+                <input type="hidden" name="decision" value="reaffecter" />
+                <div className="text-sm font-bold">Réaffecter</div>
+                <select name="technicienId" required defaultValue="" className={inputClass}>
+                  <option value="" disabled>Choisir un technicien…</option>
+                  {techniciensActifs.filter((t) => t.id !== m.technicienId).map((t) => (
+                    <option key={t.id} value={t.id}>{t.nom}</option>
+                  ))}
+                </select>
+                <input type="datetime-local" name="dateProgrammee" defaultValue={toDatetimeLocalValue(m.dateProgrammee)} className={inputClass} />
+                <Btn className="justify-center">Réaffecter et envoyer</Btn>
+              </form>
+              <form action={deciderMissionRefusee} className="flex flex-col gap-2 rounded-xl border border-line p-3">
+                <input type="hidden" name="interventionId" value={m.id} />
+                <input type="hidden" name="decision" value="renvoyer" />
+                <div className="text-sm font-bold">Maintenir avec {row.technicien}</div>
+                <input type="datetime-local" name="dateProgrammee" defaultValue={toDatetimeLocalValue(m.dateProgrammee)} className={inputClass} />
+                <input name="message" placeholder="Message (ex. vu au téléphone, nouvelle heure)…" className={inputClass} />
+                <Btn variant="ghost" className="justify-center">Renvoyer (à accepter)</Btn>
+              </form>
+              <form action={deciderMissionRefusee} className="flex flex-col gap-2 rounded-xl border border-line p-3">
+                <input type="hidden" name="interventionId" value={m.id} />
+                <input type="hidden" name="decision" value="liberer" />
+                <div className="text-sm font-bold">Remettre « à affecter »</div>
+                <p className="text-xs text-ink-soft flex-1">La mission quitte son planning ; vous l&apos;affecterez plus tard.</p>
+                <Btn variant="ghost" className="justify-center">Remettre à affecter</Btn>
+              </form>
+            </div>
+          ) : (
+            <p className="text-sm text-ink-soft mt-3">L&apos;administrateur ou le responsable qualité doit décider.</p>
+          )}
+        </Card>
+      )}
+
+      {sigs.length > 0 && (
+        <Card className="p-5">
+          <h2 className="font-display font-bold text-sm mb-2 flex items-center gap-2">
+            <TriangleAlert className="w-4 h-4 text-red-ink" /> Signalements liés à cette mission ({sigs.length})
+          </h2>
+          <ListeSignalements lignes={sigs} />
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <Card className="p-5 lg:col-span-3">

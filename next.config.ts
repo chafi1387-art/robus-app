@@ -11,6 +11,12 @@ const nextConfig: NextConfig = {
       // limite en conséquence (marge incluse).
       bodySizeLimit: "250mb",
     },
+    // Phase 21 : une page déjà visitée se réaffiche instantanément pendant
+    // 30 s (retour arrière, changement d'onglet). Toute action (envoi,
+    // validation…) vide ce cache : les données restent à jour.
+    staleTimes: {
+      dynamic: 30,
+    },
   },
 };
 

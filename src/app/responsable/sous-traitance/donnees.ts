@@ -18,6 +18,9 @@ export async function chargerHeures(f: { mois: string; clientId?: string; techni
       technicien: users.nom,
       dateTravail: heuresSousTraitance.dateTravail,
       minutes: heuresSousTraitance.minutes,
+      heureDebut: heuresSousTraitance.heureDebut,
+      heureFin: heuresSousTraitance.heureFin,
+      pauseMinutes: heuresSousTraitance.pauseMinutes,
       commentaire: heuresSousTraitance.commentaire,
       createdAt: heuresSousTraitance.createdAt,
     })
@@ -25,5 +28,5 @@ export async function chargerHeures(f: { mois: string; clientId?: string; techni
     .innerJoin(clients, eq(heuresSousTraitance.clientId, clients.id))
     .innerJoin(users, eq(heuresSousTraitance.technicienId, users.id))
     .where(and(...conds))
-    .orderBy(clients.raisonSociale, desc(heuresSousTraitance.dateTravail), users.nom);
+    .orderBy(clients.raisonSociale, desc(heuresSousTraitance.dateTravail), users.nom, heuresSousTraitance.heureDebut);
 }

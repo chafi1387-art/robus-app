@@ -53,6 +53,8 @@ import { createDocument } from "../../documents/actions";
 import { createIntervention } from "../../actions";
 import { CalendarDays, FileDown, HardHat, Plus, ArrowUpDown, ShieldCheck } from "lucide-react";
 import { FICHIER_MAX_BYTES, FICHIER_TYPES } from "@/lib/document-file-rules";
+import { signalementsDe } from "@/lib/signalements";
+import { ListeSignalements } from "@/components/liste-signalements";
 
 function truncate(texte: string | null | undefined, n: number) {
   if (!texte) return "—";
@@ -95,6 +97,7 @@ const CATEGORIE_DOC_LABEL: Record<string, string> = {
   procedures_robus: "Procédures Robus",
   videos: "Vidéos",
   fournisseur_iso: "Fournisseur / ISO 9001",
+  formation: "Formations internes",
 };
 
 // Même énumération que src/app/responsable/documents/page.tsx — dupliquée
@@ -237,6 +240,8 @@ export default async function ProjetDetailPage({
         envoyeeLe: interventions.envoyeeLe,
         vueLe: interventions.vueLe,
         accepteeLe: interventions.accepteeLe,
+        refuseeLe: interventions.refuseeLe,
+        refusMotif: interventions.refusMotif,
         envoiEmail: interventions.envoiEmail,
         envoiPush: interventions.envoiPush,
         rapportId: rapports.id,
@@ -341,6 +346,8 @@ export default async function ProjetDetailPage({
     (t) => !techniciensDejaAffectesIds.has(t.id)
   );
 
+  // Phase 21 : signalements des techniciens liés au projet (onglets Vue d'ensemble / Missions).
+  const signalementsProjet = tab === "missions" || tab === "apercu" ? await signalementsDe({ projetId: id }) : [];
   const journalProjet =
     tab === "historique"
       ? await db
@@ -448,6 +455,11 @@ export default async function ProjetDetailPage({
 
       {tab === "apercu" && (
         <>
+          {signalementsProjet.some((x) => x.statut !== "cloture") && (
+            <Link href={ongletHref("missions")} className="rounded-xl bg-red-fill text-red-ink text-sm font-semibold px-4 py-3">
+              ⚠️ {signalementsProjet.filter((x) => x.statut !== "cloture").length} signalement(s) de technicien en cours sur ce projet — voir l&apos;onglet Missions
+            </Link>
+          )}
       {/* Suivi ISO */}
       <Card className="p-5">
         <h2 className="font-display font-bold text-sm mb-3">Suivi ISO 9001</h2>
@@ -669,6 +681,12 @@ export default async function ProjetDetailPage({
           )}
         </div>
       </Card>
+      {signalementsProjet.length > 0 && (
+        <Card className="p-5">
+          <h2 className="font-display font-bold text-[15px] mb-2">⚠️ Signalements des techniciens sur ce projet ({signalementsProjet.length})</h2>
+          <ListeSignalements lignes={signalementsProjet} />
+        </Card>
+      )}
         </>
       )}
 

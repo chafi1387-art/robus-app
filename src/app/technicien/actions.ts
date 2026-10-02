@@ -17,7 +17,9 @@ import {
 } from "@/db/schema";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
-import { envoyerAlerteAide } from "@/lib/mail";
+import { envoyerAlerteAide, envoyerAlerteDemande } from "@/lib/mail";
+import { destinatairesAlertes } from "@/lib/demandes";
+import { MOTIFS_REFUS, libelleRefus } from "@/lib/missions";
 import { notifierBureau } from "@/lib/push";
 import { peutModifierHeureReelle } from "@/lib/rapport-rules";
 import { revalidatePath } from "next/cache";
@@ -48,15 +50,19 @@ export async function commencerIntervention(formData: FormData) {
   await assertOwnIntervention(interventionId, user.id, user.role);
 
   const maintenant = new Date();
+  // Phase 21 : la mission doit d'abord être acceptée manuellement (le bureau
+  // sait ainsi que le technicien est disponible).
+  const [etat] = await db
+    .select({ accepteeLe: interventions.accepteeLe, refuseeLe: interventions.refuseeLe, statut: interventions.statut })
+    .from(interventions)
+    .where(eq(interventions.id, interventionId))
+    .limit(1);
+  if (!etat || !["creee", "planifiee", "affectee"].includes(etat.statut)) throw new Error("Cette mission ne peut pas être commencée.");
+  if (!etat.accepteeLe && user.role !== "administrateur") throw new Error("Acceptez d'abord la mission.");
   await db
     .update(interventions)
     .set({ statut: "en_cours", dateDebut: maintenant })
     .where(eq(interventions.id, interventionId));
-  // Phase 17 : commencer une mission vaut acceptation.
-  await db
-    .update(interventions)
-    .set({ accepteeLe: maintenant })
-    .where(and(eq(interventions.id, interventionId), isNull(interventions.accepteeLe)));
   await db
     .update(interventions)
     .set({ vueLe: maintenant })
@@ -92,9 +98,16 @@ export async function accepterMission(formData: FormData) {
   if (!z.string().uuid().safeParse(interventionId).success) throw new Error("Mission introuvable.");
   await assertOwnIntervention(interventionId, user.id, user.role);
   const maintenant = new Date();
+  const [avant] = await db
+    .select({ refuseeLe: interventions.refuseeLe, statut: interventions.statut })
+    .from(interventions)
+    .where(eq(interventions.id, interventionId))
+    .limit(1);
+  if (!avant || !["creee", "planifiee", "affectee"].includes(avant.statut)) throw new Error("Cette mission n'est plus à accepter.");
+  // Phase 21 : accepter après un refus (changement d'avis) annule le refus.
   await db
     .update(interventions)
-    .set({ accepteeLe: maintenant })
+    .set({ accepteeLe: maintenant, refuseeLe: null, refusMotif: null, refusCommentaire: null })
     .where(and(eq(interventions.id, interventionId), isNull(interventions.accepteeLe)));
   await db
     .update(interventions)
@@ -105,10 +118,68 @@ export async function accepterMission(formData: FormData) {
     entiteId: interventionId,
     action: "mission_acceptee",
     utilisateurId: user.id,
-    details: "Mission acceptée par le technicien",
+    details: avant.refuseeLe ? "Mission finalement acceptée (refus annulé)" : "Mission acceptée par le technicien",
+  });
+  if (avant.refuseeLe) {
+    after(() =>
+      notifierBureau({ titre: "✅ Mission finalement acceptée", corps: `${user.name ?? "Le technicien"} a accepté la mission qu'il avait refusée.`, url: `/responsable/missions/${interventionId}`, tag: `refus-${interventionId}` })
+    );
+  }
+  revalidatePath("/technicien");
+  revalidatePath(`/technicien/interventions/${interventionId}`);
+}
+
+// Phase 21 : le technicien ne peut pas faire la mission — il le dit avec un
+// motif. La mission reste à son nom : c'est le bureau (admin) qui décide
+// (réaffecter, renvoyer après un appel, remettre à affecter).
+export async function refuserMission(formData: FormData) {
+  const user = await requireUser(ROLES_TECHNICIEN);
+  const interventionId = String(formData.get("interventionId") ?? "");
+  if (!z.string().uuid().safeParse(interventionId).success) throw new Error("Mission introuvable.");
+  await assertOwnIntervention(interventionId, user.id, user.role);
+  const motif = String(formData.get("motif") ?? "");
+  const commentaire = String(formData.get("commentaire") ?? "").trim().slice(0, 500);
+  const retourErreur = (m: string) => redirect(`/technicien/interventions/${interventionId}?erreur=${encodeURIComponent(m)}`);
+  if (!(motif in MOTIFS_REFUS)) retourErreur("Choisissez la raison.");
+  if (motif === "autre" && !commentaire) retourErreur("Précisez la raison.");
+  const [m] = await db
+    .select({
+      statut: interventions.statut,
+      accepteeLe: interventions.accepteeLe,
+      refuseeLe: interventions.refuseeLe,
+      dateProgrammee: interventions.dateProgrammee,
+      numero: appareils.numeroInterne,
+      projetId: interventions.projetId,
+    })
+    .from(interventions)
+    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .where(eq(interventions.id, interventionId))
+    .limit(1);
+  if (!m || !["creee", "planifiee", "affectee"].includes(m.statut)) retourErreur("Cette mission ne peut plus être refusée.");
+  const maintenant = new Date();
+  await db
+    .update(interventions)
+    .set({ refuseeLe: maintenant, refusMotif: motif, refusCommentaire: commentaire || null, accepteeLe: null })
+    .where(eq(interventions.id, interventionId));
+  await db.update(interventions).set({ vueLe: maintenant }).where(and(eq(interventions.id, interventionId), isNull(interventions.vueLe)));
+  const raison = `${libelleRefus(motif)}${commentaire ? ` — ${commentaire}` : ""}`;
+  await journaliser({ entite: "intervention", entiteId: interventionId, action: "mission_refusee", utilisateurId: user.id, details: raison });
+  const quand = m!.dateProgrammee ? m!.dateProgrammee.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", dateStyle: "short", timeStyle: "short" }) : "sans date";
+  after(async () => {
+    await notifierBureau({ titre: "⛔ Mission refusée", corps: `${user.name ?? "Le technicien"} · ${m!.numero} (${quand}) — ${raison}`, url: `/responsable/missions/${interventionId}`, tag: `refus-${interventionId}` });
+    await envoyerAlerteDemande({
+      destinataires: await destinatairesAlertes(),
+      sujet: `Mission refusée — ${user.name ?? "technicien"} · ${m!.numero}`,
+      lignes: [["Technicien", user.name ?? ""], ["Appareil", m!.numero], ["Date prévue", quand], ["Raison", libelleRefus(motif)]],
+      description: commentaire || "Aucun commentaire.",
+      lien: `${process.env.NEXTAUTH_URL || "https://robuswork.tech"}/responsable/missions/${interventionId}`,
+      urgence: false,
+      bouton: "Décider (réaffecter / renvoyer)",
+    });
   });
   revalidatePath("/technicien");
   revalidatePath(`/technicien/interventions/${interventionId}`);
+  redirect(`/technicien/interventions/${interventionId}?refusee=1`);
 }
 
 const rapportSchema = z.object({

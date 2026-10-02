@@ -44,7 +44,7 @@ const [mission] = await sql`select id from interventions order by created_at des
 if (admin) {
   const ck = await cookie(admin);
   console.log(`== Bureau (${admin.nom})`);
-  const pages = ["/responsable", "/responsable/projets", "/responsable/interventions", "/responsable/techniciens", "/responsable/habilitations", "/responsable/sous-traitance", "/responsable/demandes"];
+  const pages = ["/responsable", "/responsable/projets", "/responsable/interventions", "/responsable/techniciens", "/responsable/habilitations", "/responsable/sous-traitance", "/responsable/demandes", "/responsable/signalements", "/responsable/documents"];
   if (tech) pages.push(`/responsable/techniciens/${tech.id}`, `/responsable/techniciens/${tech.id}?tab=habilitations`, `/responsable/techniciens/${tech.id}?tab=missions`);
   if (projet) pages.push(`/responsable/projets/${projet.id}`);
   if (mission) pages.push(`/responsable/missions/${mission.id}`);
@@ -53,6 +53,6 @@ if (admin) {
 if (tech) {
   const ck = await cookie(tech);
   console.log(`== Technicien (${tech.nom})`);
-  for (const p of ["/technicien", "/technicien?vue=semaine", "/technicien/heures", "/technicien/formations", "/technicien/profil"]) await mesurer(p, ck);
+  for (const p of ["/technicien", "/technicien?vue=semaine", "/technicien/heures", "/technicien/formations", "/technicien/profil", "/technicien/signaler", "/technicien/signalements"]) await mesurer(p, ck);
 }
 await sql.end();

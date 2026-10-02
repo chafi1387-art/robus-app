@@ -8,6 +8,7 @@ import { Btn, Card, Field, Pill, inputClass } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { CATEGORIES_HABILITATION, EXIGENCES_MISSION, STATUT_HAB, habilitationsCourantes } from "@/lib/habilitations";
 import { creerSession, deciderCertificat, enregistrerCatalogue } from "./actions";
+import { ACCEPT_FICHIERS_JOINTS } from "@/lib/fichiers";
 
 // Phase 19 : Habilitations & formations — matrice des compétences, catalogue,
 // sessions de formation, certificats déposés par les techniciens à valider.
@@ -15,7 +16,7 @@ import { creerSession, deciderCertificat, enregistrerCatalogue } from "./actions
 const ONGLETS = [
   { id: "matrice", label: "Matrice des compétences" },
   { id: "a_valider", label: "Certificats à valider" },
-  { id: "sessions", label: "Formations planifiées" },
+  { id: "sessions", label: "Formations (planning)" },
   { id: "catalogue", label: "Catalogue" },
 ] as const;
 
@@ -30,9 +31,9 @@ async function techniciensActifs() {
     .orderBy(asc(users.nom));
 }
 
-export default async function HabilitationsPage({ searchParams }: { searchParams: Promise<{ onglet?: string }> }) {
+export default async function HabilitationsPage({ searchParams }: { searchParams: Promise<{ onglet?: string; technicien?: string }> }) {
   const user = await requireUser(ROLES_BUREAU);
-  const { onglet: o } = await searchParams;
+  const { onglet: o, technicien: techPre } = await searchParams;
   const onglet = ONGLETS.some((x) => x.id === o) ? (o as (typeof ONGLETS)[number]["id"]) : "matrice";
   const gestion = user.role === "administrateur" || user.role === "responsable_qualite";
 
@@ -53,9 +54,12 @@ export default async function HabilitationsPage({ searchParams }: { searchParams
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-extrabold font-display flex items-center gap-2">
-            <GraduationCap className="w-6 h-6 text-blue" /> Habilitations &amp; formations
+            <GraduationCap className="w-6 h-6 text-blue" /> Formations &amp; habilitations
           </h1>
-          <p className="text-sm text-ink-soft">Compétences et sécurité des techniciens — ISO 9001 §7.2.</p>
+          <p className="text-sm text-ink-soft">
+            Planifier les formations, valider les certificats, suivre les compétences — ISO 9001 §7.2. Les documents à lire sont dans la{" "}
+            <Link href="/responsable/documents" className="font-semibold text-blue">Bibliothèque</Link>.
+          </p>
         </div>
         <a href="/api/export/matrice-competences" className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold border border-line hover:bg-blue-pale">
           <Download className="w-4 h-4" /> Matrice PDF (audit)
@@ -134,14 +138,14 @@ export default async function HabilitationsPage({ searchParams }: { searchParams
       )}
 
       {onglet === "a_valider" && <CertificatsAValider gestion={gestion} />}
-      {onglet === "sessions" && <Sessions gestion={gestion} catalogue={actifs} techs={techs} />}
+      {onglet === "sessions" && <Sessions gestion={gestion} catalogue={actifs} techs={techs} preselection={techPre} />}
 
       {onglet === "catalogue" && (
         <div className="flex flex-col gap-3">
           {gestion && (
             <Card className="p-5">
               <details>
-                <summary className="font-display font-bold text-sm cursor-pointer select-none text-blue">+ Nouvelle habilitation</summary>
+                <summary className="font-display font-bold text-sm cursor-pointer select-none text-blue">+ Nouveau type d&apos;habilitation (catalogue)</summary>
                 <FormCatalogue />
               </details>
             </Card>
@@ -290,7 +294,9 @@ async function Sessions({
   gestion,
   catalogue,
   techs,
+  preselection,
 }: {
+  preselection?: string;
   gestion: boolean;
   catalogue: (typeof habilitationsCatalogue.$inferSelect)[];
   techs: { id: string; nom: string }[];
@@ -300,6 +306,8 @@ async function Sessions({
       s: formationsSessions,
       habilitation: habilitationsCatalogue.nom,
       inscrits: sql<number>`(select count(*)::int from ${formationsParticipants} p where p.session_id = ${formationsSessions.id})`,
+      confirmes: sql<number>`(select count(*)::int from ${formationsParticipants} p where p.session_id = ${formationsSessions.id} and p.reponse = 'confirme')`,
+      emarges: sql<number>`(select count(*)::int from ${formationsParticipants} p where p.session_id = ${formationsSessions.id} and p.emarge_le is not null)`,
     })
     .from(formationsSessions)
     .leftJoin(habilitationsCatalogue, eq(formationsSessions.catalogueId, habilitationsCatalogue.id))
@@ -309,7 +317,7 @@ async function Sessions({
     <div className="flex flex-col gap-3">
       {gestion && (
         <Card className="p-5">
-          <details>
+          <details open={!!preselection || undefined}>
             <summary className="font-display font-bold text-sm cursor-pointer select-none text-blue">+ Planifier une formation</summary>
             <form action={creerSession} className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
               <Field label="Titre">
@@ -349,29 +357,39 @@ async function Sessions({
                 <div className="flex flex-wrap gap-3">
                   {techs.map((t) => (
                     <label key={t.id} className="flex items-center gap-1.5 text-sm">
-                      <input type="checkbox" name="technicienIds" value={t.id} /> {t.nom}
+                      <input type="checkbox" name="technicienIds" value={t.id} defaultChecked={t.id === preselection} /> {t.nom}
                     </label>
                   ))}
                 </div>
               </div>
               <div className="md:col-span-2">
+                <Field label="Documents de la formation (support, programme… facultatif)">
+                  <input type="file" name="documents" multiple accept={ACCEPT_FICHIERS_JOINTS} className="text-sm" />
+                </Field>
+                <p className="text-xs text-ink-soft mt-1">Rangés aussi dans la Bibliothèque (catégorie « Formations internes ») et sur la fiche de chaque participant.</p>
+              </div>
+              <div className="md:col-span-2">
                 <Btn>Planifier et prévenir les techniciens</Btn>
+                <span className="text-xs text-ink-soft ml-3">Notification + email · la formation apparaît dans leur planning · ils confirment leur présence.</span>
               </div>
             </form>
           </details>
         </Card>
       )}
-      {sessions.map(({ s, habilitation, inscrits }) => (
+      {sessions.map(({ s, habilitation, inscrits, confirmes, emarges }) => (
         <Link key={s.id} href={`/responsable/habilitations/sessions/${s.id}`} className="block">
           <Card className="p-4 hover:bg-blue-pale/30 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className="font-semibold">{s.titre}</div>
               <div className="text-xs text-ink-soft">
                 {formatDateTime(s.dateDebut)} · {LIEUX[s.lieu] ?? s.lieu}{s.organisme ? ` · ${s.organisme}` : ""} · {inscrits} inscrit(s)
+                {s.statut === "planifiee" ? ` · ${confirmes}/${inscrits} confirmé(s)${emarges ? ` · ${emarges} présence(s) signée(s)` : ""}` : ""}
                 {habilitation ? ` · délivre « ${habilitation} »` : ""}
               </div>
             </div>
-            <Pill tone={s.statut === "terminee" ? "ok" : "warn"}>{s.statut === "terminee" ? "Terminée" : "Planifiée"}</Pill>
+            <Pill tone={s.statut === "terminee" ? "ok" : s.statut === "annulee" ? "neutral" : "warn"}>
+              {s.statut === "terminee" ? "Validée" : s.statut === "annulee" ? "Annulée" : "Planifiée"}
+            </Pill>
           </Card>
         </Link>
       ))}

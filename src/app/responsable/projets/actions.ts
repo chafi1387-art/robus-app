@@ -29,6 +29,7 @@ import { genererPassages, recalculerRestantes } from "@/lib/garantie-passages";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { REINIT_ENVOI } from "@/lib/missions";
 
 // Statuts à partir desquels le Projet est considéré engagé : on ne remonte
 // jamais en arrière (même logique que STATUTS_INTERVENTION_VERROUILLES).
@@ -385,7 +386,7 @@ export async function retirerTechnicienProjet(formData: FormData) {
   // Phase 13b : ses missions non commencées de ce projet repassent « à affecter ».
   const liberees = await db
     .update(interventions)
-    .set({ technicienId: null, statut: "creee" })
+    .set({ technicienId: null, statut: "creee", ...REINIT_ENVOI })
     .where(
       and(
         eq(interventions.projetId, parsed.data.projetId),
@@ -486,7 +487,7 @@ export async function remplacerTechnicienProjet(formData: FormData) {
   } else {
     await db
       .update(interventions)
-      .set({ technicienId: null, statut: "creee" })
+      .set({ technicienId: null, statut: "creee", ...REINIT_ENVOI })
       .where(
         and(
           eq(interventions.projetId, projetId),

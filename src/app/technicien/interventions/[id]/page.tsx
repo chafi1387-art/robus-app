@@ -29,7 +29,9 @@ import { notFound } from "next/navigation";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime, toDatetimeLocalValue } from "@/lib/format";
 import { finModificationRapport, peutModifierRapport, tempsRestantModification } from "@/lib/rapport-rules";
-import { Camera, Lock, Pencil } from "lucide-react";
+import { Camera, Lock, Pencil, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { MOTIFS_REFUS, libelleRefus } from "@/lib/missions";
 import { after } from "next/server";
 import { CheckCircle2 } from "lucide-react";
 import {
@@ -41,6 +43,7 @@ import {
   demanderAide,
   enregistrerMouvementTechnicien,
   modifierRapport,
+  refuserMission,
   retirerPhotoRapport,
   terminerIntervention,
 } from "../../actions";
@@ -54,6 +57,7 @@ const CATEGORIE_DOC_LABEL: Record<string, string> = {
   procedures_robus: "Procédures Robus",
   videos: "Vidéos",
   fournisseur_iso: "Fournisseur / ISO 9001",
+  formation: "Formations internes",
 };
 
 async function getChecklistPourAppareil(typeIntervention: string, marque: string | null, typeAppareil: string | null) {
@@ -91,11 +95,11 @@ export default async function InterventionDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ nc?: string; aide?: string; modifie?: string }>;
+  searchParams: Promise<{ nc?: string; aide?: string; modifie?: string; erreur?: string; refusee?: string }>;
 }) {
   const user = await requireUser(ROLES_TECHNICIEN);
   const { id } = await params;
-  const { nc, aide, modifie } = await searchParams;
+  const { nc, aide, modifie, erreur, refusee } = await searchParams;
 
   // Phase 6 : l'Appareil n'est plus rattaché à un Site — le client, l'adresse
   // et les instructions d'accès d'une intervention se dérivent désormais du
@@ -128,7 +132,8 @@ export default async function InterventionDetailPage({
   }
 
   const peutCommencer = ["creee", "planifiee", "affectee"].includes(intervention.statut);
-  const aAccepter = peutCommencer && !intervention.accepteeLe && intervention.technicienId === user.id;
+  const estRefusee = peutCommencer && !!intervention.refuseeLe;
+  const aAccepter = peutCommencer && !intervention.accepteeLe && !estRefusee && intervention.technicienId === user.id;
   const peutTerminer = intervention.statut === "en_cours";
   const estTerminee = ["terminee", "validee", "cloturee"].includes(intervention.statut);
 
@@ -210,17 +215,49 @@ export default async function InterventionDetailPage({
         )}
       </div>
 
+      {erreur && <div className="text-sm bg-red-fill text-red-ink rounded-lg px-3 py-2">{erreur}</div>}
+      {refusee && <div className="text-sm bg-green-fill text-green-ink rounded-lg px-3 py-2">Refus envoyé — le bureau est prévenu et va décider.</div>}
+
       {aAccepter && (
         <Card className="p-4 border-[1.5px] border-blue bg-blue-pale/40">
-          <div className="font-display font-bold text-[15px] text-navy">Nouvelle mission</div>
+          <div className="font-display font-bold text-[15px] text-navy">Nouvelle mission — à accepter</div>
           <p className="text-sm text-ink-soft mt-1">
-            Prévue le <span className="font-semibold text-ink">{formatDateTime(intervention.dateProgrammee)}</span>. Confirmez au bureau que vous l&apos;avez bien reçue.
+            Prévue le <span className="font-semibold text-ink">{formatDateTime(intervention.dateProgrammee)}</span>. Confirmez au bureau que vous êtes disponible.
           </p>
           <form action={accepterMission} className="mt-3">
             <input type="hidden" name="interventionId" value={intervention.id} />
             <Btn className="w-full justify-center">
               <CheckCircle2 className="w-4 h-4" /> J&apos;accepte la mission
             </Btn>
+          </form>
+          <details className="mt-2">
+            <summary className="text-center text-sm font-bold text-red-ink cursor-pointer select-none py-2">Je ne peux pas la faire</summary>
+            <form action={refuserMission} className="flex flex-col gap-2 mt-1">
+              <input type="hidden" name="interventionId" value={intervention.id} />
+              <div className="flex flex-col gap-1.5">
+                {Object.entries(MOTIFS_REFUS).map(([k, l]) => (
+                  <label key={k} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-[14.5px]">
+                    <input type="radio" name="motif" value={k} required className="w-4 h-4" /> {l}
+                  </label>
+                ))}
+              </div>
+              <textarea name="commentaire" rows={2} maxLength={500} placeholder="Précision pour le bureau (obligatoire si « Autre »)…" className={inputClass} />
+              <button type="submit" className="w-full rounded-xl bg-red text-white font-bold text-[15px] py-3">Envoyer mon refus au bureau</button>
+            </form>
+          </details>
+        </Card>
+      )}
+      {estRefusee && (
+        <Card className="p-4 border-[1.5px] border-red/60 bg-red-fill/40">
+          <div className="font-display font-bold text-[15px] text-red-ink">Vous avez refusé cette mission</div>
+          <p className="text-sm mt-1">
+            {libelleRefus(intervention.refusMotif)}
+            {intervention.refusCommentaire ? ` — ${intervention.refusCommentaire}` : ""}
+          </p>
+          <p className="text-xs text-ink-soft mt-1">Le bureau va décider (réaffectation ou nouvel envoi). Vous pouvez encore changer d&apos;avis :</p>
+          <form action={accepterMission} className="mt-2">
+            <input type="hidden" name="interventionId" value={intervention.id} />
+            <Btn variant="ghost" className="w-full justify-center">Finalement, j&apos;accepte</Btn>
           </form>
         </Card>
       )}
@@ -309,7 +346,7 @@ export default async function InterventionDetailPage({
         </div>
       </Card>
 
-      {peutCommencer && (
+      {peutCommencer && intervention.accepteeLe && (
         <form action={commencerIntervention}>
           <input type="hidden" name="interventionId" value={intervention.id} />
           <Btn className="w-full justify-center">Commencer l&apos;intervention</Btn>
@@ -498,16 +535,47 @@ export default async function InterventionDetailPage({
 
       {!estTerminee && (
         <Card className="p-4">
+          <h2 className="font-display font-bold text-sm mb-2">Un problème ?</h2>
           {nc === "1" && (
             <div className="mb-3 text-xs bg-green-fill text-green-ink rounded-lg px-3 py-2">
               Non-conformité déclarée — elle est transmise au responsable qualité.
             </div>
           )}
-          <details>
-            <summary className="font-display font-bold text-sm cursor-pointer select-none">
-              🚫 Signaler une non-conformité
+          {aide === "1" && (
+            <div className="mb-3 text-xs bg-green-fill text-green-ink rounded-lg px-3 py-2">
+              Demande d&apos;aide envoyée au bureau.
+            </div>
+          )}
+          <Link
+            href={`/technicien/signaler?mission=${intervention.id}`}
+            className="flex items-center gap-3 rounded-xl bg-red-fill text-red-ink px-3.5 py-3 font-bold text-[14.5px]"
+          >
+            <TriangleAlert className="w-5 h-5" /> Signaler (accident, véhicule, météo, accès…)
+          </Link>
+          <details className="mt-2 border-t border-line pt-2">
+            <summary className="font-semibold text-sm cursor-pointer select-none py-1.5">
+              🆘 Besoin d&apos;aide technique (le bureau vous rappelle)
             </summary>
-            <form action={declarerNonConformite} className="flex flex-col gap-3 mt-3">
+            <form action={demanderAide} className="flex flex-col gap-3 mt-2">
+              <input type="hidden" name="interventionId" value={intervention.id} />
+              <Field label="Message (optionnel)">
+                <textarea
+                  name="message"
+                  rows={3}
+                  className={inputClass}
+                  placeholder="Décrivez la difficulté rencontrée..."
+                />
+              </Field>
+              <Btn variant="ghost" className="w-full justify-center">
+                Alerter le bureau
+              </Btn>
+            </form>
+          </details>
+          <details className="border-t border-line pt-2 mt-2">
+            <summary className="font-semibold text-sm cursor-pointer select-none py-1.5">
+              🚫 Non-conformité sur l&apos;appareil
+            </summary>
+            <form action={declarerNonConformite} className="flex flex-col gap-3 mt-2">
               <input type="hidden" name="interventionId" value={intervention.id} />
               <Field label="Titre">
                 <input name="titre" required className={inputClass} placeholder="Résumé du problème constaté" />
@@ -524,35 +592,6 @@ export default async function InterventionDetailPage({
               </Field>
               <Btn variant="ghost" className="w-full justify-center">
                 Déclarer
-              </Btn>
-            </form>
-          </details>
-        </Card>
-      )}
-
-      {!estTerminee && (
-        <Card className="p-4">
-          {aide === "1" && (
-            <div className="mb-3 text-xs bg-green-fill text-green-ink rounded-lg px-3 py-2">
-              Demande d&apos;aide envoyée au bureau.
-            </div>
-          )}
-          <details>
-            <summary className="font-display font-bold text-sm cursor-pointer select-none">
-              🆘 Besoin d&apos;aide
-            </summary>
-            <form action={demanderAide} className="flex flex-col gap-3 mt-3">
-              <input type="hidden" name="interventionId" value={intervention.id} />
-              <Field label="Message (optionnel)">
-                <textarea
-                  name="message"
-                  rows={3}
-                  className={inputClass}
-                  placeholder="Décrivez la difficulté rencontrée..."
-                />
-              </Field>
-              <Btn variant="ghost" className="w-full justify-center">
-                Alerter le bureau
               </Btn>
             </form>
           </details>

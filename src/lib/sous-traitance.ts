@@ -77,3 +77,44 @@ export function saisieEnMinutes(heures: unknown, minutes: unknown) {
   if (total <= 0 || total > 24 * 60) return null;
   return total;
 }
+
+// ==========================================================================
+// Phase 21 : saisie par heure de début / heure de fin (+ pause).
+// ==========================================================================
+export const PAUSES_MINUTES = [0, 15, 30, 45, 60, 90] as const;
+export const DUREE_MAX_JOUR = 14 * 60;
+
+function hhmmEnMinutes(v: unknown) {
+  const t = String(v ?? "").trim();
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(t);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+/** Durée travaillée = fin − début − pause. Erreur : « horaire » (format / fin avant début) ou « duree ». */
+export function horaireEnMinutes(debut: unknown, fin: unknown, pause: unknown):
+  | { ok: true; minutes: number; heureDebut: string; heureFin: string; pauseMinutes: number }
+  | { ok: false; erreur: "horaire" | "duree" } {
+  const d = hhmmEnMinutes(debut);
+  const f = hhmmEnMinutes(fin);
+  if (d === null || f === null || f <= d) return { ok: false, erreur: "horaire" };
+  const p = Number(String(pause ?? "0")) || 0;
+  if (!Number.isInteger(p) || p < 0 || p > 240) return { ok: false, erreur: "duree" };
+  const minutes = f - d - p;
+  if (minutes < 15 || minutes > DUREE_MAX_JOUR) return { ok: false, erreur: "duree" };
+  return { ok: true, minutes, heureDebut: String(debut).trim(), heureFin: String(fin).trim(), pauseMinutes: p };
+}
+
+/** Deux plages [début, fin[ (HH:MM) se chevauchent-elles ? */
+export function plagesSeChevauchent(a: { heureDebut: string | null; heureFin: string | null }, b: { heureDebut: string; heureFin: string }) {
+  const ad = hhmmEnMinutes(a.heureDebut);
+  const af = hhmmEnMinutes(a.heureFin);
+  const bd = hhmmEnMinutes(b.heureDebut);
+  const bf = hhmmEnMinutes(b.heureFin);
+  if (ad === null || af === null || bd === null || bf === null) return false;
+  return ad < bf && bd < af;
+}
+
+export function libelleHoraire(h: { heureDebut: string | null; heureFin: string | null; pauseMinutes?: number | null }) {
+  if (!h.heureDebut || !h.heureFin) return null;
+  return `${h.heureDebut} – ${h.heureFin}${h.pauseMinutes ? ` (pause ${h.pauseMinutes} min)` : ""}`;
+}

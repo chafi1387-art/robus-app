@@ -4,14 +4,18 @@ import { HabilitationsCartes } from "@/components/habilitations-cartes";
 import { Pill } from "@/components/ui";
 import { STATUT_HAB, habilitationsCourantes } from "@/lib/habilitations";
 import { ajouterHabilitation, deciderCertificat, retirerHabilitation } from "../../habilitations/actions";
-import { habilitationsCatalogue } from "@/db/schema";
+import { formationsParticipants, formationsSessions, habilitationsCatalogue } from "@/db/schema";
+import { signalementsDe } from "@/lib/signalements";
+import { sessionsOuvertes } from "@/lib/formations";
+import { libelleRefus } from "@/lib/missions";
+import { ListeSignalements } from "@/components/liste-signalements";
+import { inscrireTechniciens } from "../../habilitations/actions";
 import { db } from "@/db";
 import {
   appareils,
   clients,
   documentsFormations,
   formationsConsultations,
-  habilitationsTechnicien,
   heuresSousTraitance,
   interventions,
   journalActivite,
@@ -22,11 +26,11 @@ import {
   users,
 } from "@/db/schema";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { formatMinutes, libelleMois } from "@/lib/sous-traitance";
+import { formatDateJour, formatMinutes, libelleMois } from "@/lib/sous-traitance";
 import { Mail, Phone, Pencil } from "lucide-react";
 import { StatutInterventionPill } from "@/components/ui";
 import { updateTechnicienFiche, uploadTechnicienDocument, uploadTechnicienPhoto } from "../actions";
@@ -41,28 +45,33 @@ const STATUT_RH_LABEL: Record<string, string> = {
   sorti_effectifs: "Sorti des effectifs",
 };
 
-const CATEGORIE_LABEL: Record<string, string> = {
-  securite: "Sécurité",
-  installation: "Installation",
-  maintenance: "Maintenance",
-  depannage: "Dépannage",
-  marques: "Marques",
-  procedures_robus: "Procédures Robus",
-  videos: "Vidéos",
-  fournisseur_iso: "Fournisseur / ISO 9001",
-};
-
+// Phase 21 : un onglet = un sujet (plus de doublon). « habilitations » garde
+// son identifiant (liens existants) mais regroupe habilitations + formations.
 const ONGLETS = [
   { id: "apercu", label: "Aperçu" },
   { id: "missions", label: "Projets & missions" },
-  { id: "habilitations", label: "Habilitations & formations" },
-  { id: "documents", label: "Documents RH" },
+  { id: "habilitations", label: "Compétences & formations" },
+  { id: "signalements", label: "Signalements" },
   { id: "heures", label: "Heures sous-traitance" },
+  { id: "documents", label: "Documents RH" },
   { id: "historique", label: "Historique" },
   { id: "modifier", label: "Modifier le profil" },
 ] as const;
 
 const FINIS = ["terminee", "validee", "cloturee"];
+
+type LigneMission = {
+  id: string;
+  statut: string;
+  type: string;
+  dateProgrammee: Date | null;
+  appareil: string;
+  projetId: string | null;
+  projetRef: string | null;
+  projetTitre: string | null;
+  refuseeLe: Date | null;
+  refusMotif: string | null;
+};
 
 function anciennete(entree: Date | null | undefined, sortie: Date | null | undefined) {
   if (!entree) return null;
@@ -88,15 +97,33 @@ export default async function TechnicienDetailPage({
 
   const debutMois = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const gestionHab = user.role === "administrateur" || user.role === "responsable_qualite";
-  const catalogueHab = await db.select({ id: habilitationsCatalogue.id, nom: habilitationsCatalogue.nom, validiteMois: habilitationsCatalogue.validiteMois }).from(habilitationsCatalogue).where(eq(habilitationsCatalogue.actif, 1)).orderBy(habilitationsCatalogue.nom);
+  const vide = <T,>() => Promise.resolve([] as T[]);
 
-  // Phase 17 : une seule vague de requêtes en parallèle (avant : 3 vagues
-  // successives) — la fiche s'ouvre nettement plus vite.
-  const [[userRow], [fiche], habilitations, documents, projetsAffectes, sitesOptions, missions, heuresMois, [stats], consultations, journal] = await Promise.all([
+  // Phase 21 : une seule vague de requêtes en parallèle, et seulement les
+  // données de l'onglet ouvert (avant : tous les onglets à chaque clic).
+  const [
+    [userRow],
+    [fiche],
+    habilitations,
+    documents,
+    projetsAffectes,
+    sitesOptions,
+    missions,
+    heuresMois,
+    [stats],
+    consultations,
+    journal,
+    catalogueHab,
+    formations,
+    sessionsDispo,
+    sigs,
+    aTraiter,
+    totalHeures,
+  ] = await Promise.all([
     db.select().from(users).where(eq(users.id, id)).limit(1),
     db.select().from(technicienFiches).where(eq(technicienFiches.technicienId, id)).limit(1),
     habilitationsCourantes([id]),
-    db.select().from(technicienDocuments).where(eq(technicienDocuments.technicienId, id)).orderBy(desc(technicienDocuments.createdAt)),
+    tab === "documents" ? db.select().from(technicienDocuments).where(eq(technicienDocuments.technicienId, id)).orderBy(desc(technicienDocuments.createdAt)) : vide<typeof technicienDocuments.$inferSelect>(),
     db
       .select({ id: projets.id, reference: projets.reference, titre: projets.titre, statut: projets.statut, clientNom: clients.raisonSociale, role: projetTechniciens.role })
       .from(projetTechniciens)
@@ -104,35 +131,46 @@ export default async function TechnicienDetailPage({
       .innerJoin(clients, eq(projets.clientId, clients.id))
       .where(eq(projetTechniciens.technicienId, id))
       .orderBy(desc(projets.createdAt)),
-    getSitesForSelect(),
-    db
-      .select({
-        id: interventions.id,
-        statut: interventions.statut,
-        type: interventions.type,
-        dateProgrammee: interventions.dateProgrammee,
-        appareil: appareils.numeroInterne,
-        projetId: projets.id,
-        projetRef: projets.reference,
-        projetTitre: projets.titre,
-      })
-      .from(interventions)
-      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
-      .leftJoin(projets, eq(interventions.projetId, projets.id))
-      .where(eq(interventions.technicienId, id))
-      .orderBy(desc(interventions.dateProgrammee))
-      .limit(tab === "missions" ? 300 : 8),
-    db
-      .select({
-        mois: sql<string>`to_char(${heuresSousTraitance.dateTravail}, 'YYYY-MM')`,
-        client: clients.raisonSociale,
-        minutes: sql<number>`sum(${heuresSousTraitance.minutes})::int`,
-      })
-      .from(heuresSousTraitance)
-      .innerJoin(clients, eq(heuresSousTraitance.clientId, clients.id))
-      .where(eq(heuresSousTraitance.technicienId, id))
-      .groupBy(sql`1`, clients.raisonSociale)
-      .orderBy(desc(sql`1`)),
+    tab === "modifier" ? getSitesForSelect() : Promise.resolve([] as Awaited<ReturnType<typeof getSitesForSelect>>),
+    tab === "missions" || tab === "apercu"
+      ? db
+          .select({
+            id: interventions.id,
+            statut: interventions.statut,
+            type: interventions.type,
+            dateProgrammee: interventions.dateProgrammee,
+            appareil: appareils.numeroInterne,
+            projetId: projets.id,
+            projetRef: projets.reference,
+            projetTitre: projets.titre,
+            refuseeLe: interventions.refuseeLe,
+            refusMotif: interventions.refusMotif,
+          })
+          .from(interventions)
+          .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+          .leftJoin(projets, eq(interventions.projetId, projets.id))
+          .where(eq(interventions.technicienId, id))
+          .orderBy(desc(interventions.dateProgrammee))
+          .limit(tab === "missions" ? 300 : 8)
+      : Promise.resolve([] as LigneMission[]),
+    tab === "heures"
+      ? db
+          .select({
+            id: heuresSousTraitance.id,
+            dateTravail: heuresSousTraitance.dateTravail,
+            heureDebut: heuresSousTraitance.heureDebut,
+            heureFin: heuresSousTraitance.heureFin,
+            pauseMinutes: heuresSousTraitance.pauseMinutes,
+            minutes: heuresSousTraitance.minutes,
+            commentaire: heuresSousTraitance.commentaire,
+            client: clients.raisonSociale,
+          })
+          .from(heuresSousTraitance)
+          .innerJoin(clients, eq(heuresSousTraitance.clientId, clients.id))
+          .where(eq(heuresSousTraitance.technicienId, id))
+          .orderBy(desc(heuresSousTraitance.dateTravail), desc(heuresSousTraitance.heureDebut))
+          .limit(400)
+      : Promise.resolve([]),
     db
       .select({
         total: sql<number>`count(*)::int`,
@@ -143,13 +181,15 @@ export default async function TechnicienDetailPage({
       })
       .from(interventions)
       .where(eq(interventions.technicienId, id)),
-    db
-      .select({ titre: documentsFormations.titre, date: formationsConsultations.dateConsultation })
-      .from(formationsConsultations)
-      .innerJoin(documentsFormations, eq(formationsConsultations.documentId, documentsFormations.id))
-      .where(eq(formationsConsultations.technicienId, id))
-      .orderBy(desc(formationsConsultations.dateConsultation))
-      .limit(30),
+    tab === "habilitations"
+      ? db
+          .select({ titre: documentsFormations.titre, date: formationsConsultations.dateConsultation, url: documentsFormations.urlFichier })
+          .from(formationsConsultations)
+          .innerJoin(documentsFormations, eq(formationsConsultations.documentId, documentsFormations.id))
+          .where(eq(formationsConsultations.technicienId, id))
+          .orderBy(desc(formationsConsultations.dateConsultation))
+          .limit(30)
+      : Promise.resolve([]),
     tab === "historique" || tab === "apercu"
       ? db
           .select({ id: journalActivite.id, entite: journalActivite.entite, action: journalActivite.action, details: journalActivite.details, createdAt: journalActivite.createdAt, auteur: users.nom })
@@ -159,6 +199,43 @@ export default async function TechnicienDetailPage({
           .orderBy(desc(journalActivite.createdAt))
           .limit(tab === "historique" ? 300 : 6)
       : Promise.resolve([]),
+    tab === "habilitations" && gestionHab
+      ? db.select({ id: habilitationsCatalogue.id, nom: habilitationsCatalogue.nom, validiteMois: habilitationsCatalogue.validiteMois }).from(habilitationsCatalogue).where(eq(habilitationsCatalogue.actif, 1)).orderBy(habilitationsCatalogue.nom)
+      : Promise.resolve([]),
+    tab === "habilitations" || tab === "apercu"
+      ? db
+          .select({
+            participantId: formationsParticipants.id,
+            sessionId: formationsSessions.id,
+            titre: formationsSessions.titre,
+            dateDebut: formationsSessions.dateDebut,
+            statut: formationsSessions.statut,
+            reponse: formationsParticipants.reponse,
+            reponseMotif: formationsParticipants.reponseMotif,
+            emargeLe: formationsParticipants.emargeLe,
+            present: formationsParticipants.present,
+            resultat: formationsParticipants.resultat,
+            nbDocuments: sql<number>`(select count(*)::int from ${documentsFormations} d where d.session_id = ${formationsSessions.id})`,
+          })
+          .from(formationsParticipants)
+          .innerJoin(formationsSessions, eq(formationsParticipants.sessionId, formationsSessions.id))
+          .where(and(eq(formationsParticipants.technicienId, id), ne(formationsSessions.statut, "annulee")))
+          .orderBy(desc(formationsSessions.dateDebut))
+      : Promise.resolve([]),
+    tab === "habilitations" && gestionHab ? sessionsOuvertes(id) : Promise.resolve([]),
+    tab === "signalements" ? signalementsDe({ technicienId: id }, 200) : tab === "apercu" ? signalementsDe({ technicienId: id }, 20) : Promise.resolve([]),
+    tab === "apercu"
+      ? db
+          .select({ id: interventions.id, numero: appareils.numeroInterne, dateProgrammee: interventions.dateProgrammee, refuseeLe: interventions.refuseeLe, refusMotif: interventions.refusMotif, envoyeeLe: interventions.envoyeeLe, vueLe: interventions.vueLe, accepteeLe: interventions.accepteeLe })
+          .from(interventions)
+          .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+          .where(and(eq(interventions.technicienId, id), inArray(interventions.statut, ["creee", "planifiee", "affectee"]), isNotNull(interventions.envoyeeLe), isNull(interventions.accepteeLe)))
+      : Promise.resolve([]),
+    db
+      .select({ n: sql<number>`coalesce(sum(${heuresSousTraitance.minutes}), 0)::int` })
+      .from(heuresSousTraitance)
+      .where(eq(heuresSousTraitance.technicienId, id))
+      .then((r) => r[0]?.n ?? 0),
   ]);
 
   if (!userRow || userRow.role !== "technicien") notFound();
@@ -166,7 +243,6 @@ export default async function TechnicienDetailPage({
 
   const siteRattache = fiche?.siteRattachementId ? sitesOptions.find((s) => s.id === fiche.siteRattachementId) : undefined;
   const habValides = habilitations.filter((h) => h.etat === "valide" || h.etat === "bientot");
-  const totalHeures = heuresMois.reduce((s, h) => s + h.minutes, 0);
   const initiales = userRow.nom.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
   const specialites = (fiche?.specialites ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const kpis: [string, string][] = ancien
@@ -259,6 +335,13 @@ export default async function TechnicienDetailPage({
 
       {tab === "apercu" && (
         <>
+          <ATraiter
+            id={id}
+            habilitations={habilitations}
+            missions={aTraiter}
+            signalements={sigs.filter((x) => x.statut !== "cloture")}
+            formations={formations.filter((f) => f.statut === "planifiee")}
+          />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <Card className="p-5 flex flex-col gap-2.5 text-[13.5px]">
               <h2 className="font-display font-bold text-[15px]">Coordonnées</h2>
@@ -419,19 +502,79 @@ export default async function TechnicienDetailPage({
               </details>
             )}
           </Card>
-          <Card className="p-5">
-            <h2 className="font-display font-bold text-[15px] mb-3">Formations consultées</h2>
-            <div className="flex flex-col divide-y divide-line">
-              {consultations.map((c, i) => (
-                <div key={i} className="py-2 flex justify-between gap-3 text-sm">
-                  <span className="truncate">{c.titre}</span>
-                  <span className="text-ink-soft text-xs whitespace-nowrap">{formatDateTime(c.date)}</span>
-                </div>
-              ))}
-              {consultations.length === 0 && <p className="text-sm text-ink-soft py-2">Aucune consultation.</p>}
-            </div>
-          </Card>
+          <div className="flex flex-col gap-4">
+            <Card className="p-5">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h2 className="font-display font-bold text-[15px]">Formations ({formations.length})</h2>
+                {gestionHab && (
+                  <Link href={`/responsable/habilitations?onglet=sessions&technicien=${id}`} className="text-xs font-semibold text-blue">+ Planifier une nouvelle formation</Link>
+                )}
+              </div>
+              <div className="flex flex-col divide-y divide-line">
+                {formations.map((f) => (
+                  <div key={f.participantId} className="py-2.5 flex items-start justify-between gap-3 text-sm">
+                    <div className="min-w-0">
+                      <Link href={`/responsable/habilitations/sessions/${f.sessionId}`} className="font-semibold text-blue hover:underline">🎓 {f.titre}</Link>
+                      <div className="text-xs text-ink-soft">
+                        {formatDateTime(f.dateDebut)}
+                        {f.nbDocuments ? ` · ${f.nbDocuments} document(s)` : ""}
+                        {f.reponse === "indisponible" && f.reponseMotif ? ` · indisponible : ${f.reponseMotif}` : ""}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <Pill tone={etatFormation(f).tone}>{etatFormation(f).label}</Pill>
+                      {f.statut === "terminee" && f.present === 1 && (
+                        <a href={`/api/export/attestation-formation/${f.participantId}`} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-blue">Attestation PDF</a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {formations.length === 0 && <p className="text-sm text-ink-soft py-2">Aucune formation.</p>}
+              </div>
+              {gestionHab && sessionsDispo.length > 0 && (
+                <form action={inscrireTechniciens} className="flex flex-wrap items-end gap-2 mt-3 pt-3 border-t border-line">
+                  <input type="hidden" name="technicienIds" value={id} />
+                  <input type="hidden" name="retour" value={`/responsable/techniciens/${id}?tab=habilitations`} />
+                  <Field label="Inscrire à une formation planifiée">
+                    <select name="sessionId" required defaultValue="" className={`${inputClass} min-w-56`}>
+                      <option value="" disabled>Choisir…</option>
+                      {sessionsDispo.map((x) => (
+                        <option key={x.id} value={x.id}>{formatDate(x.dateDebut)} — {x.titre}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Btn variant="ghost">Inscrire et prévenir</Btn>
+                </form>
+              )}
+            </Card>
+            <Card className="p-5">
+              <h2 className="font-display font-bold text-[15px] mb-3">Documents lus (lecture attestée)</h2>
+              <div className="flex flex-col divide-y divide-line">
+                {consultations.map((c, i) => (
+                  <div key={i} className="py-2 flex justify-between gap-3 text-sm">
+                    {c.url ? (
+                      <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-blue hover:underline">{c.titre}</a>
+                    ) : (
+                      <span className="truncate">{c.titre}</span>
+                    )}
+                    <span className="text-ink-soft text-xs whitespace-nowrap">{formatDateTime(c.date)}</span>
+                  </div>
+                ))}
+                {consultations.length === 0 && <p className="text-sm text-ink-soft py-2">Aucun document lu pour l&apos;instant.</p>}
+              </div>
+            </Card>
+          </div>
         </div>
+      )}
+
+      {tab === "signalements" && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="font-display font-bold text-[15px]">Signalements ({sigs.length})</h2>
+            <Link href={`/responsable/signalements?vue=tous&technicien=${id}`} className="text-xs font-semibold text-blue">Voir dans « Signalements » →</Link>
+          </div>
+          <ListeSignalements lignes={sigs} avecTechnicien={false} vide="Aucun signalement de ce technicien." />
+        </Card>
       )}
 
       {tab === "documents" && (
@@ -483,31 +626,41 @@ export default async function TechnicienDetailPage({
 
       {tab === "heures" && (
         <Card className="p-5">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h2 className="font-display font-bold text-[15px]">Heures de sous-traitance</h2>
-            <span className="text-sm">Total : <span className="font-display font-extrabold tabular">{formatMinutes(totalHeures)}</span></span>
+            <span className="text-sm">
+              Total : <span className="font-display font-extrabold tabular">{formatMinutes(totalHeures)}</span>
+              <Link href={`/responsable/sous-traitance?technicien=${id}`} className="ml-3 text-xs font-semibold text-blue">Récapitulatif / export →</Link>
+            </span>
           </div>
           {heuresMois.length === 0 ? (
             <p className="text-sm text-ink-soft">Aucune heure déclarée.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-ink-soft border-b border-line">
-                  <th className="py-2">Mois</th>
-                  <th className="py-2">Client</th>
-                  <th className="py-2 text-right">Durée</th>
-                </tr>
-              </thead>
-              <tbody>
-                {heuresMois.map((h, i) => (
-                  <tr key={i} className="border-b border-line last:border-0">
-                    <td className="py-2">{libelleMois(h.mois)}</td>
-                    <td className="py-2">{h.client}</td>
-                    <td className="py-2 text-right font-semibold tabular">{formatMinutes(h.minutes)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="flex flex-col gap-4">
+              {regrouperParMois(heuresMois).map(([mois, lignes]) => (
+                <div key={mois}>
+                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wide text-ink-soft border-b border-line pb-1.5">
+                    <span>{libelleMois(mois)}</span>
+                    <span className="tabular">{formatMinutes(lignes.reduce((t, l) => t + l.minutes, 0))}</span>
+                  </div>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {lignes.map((h) => (
+                        <tr key={h.id} className="border-b border-line last:border-0 align-top">
+                          <td className="py-2 pr-3 whitespace-nowrap w-28">{formatDateJour(h.dateTravail)}</td>
+                          <td className="py-2 pr-3 whitespace-nowrap w-40 tabular">
+                            {h.heureDebut && h.heureFin ? `${h.heureDebut} – ${h.heureFin}` : "—"}
+                            {h.pauseMinutes ? <span className="text-xs text-ink-soft"> (pause {h.pauseMinutes} min)</span> : null}
+                          </td>
+                          <td className="py-2 pr-3">{h.client}{h.commentaire ? <span className="block text-xs text-ink-soft">{h.commentaire}</span> : null}</td>
+                          <td className="py-2 text-right font-semibold tabular whitespace-nowrap">{formatMinutes(h.minutes)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
           )}
         </Card>
       )}
@@ -682,7 +835,7 @@ function Ligne({ k, v }: { k: string; v?: string | null }) {
 function ListeMissions({
   missions,
 }: {
-  missions: { id: string; statut: string; dateProgrammee: Date | null; appareil: string; projetId: string | null; projetRef: string | null; projetTitre: string | null }[];
+  missions: LigneMission[];
 }) {
   if (missions.length === 0) return <p className="text-sm text-ink-soft py-2">Aucune mission.</p>;
   return (
@@ -702,7 +855,11 @@ function ListeMissions({
               )}{" "}
               <span className="text-ink-soft">· {m.appareil}{m.projetTitre ? ` · ${m.projetTitre}` : ""}</span>
             </span>
-            <StatutInterventionPill statut={m.statut} />
+            {m.refuseeLe && !FINIS.includes(m.statut) && m.statut !== "en_cours" ? (
+              <Pill tone="crit">Refusée · {libelleRefus(m.refusMotif)}</Pill>
+            ) : (
+              <StatutInterventionPill statut={m.statut} />
+            )}
           </div>
         );
       })}
@@ -724,5 +881,76 @@ function ListeJournal({ lignes }: { lignes: { id: string; action: string; detail
         </li>
       ))}
     </ol>
+  );
+}
+
+function regrouperParMois<T extends { dateTravail: string }>(lignes: T[]) {
+  const m = new Map<string, T[]>();
+  for (const l of lignes) {
+    const k = l.dateTravail.slice(0, 7);
+    m.set(k, [...(m.get(k) ?? []), l]);
+  }
+  return [...m.entries()];
+}
+
+type FormationFiche = { statut: string; reponse: string | null; emargeLe: Date | null; present: number | null; resultat: string | null };
+
+function etatFormation(f: FormationFiche): { label: string; tone: "ok" | "warn" | "crit" | "neutral" } {
+  if (f.statut === "terminee") {
+    if (f.present === 0) return { label: "Absent", tone: "crit" };
+    if (f.resultat === "reussi") return { label: "Réussie", tone: "ok" };
+    if (f.resultat === "a_refaire") return { label: "À refaire", tone: "warn" };
+    return { label: "Validée", tone: "ok" };
+  }
+  if (f.emargeLe) return { label: "Présence signée", tone: "ok" };
+  if (f.reponse === "confirme") return { label: "Confirmée", tone: "ok" };
+  if (f.reponse === "indisponible") return { label: "Indisponible", tone: "crit" };
+  return { label: "Sans réponse", tone: "warn" };
+}
+
+// Phase 21 : en haut de l'aperçu, tout ce qui demande une action du bureau.
+function ATraiter({
+  id,
+  habilitations,
+  missions,
+  signalements,
+  formations,
+}: {
+  id: string;
+  habilitations: { id: string; nom: string; etat: string; dateExpiration: Date | null }[];
+  missions: { id: string; numero: string; dateProgrammee: Date | null; refuseeLe: Date | null; refusMotif: string | null; vueLe: Date | null }[];
+  signalements: { id: string; numero: string; type: string; gravite: string; statut: string }[];
+  formations: (FormationFiche & { sessionId: string; titre: string; dateDebut: Date })[];
+}) {
+  const items: { href: string; texte: string; ton: "crit" | "warn" }[] = [];
+  for (const sg of signalements) items.push({ href: `/responsable/signalements/${sg.id}`, texte: `Signalement ${sg.numero} ${sg.statut === "nouveau" ? "à prendre en charge" : "en cours"}`, ton: sg.gravite === "normale" ? "warn" : "crit" });
+  for (const m of missions) {
+    if (m.refuseeLe) items.push({ href: `/responsable/missions/${m.id}`, texte: `Mission ${m.numero} refusée (${libelleRefus(m.refusMotif)}) — à décider`, ton: "crit" });
+    else items.push({ href: `/responsable/missions/${m.id}`, texte: `Mission ${m.numero}${m.dateProgrammee ? ` du ${formatDate(m.dateProgrammee)}` : ""} ${m.vueLe ? "vue, pas encore acceptée" : "envoyée, pas encore vue"}`, ton: "warn" });
+  }
+  for (const h of habilitations) {
+    if (h.etat === "en_attente") items.push({ href: `/responsable/techniciens/${id}?tab=habilitations`, texte: `Certificat à valider : ${h.nom}`, ton: "warn" });
+    if (h.etat === "expiree") items.push({ href: `/responsable/techniciens/${id}?tab=habilitations`, texte: `Habilitation expirée : ${h.nom}`, ton: "crit" });
+    if (h.etat === "bientot") items.push({ href: `/responsable/techniciens/${id}?tab=habilitations`, texte: `À renouveler : ${h.nom}${h.dateExpiration ? ` (${formatDate(h.dateExpiration)})` : ""}`, ton: "warn" });
+  }
+  for (const f of formations) {
+    if (f.reponse === "indisponible") items.push({ href: `/responsable/habilitations/sessions/${f.sessionId}`, texte: `Indisponible pour la formation « ${f.titre} »`, ton: "warn" });
+    else if (!f.reponse) items.push({ href: `/responsable/habilitations/sessions/${f.sessionId}`, texte: `Formation « ${f.titre} » du ${formatDate(f.dateDebut)} pas encore confirmée`, ton: "warn" });
+  }
+  if (!items.length) {
+    return <div className="rounded-xl bg-green-fill text-green-ink text-sm font-semibold px-4 py-3">✓ Rien à traiter pour ce technicien.</div>;
+  }
+  return (
+    <Card className="p-5 border-orange/40 border-[1.5px]">
+      <h2 className="font-display font-bold text-[15px] mb-2">À traiter ({items.length})</h2>
+      <div className="flex flex-col gap-1.5">
+        {items.map((it, i) => (
+          <Link key={i} href={it.href} className="flex items-center gap-2 text-sm hover:text-blue">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${it.ton === "crit" ? "bg-red" : "bg-orange"}`} />
+            {it.texte}
+          </Link>
+        ))}
+      </div>
+    </Card>
   );
 }

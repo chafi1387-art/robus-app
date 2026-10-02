@@ -37,6 +37,7 @@ const CATEGORIE_DOC_LABEL: Record<string, string> = {
   procedures_robus: "Procédures Robus",
   videos: "Vidéos",
   fournisseur_iso: "Fournisseur / ISO 9001",
+  formation: "Formations internes",
 };
 
 const STATUTS = [

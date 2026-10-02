@@ -10,9 +10,14 @@ import {
   pushAbonnements,
   reglesPlanification,
   demandesClient,
+  formationsParticipants,
+  formationsSessions,
+  signalements,
   users,
 } from "@/db/schema";
-import { and, eq, inArray, isNotNull, isNull, lt, ne, notExists, sql } from "drizzle-orm";
+import { TYPES_SIGNALEMENT } from "@/lib/signalements-types";
+import { libelleRefus } from "@/lib/missions";
+import { and, eq, gt, inArray, isNotNull, isNull, lt, ne, notExists, sql } from "drizzle-orm";
 import { habilitationsCourantes } from "@/lib/habilitations";
 
 export type Notification = {
@@ -48,6 +53,10 @@ export async function getNotifications(): Promise<Notification[]> {
     emailsEchec,
     techSansNotif,
     pannesSignalees,
+    signalementsNouveaux,
+    missionsRefusees,
+    formationsReponses,
+    techniciens,
   ] = await Promise.all([
     db
       .select({ id: appareils.id, numeroInterne: appareils.numeroInterne })
@@ -133,7 +142,67 @@ export async function getNotifications(): Promise<Notification[]> {
       .from(demandesClient)
       .innerJoin(appareils, eq(demandesClient.appareilId, appareils.id))
       .where(eq(demandesClient.statut, "nouvelle")),
+    // Phase 21 : signalements des techniciens pas encore pris en charge.
+    db
+      .select({ id: signalements.id, numero: signalements.numero, type: signalements.type, gravite: signalements.gravite, blesse: signalements.blesse, technicien: users.nom })
+      .from(signalements)
+      .innerJoin(users, eq(signalements.technicienId, users.id))
+      .where(eq(signalements.statut, "nouveau")),
+    // Phase 21 : missions refusées par le technicien — décision du bureau attendue.
+    db
+      .select({ id: interventions.id, technicien: users.nom, numero: appareils.numeroInterne, motif: interventions.refusMotif })
+      .from(interventions)
+      .innerJoin(users, eq(interventions.technicienId, users.id))
+      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .where(and(isNotNull(interventions.refuseeLe), inArray(interventions.statut, [...NON_COMMENCES]))),
+    // Phase 21 : formations à venir — technicien indisponible, ou sans réponse à 3 jours.
+    db
+      .select({
+        sessionId: formationsSessions.id,
+        titre: formationsSessions.titre,
+        dateDebut: formationsSessions.dateDebut,
+        reponse: formationsParticipants.reponse,
+        participantId: formationsParticipants.id,
+        technicien: users.nom,
+      })
+      .from(formationsParticipants)
+      .innerJoin(formationsSessions, eq(formationsParticipants.sessionId, formationsSessions.id))
+      .innerJoin(users, eq(formationsParticipants.technicienId, users.id))
+      .where(
+        and(
+          eq(formationsSessions.statut, "planifiee"),
+          gt(formationsSessions.dateDebut, now),
+          sql`(${formationsParticipants.reponse} = 'indisponible' or (${formationsParticipants.reponse} is null and ${formationsSessions.dateDebut} < ${dansNJours(3).toISOString()}::timestamp))`
+        )
+      ),
+    db.select({ id: users.id, nom: users.nom }).from(users).where(eq(users.role, "technicien")),
   ]);
+
+  for (const sg of signalementsNouveaux) {
+    const t = TYPES_SIGNALEMENT[sg.type];
+    notifications.push({
+      id: `signalement-${sg.id}`,
+      gravite: sg.gravite === "normale" ? "warn" : "crit",
+      titre: `${sg.blesse ? "URGENT — blessé · " : ""}Signalement ${t?.label.toLowerCase() ?? sg.type} — ${sg.technicien} (${sg.numero})`,
+      href: `/responsable/signalements/${sg.id}`,
+    });
+  }
+  for (const m of missionsRefusees) {
+    notifications.push({
+      id: `refus-${m.id}`,
+      gravite: "crit",
+      titre: `Mission refusée — ${m.technicien} (${m.numero}) : ${libelleRefus(m.motif)} — à décider`,
+      href: `/responsable/missions/${m.id}`,
+    });
+  }
+  for (const f of formationsReponses) {
+    notifications.push({
+      id: `formation-${f.participantId}`,
+      gravite: "warn",
+      titre: f.reponse === "indisponible" ? `${f.technicien} indisponible pour la formation « ${f.titre} »` : `${f.technicien} n'a pas confirmé la formation « ${f.titre} » (${f.dateDebut.toLocaleDateString("fr-BE")})`,
+      href: `/responsable/habilitations/sessions/${f.sessionId}`,
+    });
+  }
 
   for (const p of pannesSignalees) {
     notifications.push({
@@ -224,7 +293,7 @@ export async function getNotifications(): Promise<Notification[]> {
   }
 
   // Phase 19 : statut calculé selon le catalogue (délai d'alerte propre à chaque habilitation).
-  const nomsTech = new Map((await db.select({ id: users.id, nom: users.nom }).from(users).where(eq(users.role, "technicien"))).map((u) => [u.id, u.nom]));
+  const nomsTech = new Map(techniciens.map((u) => [u.id, u.nom]));
   for (const h of habilitations) {
     const qui = nomsTech.get(h.technicienId) ?? "Technicien";
     if (h.etat === "expiree") {

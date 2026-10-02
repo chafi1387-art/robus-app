@@ -14,68 +14,39 @@ import {
   sites,
   users,
 } from "@/db/schema";
-import { and, asc, count, desc, eq, inArray, gte, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, gte, isNull, lt, sql } from "drizzle-orm";
 import { formatDateTime } from "@/lib/format";
 import { BLOCS_ISO, calculerScoreGlobal } from "@/lib/score-iso";
 import { CarteApplication } from "@/components/app-installable";
 import { clePubliqueVapid } from "@/lib/push";
 import Link from "next/link";
+import { statsSecurite } from "@/lib/signalements-stats";
 
-const DONE_STATUSES = ["terminee", "validee", "cloturee"] as const;
 
+// Phase 21 : une seule requête pour tous les compteurs (avant : 6 allers-retours successifs).
 async function getStats() {
-  const now = new Date();
-
-  const [[{ n: nbClients }], [{ n: nbSites }], [{ n: nbAppareils }], [{ n: nbInterventions }]] =
-    await Promise.all([
-      db.select({ n: count() }).from(clients),
-      db.select({ n: count() }).from(sites),
-      db.select({ n: count() }).from(appareils),
-      db.select({ n: count() }).from(interventions),
-    ]);
-
-  const [[{ n: nbAppareilsEnPanne }]] = await Promise.all([
-    db.select({ n: count() }).from(appareils).where(eq(appareils.statut, "en_panne")),
-  ]);
-
-  const [[{ n: nbDone }]] = await Promise.all([
-    db
-      .select({ n: count() })
-      .from(interventions)
-      .where(sql`${interventions.statut} in ('terminee','validee','cloturee')`),
-  ]);
-
-  const [[{ n: nbEnRetard }]] = await Promise.all([
-    db
-      .select({ n: count() })
-      .from(interventions)
-      .where(
-        and(
-          lt(interventions.dateProgrammee, now),
-          sql`${interventions.statut} not in ('terminee','validee','cloturee')`
-        )
-      ),
-  ]);
-
-  const [[{ n: nbNonAffectees }]] = await Promise.all([
-    db
-      .select({ n: count() })
-      .from(interventions)
-      .where(and(ne(interventions.statut, "cloturee"), isNull(interventions.technicienId))),
-  ]);
-
-  const tauxRealisation =
-    Number(nbInterventions) > 0 ? Math.round((Number(nbDone) / Number(nbInterventions)) * 100) : 0;
-
+  const [r] = await db
+    .select({
+      nbClients: sql<number>`(select count(*)::int from ${clients})`,
+      nbSites: sql<number>`(select count(*)::int from ${sites})`,
+      nbAppareils: sql<number>`(select count(*)::int from ${appareils})`,
+      nbAppareilsEnPanne: sql<number>`(select count(*)::int from ${appareils} where ${appareils.statut} = 'en_panne')`,
+      nbInterventions: sql<number>`(select count(*)::int from ${interventions})`,
+      nbDone: sql<number>`(select count(*)::int from ${interventions} where ${interventions.statut} in ('terminee','validee','cloturee'))`,
+      nbEnRetard: sql<number>`(select count(*)::int from ${interventions} where ${interventions.dateProgrammee} < now() at time zone 'utc' and ${interventions.statut} not in ('terminee','validee','cloturee'))`,
+      nbNonAffectees: sql<number>`(select count(*)::int from ${interventions} where ${interventions.statut} <> 'cloturee' and ${interventions.technicienId} is null)`,
+    })
+    .from(sql`(select 1) as un`);
+  const nbInterventions = Number(r?.nbInterventions ?? 0);
   return {
-    nbClients: Number(nbClients),
-    nbSites: Number(nbSites),
-    nbAppareils: Number(nbAppareils),
-    nbInterventions: Number(nbInterventions),
-    nbAppareilsEnPanne: Number(nbAppareilsEnPanne),
-    nbEnRetard: Number(nbEnRetard),
-    nbNonAffectees: Number(nbNonAffectees),
-    tauxRealisation,
+    nbClients: Number(r?.nbClients ?? 0),
+    nbSites: Number(r?.nbSites ?? 0),
+    nbAppareils: Number(r?.nbAppareils ?? 0),
+    nbInterventions,
+    nbAppareilsEnPanne: Number(r?.nbAppareilsEnPanne ?? 0),
+    nbEnRetard: Number(r?.nbEnRetard ?? 0),
+    nbNonAffectees: Number(r?.nbNonAffectees ?? 0),
+    tauxRealisation: nbInterventions > 0 ? Math.round((Number(r?.nbDone ?? 0) / nbInterventions) * 100) : 0,
   };
 }
 
@@ -85,7 +56,8 @@ async function getAlertes() {
   // Phase 6 : l'Appareil n'est plus rattaché à un Site — le client se
   // dérive désormais du Projet. LEFT JOIN pour ne jamais faire disparaître
   // (ou planter sur) une intervention/un appareil sans Projet/Site.
-  const enRetard = await db
+  const [enRetard, enPanne] = await Promise.all([
+    db
     .select({
       id: interventions.id,
       description: interventions.description,
@@ -104,9 +76,8 @@ async function getAlertes() {
         sql`${interventions.statut} not in ('terminee','validee','cloturee')`
       )
     )
-    .limit(6);
-
-  const enPanne = await db
+    .limit(6),
+    db
     .select({
       id: appareils.id,
       numeroInterne: appareils.numeroInterne,
@@ -116,7 +87,8 @@ async function getAlertes() {
     .leftJoin(sites, eq(appareils.siteId, sites.id))
     .leftJoin(clients, eq(sites.clientId, clients.id))
     .where(eq(appareils.statut, "en_panne"))
-    .limit(6);
+    .limit(6),
+  ]);
 
   return { enRetard, enPanne };
 }
@@ -125,12 +97,10 @@ const JOURS_ALERTE_GARANTIE = 60;
 
 async function getGarantiesStats() {
   const now = new Date();
-  const [[{ n: nbActives }]] = await Promise.all([
-    db.select({ n: count() }).from(garanties).where(gte(garanties.dateFin, now)),
-  ]);
-
   const seuil = new Date(now.getTime() + JOURS_ALERTE_GARANTIE * 24 * 60 * 60 * 1000);
-  const echeanceProche = await db
+  const [[{ n: nbActives }], echeanceProche] = await Promise.all([
+    db.select({ n: count() }).from(garanties).where(gte(garanties.dateFin, now)),
+    db
     .select({
       id: garanties.id,
       dateFin: garanties.dateFin,
@@ -142,7 +112,8 @@ async function getGarantiesStats() {
     .innerJoin(projets, eq(garanties.projetId, projets.id))
     .innerJoin(clients, eq(projets.clientId, clients.id))
     .where(and(gte(garanties.dateFin, now), lt(garanties.dateFin, seuil)))
-    .limit(6);
+    .limit(6),
+  ]);
 
   return { nbActives: Number(nbActives), echeanceProche };
 }
@@ -205,7 +176,8 @@ const TONE_TEXT: Record<"ok" | "warn" | "crit", string> = {
 };
 
 export default async function DashboardPage() {
-  const [demandesOuvertes, statsDem, dlDem] = await Promise.all([
+  const [[demandesOuvertes, statsDem, dlDem], [stats, alertes, planning, scoreIso, garantiesStats, passages, piecesManquantes, securite]] = await Promise.all([
+    Promise.all([
     db
       .select({ d: demandesClient, appareil: appareils.numeroInterne, client: clients.raisonSociale })
       .from(demandesClient)
@@ -216,8 +188,8 @@ export default async function DashboardPage() {
       .limit(8),
     statsDemandes(),
     delais(),
-  ]);
-  const [stats, alertes, planning, scoreIso, garantiesStats, passages, piecesManquantes] = await Promise.all([
+  ]),
+    Promise.all([
     getStats(),
     getAlertes(),
     getPlanningDuJour(),
@@ -231,6 +203,8 @@ export default async function DashboardPage() {
       .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
       .where(and(eq(missionNotes.type, "piece_manquante"), isNull(missionNotes.regleLe), isNull(missionNotes.archiveLe)))
       .orderBy(asc(missionNotes.createdAt)),
+    statsSecurite(),
+  ]),
   ]);
   const ORDRE_PASSAGE: Record<string, number> = { retard: 0, a_planifier: 1, bientot: 2, planifie: 3, a_venir: 4, realise: 5 };
   passages.sort((a, b) => ORDRE_PASSAGE[a.etat] - ORDRE_PASSAGE[b.etat] || a.datePrevue.getTime() - b.datePrevue.getTime());
@@ -253,6 +227,22 @@ export default async function DashboardPage() {
         <StatTile label="Appareils" value={stats.nbAppareils} href="/responsable/appareils" />
         <StatTile label="Interventions" value={stats.nbInterventions} href="/responsable/interventions" />
       </div>
+
+      <Link
+        href="/responsable/signalements"
+        className={`rounded-2xl border px-5 py-4 flex flex-wrap items-center gap-x-8 gap-y-2 hover:shadow-md transition-shadow ${securite.nouveaux > 0 ? "bg-red-fill/50 border-red/40" : "bg-surface border-line"}`}
+      >
+        <span className="font-display font-bold text-[15px]">🦺 Sécurité terrain</span>
+        <span className="text-sm">
+          <span className={`font-display text-xl font-extrabold tabular ${securite.nouveaux > 0 ? "text-red-ink" : ""}`}>{securite.nouveaux}</span> signalement(s) à prendre en charge
+        </span>
+        <span className="text-sm">
+          <span className="font-display text-xl font-extrabold tabular">{securite.enCours}</span> en cours
+        </span>
+        <span className="text-sm">
+          <span className="font-display text-xl font-extrabold tabular text-green-ink">{securite.joursSansAccident ?? "—"}</span> jour(s) sans accident
+        </span>
+      </Link>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-5">

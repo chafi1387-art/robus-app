@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card } from "@/components/ui";
 import { HabilitationsCartes } from "@/components/habilitations-cartes";
 import { habilitationsCourantes } from "@/lib/habilitations";
@@ -27,6 +28,7 @@ const CATEGORIE_LABEL: Record<string, string> = {
   procedures_robus: "Procédures Robus",
   videos: "Vidéos",
   fournisseur_iso: "Fournisseur / ISO 9001",
+  formation: "Formations internes",
 };
 
 export default async function ProfilPage({ searchParams }: { searchParams: Promise<{ depose?: string; erreurHab?: string }> }) {
@@ -152,9 +154,22 @@ export default async function ProfilPage({ searchParams }: { searchParams: Promi
         </details>
       </section>
 
+      <section className="grid grid-cols-2 gap-2.5">
+        <Link href="/technicien/signalements" className="rounded-2xl border border-line bg-surface px-4 py-3">
+          <span className="block text-xl">⚠️</span>
+          <span className="block font-bold text-sm">Mes signalements</span>
+          <span className="block text-xs text-ink-soft">Suivi et réponses du bureau</span>
+        </Link>
+        <Link href="/technicien/formations" className="rounded-2xl border border-line bg-surface px-4 py-3">
+          <span className="block text-xl">🎓</span>
+          <span className="block font-bold text-sm">Mes formations</span>
+          <span className="block text-xs text-ink-soft">Dates, présence, attestations</span>
+        </Link>
+      </section>
+
       <section>
         <h2 className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-2">
-          Formations suivies
+          Documents lus (lecture attestée)
         </h2>
         <div className="flex flex-col divide-y divide-line bg-surface border border-line rounded-2xl">
           {consultations.map((c, i) => (
@@ -166,7 +181,7 @@ export default async function ProfilPage({ searchParams }: { searchParams: Promi
             </div>
           ))}
           {consultations.length === 0 && (
-            <p className="text-sm text-ink-soft px-4 py-3">Aucune formation suivie pour l&apos;instant.</p>
+            <p className="text-sm text-ink-soft px-4 py-3">Aucun document lu pour l&apos;instant.</p>
           )}
         </div>
       </section>

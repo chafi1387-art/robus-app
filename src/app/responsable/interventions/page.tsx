@@ -41,6 +41,8 @@ export default async function InterventionsPage() {
         envoyeeLe: interventions.envoyeeLe,
         vueLe: interventions.vueLe,
         accepteeLe: interventions.accepteeLe,
+        refuseeLe: interventions.refuseeLe,
+        refusMotif: interventions.refusMotif,
         envoiEmail: interventions.envoiEmail,
         envoiPush: interventions.envoiPush,
         projetId: interventions.projetId,

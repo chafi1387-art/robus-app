@@ -413,9 +413,12 @@ export async function envoyerAlerteDemande(params: {
   description: string;
   lien: string;
   urgence: boolean;
+  /** Phase 21 : libellé du bouton (« Ouvrir la demande » par défaut). */
+  bouton?: string;
 }) {
   const transport = getTransport();
   if (!transport || !params.destinataires.length) return "non_configure" as const;
+  const bouton = params.bouton ?? "Ouvrir la demande";
   const tableau = params.lignes
     .map(
       ([k, v]) =>
@@ -428,13 +431,13 @@ export async function envoyerAlerteDemande(params: {
       to: params.destinataires.join(", "),
       subject: params.sujet,
       priority: params.urgence ? "high" : "normal",
-      text: `${params.sujet}\n\n${params.lignes.map(([k, v]) => `${k} : ${v}`).join("\n")}\n\n${params.description}\n\nOuvrir la demande : ${params.lien}\n\nROBUS`,
+      text: `${params.sujet}\n\n${params.lignes.map(([k, v]) => `${k} : ${v}`).join("\n")}\n\n${params.description}\n\n${bouton} : ${params.lien}\n\nROBUS`,
       html: `${enteteHtml()}<div style="font-family:Arial,sans-serif;padding:20px;color:#1f2a37;max-width:560px;">
         ${params.urgence ? `<div style="background:#fdecea;color:#a3261b;font-weight:bold;padding:10px 14px;border-radius:8px;margin-bottom:12px;">URGENCE — à traiter immédiatement</div>` : ""}
         <p style="font-size:16px;font-weight:bold;margin:0 0 10px;">${echapperHtml(params.sujet)}</p>
         <table style="border-collapse:collapse;margin:0 0 12px;">${tableau}</table>
         <div style="background:#f4f7fb;border-radius:8px;padding:12px 14px;font-size:14px;white-space:pre-wrap;">${echapperHtml(params.description)}</div>
-        <p style="margin-top:18px;"><a href="${params.lien}" style="display:inline-block;background:#0055a4;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Ouvrir la demande</a></p>
+        <p style="margin-top:18px;"><a href="${params.lien}" style="display:inline-block;background:#0055a4;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">${echapperHtml(bouton)}</a></p>
       </div>`,
       attachments: logoAttachment(),
     });
@@ -476,3 +479,6 @@ export async function envoyerResumeMensuel(params: { email: string; nom: string;
     return "echec" as const;
   }
 }
+
+/** Phase 21 : avis simple (technicien, observateur…) — titre, texte, bouton « Voir le détail ». */
+export const envoyerAvisSimple = envoyerAvisObservateur;

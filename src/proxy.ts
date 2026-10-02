@@ -68,5 +68,8 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Phase 21 : le logo, les icônes et le service worker ne passent plus par
+  // le contrôle de session (moins de travail par page). Les fichiers
+  // envoyés (/uploads/) restent protégés.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo-robus.png|icons/|sw.js|manifest.webmanifest).*)"],
 };

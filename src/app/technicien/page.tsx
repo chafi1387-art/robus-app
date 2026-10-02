@@ -1,8 +1,8 @@
 import { TypeInterventionPill, StatutInterventionPill } from "@/components/ui";
 import { db } from "@/db";
 import { appareils, clients, interventions, projets } from "@/db/schema";
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, or, sql } from "drizzle-orm";
-import { formationsParticipants, formationsSessions, rapportPhotos, rapports } from "@/db/schema";
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { formationsParticipants, formationsSessions, rapportPhotos, rapports, signalements } from "@/db/schema";
 import { tempsRestantModification } from "@/lib/rapport-rules";
 import { Lock, Search } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +24,7 @@ function baseQuery() {
       dateProgrammee: interventions.dateProgrammee,
       vueLe: interventions.vueLe,
       accepteeLe: interventions.accepteeLe,
+      refuseeLe: interventions.refuseeLe,
       numeroInterne: appareils.numeroInterne,
       projetReference: projets.reference,
       adresse: projets.adresse,
@@ -116,22 +117,42 @@ export default async function MesInterventionsPage({
     return `/technicien?vue=${v}&date=${toDateParam(d)}`;
   }
 
-  // Phase 19b : formation planifiée dans les 14 prochains jours -> rappel sur l'accueil.
-  const prochainesFormations = await db
-    .select({ id: formationsSessions.id, titre: formationsSessions.titre, dateDebut: formationsSessions.dateDebut })
+  // Phase 21 : formations du technicien — dans le planning (période affichée)
+  // et en haut de l'écran tant qu'elles ne sont pas confirmées / émargées.
+  const formationsRows = await db
+    .select({
+      id: formationsSessions.id,
+      titre: formationsSessions.titre,
+      dateDebut: formationsSessions.dateDebut,
+      dureeHeures: formationsSessions.dureeHeures,
+      lieu: formationsSessions.lieu,
+      statut: formationsSessions.statut,
+      reponse: formationsParticipants.reponse,
+      emargeLe: formationsParticipants.emargeLe,
+    })
     .from(formationsParticipants)
     .innerJoin(formationsSessions, eq(formationsParticipants.sessionId, formationsSessions.id))
     .where(
       and(
         eq(formationsParticipants.technicienId, user.id),
-        eq(formationsSessions.statut, "planifiee"),
-        gte(formationsSessions.dateDebut, aujourdhui),
-        lt(formationsSessions.dateDebut, addDays(aujourdhui, 14))
+        ne(formationsSessions.statut, "annulee"),
+        or(
+          and(gte(formationsSessions.dateDebut, periodeDebut), lt(formationsSessions.dateDebut, periodeFin)),
+          and(eq(formationsSessions.statut, "planifiee"), gte(formationsSessions.dateDebut, addDays(aujourdhui, -1)))
+        )
       )
     )
     .orderBy(asc(formationsSessions.dateDebut));
+  const formationsPeriode = formationsRows.filter((f) => f.dateDebut >= periodeDebut && f.dateDebut < periodeFin);
+  const formationsAConfirmer = formationsRows.filter(
+    (f) => f.statut === "planifiee" && f.dateDebut >= aujourdhui && (!f.reponse || (estJourJ(f.dateDebut) && f.reponse === "confirme" && !f.emargeLe))
+  );
+  const [signalementsOuverts] = await db
+    .select({ n: sql<number>`count(*)::int`, reponses: sql<number>`count(*) filter (where ${signalements.reponseLe} > now() - interval '3 days')::int` })
+    .from(signalements)
+    .where(and(eq(signalements.technicienId, user.id), ne(signalements.statut, "cloture")));
 
-  const [nouvelles, sansDate, enRetard, periode, ajourdhuiCount] = await Promise.all([
+  const [nouvelles, sansDate, enRetard, periode, ajourdhuiCount, refusees] = await Promise.all([
     // Phase 17 : toute mission envoyée et pas encore acceptée apparaît ici,
     // quelle que soit sa date (une mission du 14 du mois prochain ne doit
     // pas rester cachée dans la vue « Jour »).
@@ -140,7 +161,8 @@ export default async function MesInterventionsPage({
         and(
           eq(interventions.technicienId, user.id),
           inArray(interventions.statut, ["creee", "planifiee", "affectee"]),
-          isNull(interventions.accepteeLe)
+          isNull(interventions.accepteeLe),
+          isNull(interventions.refuseeLe)
         )
       )
       .orderBy(asc(interventions.dateProgrammee)),
@@ -186,9 +208,24 @@ export default async function MesInterventionsPage({
         )
       )
       .then((r) => Number(r[0]?.n ?? 0)),
+    // Phase 21 : missions refusées, en attente de la décision du bureau.
+    baseQuery()
+      .where(
+        and(
+          eq(interventions.technicienId, user.id),
+          inArray(interventions.statut, ["creee", "planifiee", "affectee"]),
+          sql`${interventions.refuseeLe} is not null`
+        )
+      )
+      .orderBy(asc(interventions.dateProgrammee)),
   ]);
 
-  // Regroupement par jour pour les vues Semaine / Mois.
+  // Regroupement par jour pour les vues Semaine / Mois (missions + formations).
+  const formationsParJour = new Map<string, FormationRow[]>();
+  for (const f of formationsPeriode) {
+    const key = dayKey(f.dateDebut);
+    formationsParJour.set(key, [...(formationsParJour.get(key) ?? []), f]);
+  }
   const parJour = new Map<string, Row[]>();
   for (const r of periode) {
     if (!r.dateProgrammee) continue;
@@ -205,7 +242,7 @@ export default async function MesInterventionsPage({
     for (let i = 0; i < nbJours; i++) {
       const d = addDays(periodeDebut, i);
       const rows = parJour.get(dayKey(d)) ?? [];
-      if (rows.length > 0) jours.push({ date: d, rows });
+      if (rows.length > 0 || formationsParJour.has(dayKey(d))) jours.push({ date: d, rows });
     }
   }
 
@@ -244,15 +281,19 @@ export default async function MesInterventionsPage({
 
       <OngletsMissions actif="afaire" />
 
-      {prochainesFormations.map((f) => (
-        <Link key={f.id} href="/technicien/formations#sessions" className="rounded-2xl bg-blue-pale/60 border border-blue/30 px-4 py-3 flex items-center gap-3">
-          <span className="text-xl">🎓</span>
+      {formationsAConfirmer.map((f) => (
+        <FormationCarte key={f.id} f={f} enAvant />
+      ))}
+
+      {(signalementsOuverts?.n ?? 0) > 0 && (
+        <Link href="/technicien/signalements" className="rounded-2xl bg-red-fill/60 border border-red/30 px-4 py-3 flex items-center gap-3">
+          <span className="text-xl">⚠️</span>
           <span className="min-w-0 text-sm">
-            <span className="block font-bold text-navy truncate">Formation : {f.titre}</span>
-            <span className="block text-ink-soft">{formatDateTime(f.dateDebut)}</span>
+            <span className="block font-bold text-red-ink">{signalementsOuverts!.n} signalement(s) en cours</span>
+            <span className="block text-ink-soft">{(signalementsOuverts?.reponses ?? 0) > 0 ? "Nouvelle réponse du bureau — voir" : "Suivi et réponses du bureau"}</span>
           </span>
         </Link>
-      ))}
+      )}
 
       <CarteApplication cleVapid={clePubliqueVapid()} seulementSiAction compact />
 
@@ -264,6 +305,17 @@ export default async function MesInterventionsPage({
           <div className="flex flex-col gap-3">
             {nouvelles.map((i) => (
               <InterventionCard key={i.id} i={i} nouvelle />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {refusees.length > 0 && (
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-wide text-red-ink mb-2">Refusées — le bureau décide ({refusees.length})</h2>
+          <div className="flex flex-col gap-3">
+            {refusees.map((i) => (
+              <InterventionCard key={i.id} i={i} />
             ))}
           </div>
         </div>
@@ -324,7 +376,12 @@ export default async function MesInterventionsPage({
         </div>
 
         {vue === "jour" ? (
-          <Section rows={periode} empty="Rien de prévu ce jour-là." />
+          <div className="flex flex-col gap-3">
+            {formationsPeriode.map((f) => (
+              <FormationCarte key={f.id} f={f} />
+            ))}
+            <Section rows={periode} empty={formationsPeriode.length ? "" : "Rien de prévu ce jour-là."} />
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
             {jours.map(({ date, rows }) => (
@@ -332,13 +389,74 @@ export default async function MesInterventionsPage({
                 <h3 className="text-xs font-bold uppercase tracking-wide text-ink-soft mb-1.5">
                   {formatDate(date)}
                 </h3>
-                <Section rows={rows} empty="" />
+                <div className="flex flex-col gap-3">
+                  {(formationsParJour.get(dayKey(date)) ?? []).map((f) => (
+                    <FormationCarte key={f.id} f={f} />
+                  ))}
+                  <Section rows={rows} empty="" />
+                </div>
               </div>
             ))}
             {jours.length === 0 && <p className="text-sm text-ink-soft">Rien de prévu sur cette période.</p>}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+type FormationRow = {
+  id: string;
+  titre: string;
+  dateDebut: Date;
+  dureeHeures: string | null;
+  lieu: string;
+  statut: string;
+  reponse: string | null;
+  emargeLe: Date | null;
+};
+
+const LIEU_FORMATION: Record<string, string> = { terrain: "Sur le terrain", bureau: "Au bureau", ecole: "École / organisme" };
+
+function estJourJ(d: Date) {
+  const j = (x: Date) => x.toLocaleDateString("fr-BE", { timeZone: "Europe/Brussels" });
+  return j(d) === j(new Date());
+}
+
+// Phase 21 : une formation dans le planning — confirmer sa présence, puis
+// émarger le jour J (la validation finale reste au bureau).
+function FormationCarte({ f, enAvant = false }: { f: FormationRow; enAvant?: boolean }) {
+  const heure = formatDateTime(f.dateDebut).split(" ")[1] ?? "";
+  const jourJ = estJourJ(f.dateDebut);
+  const etat =
+    f.statut === "terminee"
+      ? { txt: "Terminée", cls: "bg-[#eef1f5] text-ink-soft" }
+      : f.emargeLe
+        ? { txt: "Présence signée", cls: "bg-green-fill text-green-ink" }
+        : f.reponse === "confirme"
+          ? { txt: "Présence confirmée", cls: "bg-green-fill text-green-ink" }
+          : f.reponse === "indisponible"
+            ? { txt: "Indisponible", cls: "bg-red-fill text-red-ink" }
+            : { txt: "À confirmer", cls: "bg-orange-fill text-orange-ink" };
+  return (
+    <div className={`rounded-2xl p-4 flex flex-col gap-2 bg-[#f3f0ff] ${enAvant ? "border-[1.5px] border-[#7c5cff]" : "border border-[#d9d0ff]"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-display font-extrabold text-[17px] tabular text-[#4b2fc9]">
+          {enAvant ? `${formatDate(f.dateDebut)} · ${heure}` : heure}
+        </span>
+        <span className={`text-[11px] font-bold uppercase tracking-wide rounded-full px-2.5 py-1 ${etat.cls}`}>{etat.txt}</span>
+      </div>
+      <div className="font-display font-bold text-[15px]">🎓 {f.titre}</div>
+      <div className="text-[13px] text-ink-soft">
+        Formation · {LIEU_FORMATION[f.lieu] ?? f.lieu}
+        {f.dureeHeures ? ` · ${f.dureeHeures} h` : ""}
+      </div>
+      <Link
+        href={`/technicien/formations/${f.id}`}
+        className="min-h-11 rounded-xl bg-[#5b3fe0] text-white font-bold text-[14px] flex items-center justify-center"
+      >
+        {f.statut === "planifiee" && !f.reponse ? "Confirmer ma présence" : f.statut === "planifiee" && jourJ && !f.emargeLe && f.reponse === "confirme" ? "Signer ma présence" : "Voir la formation"}
+      </Link>
     </div>
   );
 }
@@ -357,17 +475,21 @@ function Section({ rows, empty }: { rows: Row[]; empty: string }) {
 function InterventionCard({ i, retard = false, nouvelle = false }: { i: Row; retard?: boolean; nouvelle?: boolean }) {
   const heure = i.dateProgrammee ? (formatDateTime(i.dateProgrammee).split(" ")[1] ?? "—") : "Date à confirmer";
   const itineraire = i.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(i.adresse)}` : null;
-  const action = nouvelle ? "Voir et accepter" : i.statut === "en_cours" ? "Continuer le rapport" : ["terminee", "validee", "cloturee"].includes(i.statut) ? "Voir la mission" : "Ouvrir la mission";
+  const action = nouvelle ? "Voir et accepter" : i.refuseeLe && ["creee", "planifiee", "affectee"].includes(i.statut) ? "Voir" : i.statut === "en_cours" ? "Continuer le rapport" : ["terminee", "validee", "cloturee"].includes(i.statut) ? "Voir la mission" : "Ouvrir la mission";
   return (
     <div className={`bg-surface rounded-2xl p-4 flex flex-col gap-2 shadow-[0_1px_2px_rgba(16,24,40,0.05)] ${retard ? "border-[1.5px] border-[#f3b8b0]" : nouvelle ? "border-[1.5px] border-blue" : "border border-line"}`}>
       <div className="flex items-center justify-between gap-2">
         <span className={`font-display font-extrabold text-[17px] tabular ${retard ? "text-red-ink" : "text-navy"}`}>
           {(retard || nouvelle) && i.dateProgrammee ? `${formatDate(i.dateProgrammee)} · ${heure}` : heure}
         </span>
-        {nouvelle ? (
+        {i.refuseeLe && ["creee", "planifiee", "affectee"].includes(i.statut) ? (
+          <span className="text-[11px] font-bold uppercase tracking-wide text-red-ink bg-red-fill rounded-full px-2.5 py-1">Refusée</span>
+        ) : nouvelle ? (
           <span className="text-[11px] font-bold uppercase tracking-wide text-white bg-blue rounded-full px-2.5 py-1">
             {i.vueLe ? "À accepter" : "Nouveau"}
           </span>
+        ) : ["creee", "planifiee", "affectee"].includes(i.statut) && !i.accepteeLe ? (
+          <span className="text-[11px] font-bold uppercase tracking-wide text-blue bg-blue-pale rounded-full px-2.5 py-1">À accepter</span>
         ) : (
           <StatutInterventionPill statut={i.statut} />
         )}

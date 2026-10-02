@@ -14,6 +14,9 @@ import { appareils, interventions, missionNotes, mouvementsStock, pieces, rappor
 import { requireUser } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { notifierObservateurs } from "@/lib/observateur";
+import { REINIT_ENVOI } from "@/lib/missions";
+import { envoyerMissionsAuTechnicien } from "@/lib/envoi-mission";
+import { controlerHabilitations, messageManques, nomUtilisateur } from "@/lib/habilitations";
 
 // Phase 18 : le bureau valide le rapport d'une mission terminée. Le rapport
 // devient visible par les observateurs (droit « rapports ») et n'est plus
@@ -288,4 +291,59 @@ export async function actionNoteMission(formData: FormData) {
   await journaliser({ entite: "intervention", entiteId: id, action: `note_${action}`, utilisateurId: user.id, details: n!.titre ?? n!.texte?.slice(0, 120) ?? null });
   revalidatePath(page(id));
   redirect(retour);
+}
+
+// ==========================================================================
+// Phase 21 — Mission refusée par le technicien : c'est l'admin qui décide.
+//  - reaffecter : à un autre technicien (contrôle des habilitations) ;
+//  - renvoyer   : au même technicien (après un appel), avec un message ;
+//  - liberer    : la mission repasse « à affecter ».
+// ==========================================================================
+export async function deciderMissionRefusee(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const id = String(formData.get("interventionId") ?? "");
+  if (!z.string().uuid().safeParse(id).success) throw new Error("Mission introuvable.");
+  const decision = String(formData.get("decision") ?? "");
+  const retour = page(id);
+  const [m] = await db
+    .select({ statut: interventions.statut, technicienId: interventions.technicienId, projetId: interventions.projetId, dateProgrammee: interventions.dateProgrammee, refuseeLe: interventions.refuseeLe })
+    .from(interventions)
+    .where(eq(interventions.id, id))
+    .limit(1);
+  if (!m || !["creee", "planifiee", "affectee"].includes(m.statut)) redirect(avecMessage(retour, "erreur", "Cette mission est déjà engagée."));
+  const dateTxt = String(formData.get("dateProgrammee") ?? "").trim();
+  const nouvelleDate = dateTxt ? new Date(dateTxt) : null;
+  if (nouvelleDate && Number.isNaN(nouvelleDate.getTime())) redirect(avecMessage(retour, "erreur", "Date invalide."));
+  const message = String(formData.get("message") ?? "").trim().slice(0, 1000) || undefined;
+
+  if (decision === "liberer") {
+    await db.update(interventions).set({ technicienId: null, statut: "creee", ...REINIT_ENVOI }).where(eq(interventions.id, id));
+    await journaliser({ entite: "intervention", entiteId: id, action: "mission_liberee", utilisateurId: user.id, details: "Refus traité : mission remise à affecter" });
+    revalidatePath(retour);
+    redirect(avecMessage(retour, "ok", "La mission est remise « à affecter »."));
+  }
+
+  const technicienId = decision === "renvoyer" ? m!.technicienId : String(formData.get("technicienId") ?? "");
+  if (!technicienId || !z.string().uuid().safeParse(technicienId).success) redirect(avecMessage(retour, "erreur", "Choisissez le technicien."));
+  if (!m!.projetId) redirect(avecMessage(retour, "erreur", "Mission sans projet : affectez-la depuis le Planning des missions."));
+  const date = nouvelleDate ?? m!.dateProgrammee;
+  if (!date) redirect(avecMessage(retour, "erreur", "Indiquez la date de la mission."));
+  if (decision === "reaffecter") {
+    const manques = await controlerHabilitations(technicienId!, [id]);
+    if (manques.length) redirect(avecMessage(retour, "erreur", messageManques(await nomUtilisateur(technicienId!), manques)));
+  }
+  await db
+    .update(interventions)
+    .set({ technicienId: technicienId!, statut: "affectee", dateProgrammee: date!, retardNotifieLe: null })
+    .where(eq(interventions.id, id));
+  await envoyerMissionsAuTechnicien({ projetId: m!.projetId!, technicienId: technicienId!, interventionIds: [id], message, envoyeParId: user.id });
+  await journaliser({
+    entite: "intervention",
+    entiteId: id,
+    action: decision === "renvoyer" ? "mission_renvoyee" : "mission_reaffectee",
+    utilisateurId: user.id,
+    details: `Refus traité — ${decision === "renvoyer" ? "renvoyée au même technicien" : `réaffectée à ${await nomUtilisateur(technicienId!)}`}`,
+  });
+  revalidatePath(retour);
+  redirect(avecMessage(retour, "ok", decision === "renvoyer" ? "Mission renvoyée au technicien — il doit de nouveau l'accepter." : "Mission réaffectée et envoyée."));
 }
