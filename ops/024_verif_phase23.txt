@@ -1,0 +1,18 @@
+== commit
+bd3c31f Phase 23 : checklists choisies à la création de la mission (ou la plus adaptée automatiquement), visibles par le technicien dès l'ordre, cochées en direct (✓ conforme / ✗ non conforme + commentaire, mesures avec limites), rapport bloqué si tâches obligatoires manquantes, suivi bureau en direct, points ✗ à traiter (non-conformité en un clic), modèles versionnés (sections, ordre, duplication), PDF — migration 0019
+== tables
+mission_checklists 0
+mission_checklist_taches 0
+== modèles (actif, tâches)
+    nom    | type_intervention | actif | version | taches 
+-----------+-------------------+-------+---------+--------
+ Sécurité  | systematique      |     1 |       1 |      1
+(1 row)
+
+== missions non commencées sans checklist
+2
+== pages
+/responsable/checklists 307
+== erreurs récentes
+Fri Oct  2 12:36:40 UTC 2026
+(code retour 0, 2026-10-02 12:36:40)

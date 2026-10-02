@@ -1,5 +1,21 @@
-=== Deploiement 2026-10-02 11:44:01 : 3e0682c -> a128dfa
---- npm install
+=== Deploiement 2026-10-02 12:35:02 : a128dfa -> bd3c31f
+--- migration 0019_checklists_missions.sql
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
 --- build
 ├ ƒ /responsable/sous-traitance
 ├ ƒ /responsable/stock
@@ -27,4 +43,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK a128dfa
+STATUT: OK bd3c31f
