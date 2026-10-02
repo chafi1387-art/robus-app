@@ -1,55 +1,5 @@
 CREATE INDEX
 CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-UPDATE 3
-UPDATE 1
---- build
-├ ƒ /responsable/rapports
-├ ƒ /responsable/revues-direction
-├ ƒ /responsable/risques
-├ ƒ /responsable/satisfaction
-├ ƒ /responsable/score-iso
-├ ƒ /responsable/sites
-├ ƒ /responsable/sites/[id]
-├ ƒ /responsable/sous-traitance
-├ ƒ /responsable/stock
-├ ƒ /responsable/stock/pieces/[id]
-├ ƒ /responsable/techniciens
-├ ƒ /responsable/techniciens/[id]
-├ ƒ /responsable/utilisateurs
-├ ƒ /technicien
-├ ƒ /technicien/formations
-├ ƒ /technicien/heures
-├ ƒ /technicien/interventions/[id]
-└ ƒ /technicien/profil
-
-
-ƒ Proxy (Middleware)
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-
---- curl /responsable/projets : 307
-STATUT: OK 43b2501
-=== 2026-10-01 09:27:01 : 94ddbe7 (ops seulement, pas de build)
-STATUT: OK 94ddbe7
-=== Deploiement 2026-10-01 10:03:02 : 94ddbe7 -> de56aea
---- npm install
---- migration 0015_historique_direct_observateur.sql
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-CREATE TABLE
-CREATE INDEX
-ALTER TYPE
-CREATE TABLE
-CREATE INDEX
-CREATE INDEX
-CREATE TABLE
-CREATE INDEX
-CREATE INDEX
 ALTER TABLE
 CREATE INDEX
 ALTER TABLE
@@ -298,3 +248,53 @@ STATUT: OK 2ec2e3e
 
 --- curl /responsable/projets : 307
 STATUT: OK 3c47cfc
+=== Deploiement 2026-10-02 10:54:02 : 3c47cfc -> 0a3c3b0
+--- migration 0018_technicien_signalements_formations.sql
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TYPE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+--- build
+├ ƒ /responsable/signalements/[id]
+├ ƒ /responsable/sites
+├ ƒ /responsable/sites/[id]
+├ ƒ /responsable/sous-traitance
+├ ƒ /responsable/stock
+├ ƒ /responsable/stock/pieces/[id]
+├ ƒ /responsable/techniciens
+├ ƒ /responsable/techniciens/[id]
+├ ƒ /responsable/utilisateurs
+├ ƒ /technicien
+├ ƒ /technicien/formations
+├ ƒ /technicien/formations/[id]
+├ ƒ /technicien/heures
+├ ƒ /technicien/interventions/[id]
+├ ƒ /technicien/profil
+├ ƒ /technicien/signalements
+├ ƒ /technicien/signalements/[id]
+└ ƒ /technicien/signaler
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+--- curl /responsable/projets : 307
+STATUT: OK 0a3c3b0

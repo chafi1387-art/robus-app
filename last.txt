@@ -1,10 +1,27 @@
-=== Deploiement 2026-10-02 10:15:03 : 2ec2e3e -> 3c47cfc
+=== Deploiement 2026-10-02 10:54:02 : 3c47cfc -> 0a3c3b0
+--- migration 0018_technicien_signalements_formations.sql
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TYPE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
 --- build
-├ ƒ /responsable/rapports
-├ ƒ /responsable/revues-direction
-├ ƒ /responsable/risques
-├ ƒ /responsable/satisfaction
-├ ƒ /responsable/score-iso
+├ ƒ /responsable/signalements/[id]
 ├ ƒ /responsable/sites
 ├ ƒ /responsable/sites/[id]
 ├ ƒ /responsable/sous-traitance
@@ -15,9 +32,13 @@
 ├ ƒ /responsable/utilisateurs
 ├ ƒ /technicien
 ├ ƒ /technicien/formations
+├ ƒ /technicien/formations/[id]
 ├ ƒ /technicien/heures
 ├ ƒ /technicien/interventions/[id]
-└ ƒ /technicien/profil
+├ ƒ /technicien/profil
+├ ƒ /technicien/signalements
+├ ƒ /technicien/signalements/[id]
+└ ƒ /technicien/signaler
 
 
 ƒ Proxy (Middleware)
@@ -26,4 +47,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK 3c47cfc
+STATUT: OK 0a3c3b0

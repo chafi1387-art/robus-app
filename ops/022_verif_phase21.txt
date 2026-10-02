@@ -1,0 +1,43 @@
+== commit
+0a3c3b0 Phase 21 : technicien complet — acceptation manuelle / refus motivé des missions (décision de l'admin), signalements (accident, véhicule, météo…) liés aux missions et projets, formations dans le planning avec confirmation, signature de présence, documents, attestations et feuille d'émargement, heures de sous-traitance début/fin, menus sans doublon, fiche technicien par onglet, rapidité (requêtes groupées, cache de navigation 30 s, index) — migration 0018
+== migration
+1
+== colonnes
+7
+== tables
+signalements 0
+formations_sessions 2
+formations_participants 3
+== catégorie formation
+t
+== cron
+{"notifiees":0,"nonVues":0,"passagesCrees":0,"alertesHabilitations":0,"demandesRelancees":0,"resumes":0,"rappelsFormations":0}
+== logo public
+200
+== vitesse
+== Bureau (amine)
+  170 ms  200  /responsable
+   73 ms  200  /responsable/projets
+   87 ms  200  /responsable/interventions
+   68 ms  200  /responsable/techniciens
+   57 ms  200  /responsable/habilitations
+   80 ms  200  /responsable/sous-traitance
+   62 ms  200  /responsable/demandes
+   82 ms  200  /responsable/signalements
+   53 ms  200  /responsable/documents
+   66 ms  200  /responsable/techniciens/ac581064-87bb-4b20-82a7-d8fc077e3d76
+   71 ms  200  /responsable/techniciens/ac581064-87bb-4b20-82a7-d8fc077e3d76?tab=habilitations
+   50 ms  200  /responsable/techniciens/ac581064-87bb-4b20-82a7-d8fc077e3d76?tab=missions
+   88 ms  200  /responsable/projets/b624ce85-2511-442f-b875-ae8936d47230
+   76 ms  200  /responsable/missions/5a9f1f34-5a9d-4613-a478-cbbcd9511ad5
+== Technicien (chafi)
+   37 ms  200  /technicien
+   42 ms  200  /technicien?vue=semaine
+   34 ms  200  /technicien/heures
+   32 ms  200  /technicien/formations
+   56 ms  200  /technicien/profil
+   24 ms  200  /technicien/signaler
+   20 ms  200  /technicien/signalements
+== erreurs récentes
+Fri Oct  2 10:55:32 UTC 2026
+(code retour 0, 2026-10-02 10:55:32)
