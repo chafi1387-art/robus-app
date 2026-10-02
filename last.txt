@@ -1,25 +1,4 @@
-=== Deploiement 2026-10-02 10:54:02 : 3c47cfc -> 0a3c3b0
---- migration 0018_technicien_signalements_formations.sql
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TYPE
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
+=== Deploiement 2026-10-02 11:31:01 : 0a3c3b0 -> 3e0682c
 --- build
 ├ ƒ /responsable/signalements/[id]
 ├ ƒ /responsable/sites
@@ -47,4 +26,4 @@ CREATE INDEX
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK 0a3c3b0
+STATUT: OK 3e0682c
