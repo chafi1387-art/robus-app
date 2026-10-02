@@ -29,7 +29,7 @@ export default async function SignalerPage({
           <p className="text-sm text-ink-soft">Choisissez ce qui se passe. Le bureau est prévenu tout de suite.</p>
         </div>
         <div className="rounded-xl bg-red-fill text-red-ink text-sm font-semibold px-3 py-2.5">
-          Blessé grave ou danger immédiat : appelez d&apos;abord le <a href="tel:112" className="underline font-extrabold">112</a>, puis signalez.
+          Blessé grave ou danger immédiat : appelez d&apos;abord les secours du pays où vous êtes, puis signalez.
         </div>
         <div className="grid grid-cols-2 gap-2.5">
           {Object.entries(TYPES_SIGNALEMENT).map(([k, t]) => (
@@ -100,7 +100,7 @@ export default async function SignalerPage({
       </div>
       {type === "accident" && (
         <div className="rounded-xl bg-red-fill text-red-ink text-sm font-semibold px-3 py-2.5">
-          Blessé grave : appelez d&apos;abord le <a href="tel:112" className="underline font-extrabold">112</a>.
+          Blessé grave : appelez d&apos;abord les secours du pays où vous êtes.
         </div>
       )}
       {sp.erreur && <div className="text-sm bg-red-fill text-red-ink rounded-lg px-3 py-2">{sp.erreur}</div>}
