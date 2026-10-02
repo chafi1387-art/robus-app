@@ -1,5 +1,6 @@
 "use server";
 import { REINIT_ENVOI } from "@/lib/missions";
+import { attribuerChecklists, attribuerParDefaut } from "@/lib/checklists";
 
 import { z } from "zod";
 import { db } from "@/db";
@@ -318,6 +319,13 @@ export async function createIntervention(formData: FormData) {
     statut: parsed.data.technicienId ? "affectee" : "creee",
     dateProgrammee: parsed.data.dateProgrammee ? new Date(parsed.data.dateProgrammee) : null,
   }).returning({ id: interventions.id });
+
+  // Phase 23 : checklists choisies (ou la plus adaptée si aucune case cochée).
+  if (formData.get("sansChecklist") !== "on") {
+    const choisies = formData.getAll("checklistIds").map(String).filter((x) => z.string().uuid().safeParse(x).success);
+    if (choisies.length) await attribuerChecklists(creee.id, choisies, user.id);
+    else await attribuerParDefaut(creee.id);
+  }
 
   // Phase 10 : même règle que assignerIntervention — si un technicien est
   // choisi dès la création, l'ordre de mission part immédiatement.

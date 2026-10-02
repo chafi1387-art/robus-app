@@ -186,6 +186,7 @@ export default async function FicheAppareilTechnicienPage({ params }: { params: 
                     <span>{h.technicien ?? "—"}</span>
                     {h.photos.length > 0 && <span>· 📷 {h.photos.length}</span>}
                     {h.pieces.length > 0 && <span>· 🔩 {h.pieces.length}</span>}
+                    {h.checklist && <span className={h.checklist.nok ? "text-red-ink font-semibold" : ""}>· ☑ {h.checklist.faites - h.checklist.nok} ✓{h.checklist.nok ? ` ${h.checklist.nok} ✗` : ""}</span>}
                   </div>
                   {h.travaux && <div className="text-[13px] line-clamp-2 group-open:line-clamp-none">{h.travaux}</div>}
                 </summary>

@@ -54,6 +54,8 @@ import { createIntervention } from "../../actions";
 import { CalendarDays, FileDown, HardHat, Plus, ArrowUpDown, ShieldCheck } from "lucide-react";
 import { FICHIER_MAX_BYTES, FICHIER_TYPES } from "@/lib/document-file-rules";
 import { signalementsDe } from "@/lib/signalements";
+import { modelesActifs, progressionMissions } from "@/lib/checklists";
+import { ChoixChecklists } from "@/components/choix-checklists";
 import { ListeSignalements } from "@/components/liste-signalements";
 
 function truncate(texte: string | null | undefined, n: number) {
@@ -346,6 +348,8 @@ export default async function ProjetDetailPage({
     (t) => !techniciensDejaAffectesIds.has(t.id)
   );
 
+  // Phase 23 : modèles de checklist (formulaire « Nouvelle mission ») + progression par mission.
+  const [modelesChecklist, progressionChecklists] = tab === "missions" ? await Promise.all([modelesActifs(), progressionMissions(interventionsListe.map((i) => i.id))]) : [[], new Map()];
   // Phase 21 : signalements des techniciens liés au projet (onglets Vue d'ensemble / Missions).
   const signalementsProjet = tab === "missions" || tab === "apercu" ? await signalementsDe({ projetId: id }) : [];
   const journalProjet =
@@ -616,6 +620,7 @@ export default async function ProjetDetailPage({
                   <Field label="Consignes">
                     <input name="description" className={inputClass} placeholder="Ce que le technicien doit faire…" />
                   </Field>
+                  <ChoixChecklists modeles={modelesChecklist} className="md:col-span-2 xl:col-span-3" />
                   <div className="md:col-span-2 xl:col-span-3 flex items-center justify-between gap-3 flex-wrap">
                     <span className="text-xs text-ink-soft">Si un technicien est choisi, la mission lui est envoyée immédiatement : application, notification sur son téléphone et email.</span>
                     <Btn>Créer la mission</Btn>
@@ -651,6 +656,14 @@ export default async function ProjetDetailPage({
                     </span>
                   )}
                   <SuiviEnvoi m={i} />
+                  {(() => {
+                    const pc = progressionChecklists.get(i.id);
+                    return pc ? (
+                      <Pill tone={pc.nok ? "crit" : pc.faites === pc.total ? "ok" : "neutral"}>
+                        Checklist {pc.faites}/{pc.total}{pc.nok ? ` · ${pc.nok} ✗` : ""}
+                      </Pill>
+                    ) : null;
+                  })()}
                   <StatutInterventionPill statut={i.statut} />
                 </div>
                 <div className="flex items-center gap-3 flex-wrap text-xs text-ink-soft">

@@ -1,3 +1,4 @@
+import { checklistsMission } from "@/lib/checklists";
 import { db } from "@/db";
 import {
   appareils,
@@ -19,6 +20,7 @@ import {
   finaliserAvecPagination,
   ligneCle,
   sectionTitre,
+  tableau,
 } from "@/lib/pdf";
 import { journaliser } from "@/lib/journal";
 import { eq } from "drizzle-orm";
@@ -121,6 +123,28 @@ export async function GET(
           ligneCle(doc, r.libelle, r.observation ? `${val} — ${r.observation}` : val);
         }
       }
+    }
+
+    // Phase 23 : checklists attribuées à la mission (copie figée).
+    for (const c of await checklistsMission(intervention.id)) {
+      sectionTitre(doc, `Checklist — ${c.nom} (v${c.versionModele}) : ${c.compte.ok} conforme(s), ${c.compte.nok} non conforme(s), ${c.compte.total - c.compte.faites} non remplie(s)`);
+      tableau(
+        doc,
+        [
+          { label: "Section", width: 80 },
+          { label: "Tâche", width: 190 },
+          { label: "Résultat", width: 70 },
+          { label: "Relevé", width: 60 },
+          { label: "Commentaire", width: 105 },
+        ],
+        c.taches.map((t) => [
+          t.section ?? "",
+          t.libelle,
+          t.resultat === "ok" ? "Conforme" : t.resultat === "nok" ? "NON CONFORME" : "—",
+          t.valeur ? `${Number(t.valeur).toLocaleString("fr-BE")} ${t.unite ?? ""}`.trim() : "",
+          t.commentaire ?? "",
+        ])
+      );
     }
 
     const photos = await db

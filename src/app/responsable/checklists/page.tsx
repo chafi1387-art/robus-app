@@ -1,8 +1,8 @@
 import { Card, Btn, Field, inputClass, Pill } from "@/components/ui";
 import { db } from "@/db";
-import { checklistItems, checklistModeles } from "@/db/schema";
+import { checklistModeles } from "@/db/schema";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
-import { count, eq } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import Link from "next/link";
 import { createChecklistModele, toggleChecklistModeleActif } from "./actions";
 
@@ -12,8 +12,9 @@ const TYPE_INTERVENTION_LABEL: Record<string, string> = {
   systematique: "Systématique",
 };
 
+// Phase 23 : une seule requête (avant : une par modèle) + nombre de missions.
 async function getModeles() {
-  const rows = await db
+  return db
     .select({
       id: checklistModeles.id,
       nom: checklistModeles.nom,
@@ -21,20 +22,12 @@ async function getModeles() {
       marque: checklistModeles.marque,
       typeAppareil: checklistModeles.typeAppareil,
       actif: checklistModeles.actif,
+      version: checklistModeles.version,
+      nbItems: sql<number>`(select count(*)::int from checklist_items i where i.modele_id = "checklist_modeles"."id" and i.actif = 1)`,
+      nbMissions: sql<number>`(select count(*)::int from mission_checklists mc where mc.modele_id = "checklist_modeles"."id")`,
     })
     .from(checklistModeles)
-    .orderBy(checklistModeles.nom);
-
-  const withCounts = await Promise.all(
-    rows.map(async (m) => {
-      const [{ n }] = await db
-        .select({ n: count() })
-        .from(checklistItems)
-        .where(eq(checklistItems.modeleId, m.id));
-      return { ...m, nbItems: Number(n) };
-    })
-  );
-  return withCounts;
+    .orderBy(desc(checklistModeles.actif), checklistModeles.nom);
 }
 
 export default async function ChecklistsPage() {
@@ -46,8 +39,8 @@ export default async function ChecklistsPage() {
       <div>
         <h1 className="text-2xl font-extrabold font-display">Checklists</h1>
         <p className="text-sm text-ink-soft">
-          {rows.length} modèle(s) de checklist — préventive standard et checklists différenciées
-          par marque / type d&apos;appareil.
+          {rows.length} modèle(s). Vous choisissez les checklists en créant la mission (sinon la plus adaptée est ajoutée automatiquement selon le type de mission,
+          la marque et le type d&apos;appareil). Le technicien les voit dès réception de l&apos;ordre et les coche pendant l&apos;intervention : ✓ conforme, ✗ non conforme avec un commentaire.
         </p>
       </div>
 
@@ -72,7 +65,7 @@ export default async function ChecklistsPage() {
                   </div>
                 </Link>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-ink-soft">{m.nbItems} item(s)</span>
+                  <span className="text-xs text-ink-soft text-right">{m.nbItems} tâche(s) · v{m.version}<br />{m.nbMissions} mission(s)</span>
                   <Pill tone={m.actif ? "ok" : "neutral"}>{m.actif ? "Actif" : "Inactif"}</Pill>
                   <form action={toggleChecklistModeleActif}>
                     <input type="hidden" name="modeleId" value={m.id} />

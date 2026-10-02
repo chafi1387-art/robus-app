@@ -308,6 +308,10 @@ export const checklistModeles = pgTable("checklist_modeles", {
   marque: varchar("marque", { length: 80 }),
   typeAppareil: varchar("type_appareil", { length: 80 }),
   actif: integer("actif").notNull().default(1),
+  // Phase 23 : description et n° de version (augmente à chaque modification des tâches).
+  description: text("description"),
+  version: integer("version").notNull().default(1),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -318,6 +322,14 @@ export const checklistItems = pgTable("checklist_items", {
     .references(() => checklistModeles.id, { onDelete: "cascade" }),
   ordre: integer("ordre").notNull().default(0),
   libelle: varchar("libelle", { length: 200 }).notNull(),
+  // Phase 23 : section (Machinerie, Cabine…), obligatoire, case ✓/✗ ou mesure avec limites.
+  section: varchar("section", { length: 80 }),
+  obligatoire: integer("obligatoire").notNull().default(1),
+  type: varchar("type", { length: 20 }).notNull().default("case"), // case | mesure
+  unite: varchar("unite", { length: 20 }),
+  valeurMin: numeric("valeur_min"),
+  valeurMax: numeric("valeur_max"),
+  actif: integer("actif").notNull().default(1),
 });
 
 // Réponses cochées lors d'un rapport d'intervention (conforme = 1/0/NULL non renseigné)
@@ -1529,4 +1541,52 @@ export const signalements = pgTable(
     index("signalements_intervention_idx").on(t.interventionId),
     index("signalements_projet_idx").on(t.projetId),
   ]
+);
+
+// ==========================================================================
+// PHASE 23 — Checklists attribuées à la mission (copie figée du modèle)
+// ==========================================================================
+export const missionChecklists = pgTable(
+  "mission_checklists",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    interventionId: uuid("intervention_id")
+      .notNull()
+      .references(() => interventions.id, { onDelete: "cascade" }),
+    modeleId: uuid("modele_id").references(() => checklistModeles.id, { onDelete: "set null" }),
+    nom: varchar("nom", { length: 200 }).notNull(),
+    versionModele: integer("version_modele").notNull().default(1),
+    ordre: integer("ordre").notNull().default(0),
+    ajouteeParId: uuid("ajoutee_par_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("mission_checklists_intervention_idx").on(t.interventionId)]
+);
+
+export const missionChecklistTaches = pgTable(
+  "mission_checklist_taches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    missionChecklistId: uuid("mission_checklist_id")
+      .notNull()
+      .references(() => missionChecklists.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id").references(() => checklistItems.id, { onDelete: "set null" }),
+    ordre: integer("ordre").notNull().default(0),
+    section: varchar("section", { length: 80 }),
+    libelle: varchar("libelle", { length: 200 }).notNull(),
+    obligatoire: integer("obligatoire").notNull().default(1),
+    type: varchar("type", { length: 20 }).notNull().default("case"),
+    unite: varchar("unite", { length: 20 }),
+    valeurMin: numeric("valeur_min"),
+    valeurMax: numeric("valeur_max"),
+    resultat: varchar("resultat", { length: 10 }), // ok | nok
+    valeur: numeric("valeur"),
+    commentaire: text("commentaire"),
+    rempliLe: timestamp("rempli_le"),
+    rempliParId: uuid("rempli_par_id").references(() => users.id, { onDelete: "set null" }),
+    traiteLe: timestamp("traite_le"),
+    traiteParId: uuid("traite_par_id").references(() => users.id, { onDelete: "set null" }),
+    nonConformiteId: uuid("non_conformite_id").references(() => nonConformites.id, { onDelete: "set null" }),
+  },
+  (t) => [index("mission_checklist_taches_checklist_idx").on(t.missionChecklistId, t.ordre)]
 );

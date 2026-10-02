@@ -1,4 +1,5 @@
 import "server-only";
+import { attribuerParDefaut } from "@/lib/checklists";
 import { db } from "@/db";
 import {
   appareils,
@@ -209,6 +210,7 @@ export async function creerMissionsPassagesProches() {
         dateProgrammee: p.datePrevue,
       })
       .returning({ id: interventions.id });
+    await attribuerParDefaut(m.id);
     await db.update(garantiePassages).set({ interventionId: m.id }).where(and(eq(garantiePassages.id, p.id), isNull(garantiePassages.interventionId)));
     crees.push(p);
   }

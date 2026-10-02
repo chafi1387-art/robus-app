@@ -12,6 +12,8 @@ import {
   demandesClient,
   formationsParticipants,
   formationsSessions,
+  missionChecklistTaches,
+  missionChecklists,
   signalements,
   users,
 } from "@/db/schema";
@@ -57,6 +59,7 @@ export async function getNotifications(): Promise<Notification[]> {
     missionsRefusees,
     formationsReponses,
     techniciens,
+    pointsNok,
   ] = await Promise.all([
     db
       .select({ id: appareils.id, numeroInterne: appareils.numeroInterne })
@@ -176,7 +179,20 @@ export async function getNotifications(): Promise<Notification[]> {
         )
       ),
     db.select({ id: users.id, nom: users.nom }).from(users).where(eq(users.role, "technicien")),
+    // Phase 23 : points de checklist non conformes pas encore traités par le bureau.
+    db
+      .select({ id: missionChecklistTaches.id, libelle: missionChecklistTaches.libelle, interventionId: missionChecklists.interventionId, numero: appareils.numeroInterne })
+      .from(missionChecklistTaches)
+      .innerJoin(missionChecklists, eq(missionChecklistTaches.missionChecklistId, missionChecklists.id))
+      .innerJoin(interventions, eq(missionChecklists.interventionId, interventions.id))
+      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .where(and(eq(missionChecklistTaches.resultat, "nok"), isNull(missionChecklistTaches.traiteLe)))
+      .limit(50),
   ]);
+
+  for (const p of pointsNok) {
+    notifications.push({ id: `checklist-${p.id}`, gravite: "warn", titre: `Checklist ✗ ${p.numero} : ${p.libelle} — à traiter`, href: `/responsable/missions/${p.interventionId}#checklist` });
+  }
 
   for (const sg of signalementsNouveaux) {
     const t = TYPES_SIGNALEMENT[sg.type];

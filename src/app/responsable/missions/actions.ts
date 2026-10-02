@@ -10,7 +10,8 @@ import { enregistrerFichiers, fichiersDuFormulaire } from "@/lib/fichiers";
 import { avecMessage } from "@/lib/url";
 import { piecesNettes } from "@/lib/pieces-mission";
 import { db } from "@/db";
-import { appareils, interventions, missionNotes, mouvementsStock, pieces, rapportPhotos, rapports, rapportVersions } from "@/db/schema";
+import { appareils, interventions, missionChecklistTaches, missionChecklists, missionNotes, mouvementsStock, nonConformites, pieces, rapportPhotos, rapports, rapportVersions } from "@/db/schema";
+import { attribuerChecklists } from "@/lib/checklists";
 import { requireUser } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { notifierObservateurs } from "@/lib/observateur";
@@ -346,4 +347,74 @@ export async function deciderMissionRefusee(formData: FormData) {
   });
   revalidatePath(retour);
   redirect(avecMessage(retour, "ok", decision === "renvoyer" ? "Mission renvoyée au technicien — il doit de nouveau l'accepter." : "Mission réaffectée et envoyée."));
+}
+
+// ==========================================================================
+// Phase 23 — Checklists de la mission (bureau)
+// ==========================================================================
+export async function ajouterChecklistMission(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const id = String(formData.get("interventionId") ?? "");
+  const modeleId = String(formData.get("modeleId") ?? "");
+  if (!z.string().uuid().safeParse(id).success || !z.string().uuid().safeParse(modeleId).success) redirect(page(id, "#checklist"));
+  const [m] = await db.select({ statut: interventions.statut }).from(interventions).where(eq(interventions.id, id)).limit(1);
+  if (!m || ["terminee", "validee", "cloturee"].includes(m.statut)) redirect(avecMessage(page(id), "erreur", "Mission terminée : la checklist ne peut plus changer."));
+  const n = await attribuerChecklists(id, [modeleId], user.id);
+  await journaliser({ entite: "intervention", entiteId: id, action: "checklist_ajoutee", utilisateurId: user.id, details: modeleId });
+  revalidatePath(page(id));
+  redirect(avecMessage(page(id, "#checklist"), n ? "ok" : "erreur", n ? "Checklist ajoutée à la mission." : "Cette checklist est déjà sur la mission (ou n'a pas de tâche)."));
+}
+
+export async function retirerChecklistMission(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const id = String(formData.get("interventionId") ?? "");
+  const mcId = String(formData.get("missionChecklistId") ?? "");
+  if (!z.string().uuid().safeParse(mcId).success) redirect(page(id));
+  const [rempli] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(missionChecklistTaches)
+    .where(and(eq(missionChecklistTaches.missionChecklistId, mcId), sql`${missionChecklistTaches.resultat} is not null`));
+  if ((rempli?.n ?? 0) > 0) redirect(avecMessage(page(id, "#checklist"), "erreur", "Le technicien a déjà commencé cette checklist : elle ne peut plus être retirée."));
+  await db.delete(missionChecklists).where(and(eq(missionChecklists.id, mcId), eq(missionChecklists.interventionId, id)));
+  await journaliser({ entite: "intervention", entiteId: id, action: "checklist_retiree", utilisateurId: user.id, details: mcId });
+  revalidatePath(page(id));
+  redirect(avecMessage(page(id, "#checklist"), "ok", "Checklist retirée de la mission."));
+}
+
+/** Point ✗ : le bureau le marque « traité » ou ouvre une non-conformité (ISO). */
+export async function traiterTacheNonConforme(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const tacheId = String(formData.get("tacheId") ?? "");
+  const decision = String(formData.get("decision") ?? "");
+  if (!z.string().uuid().safeParse(tacheId).success) redirect("/responsable/interventions");
+  const [t] = await db
+    .select({ tache: missionChecklistTaches, interventionId: missionChecklists.interventionId, appareilId: interventions.appareilId, numero: appareils.numeroInterne, technicienId: interventions.technicienId })
+    .from(missionChecklistTaches)
+    .innerJoin(missionChecklists, eq(missionChecklistTaches.missionChecklistId, missionChecklists.id))
+    .innerJoin(interventions, eq(missionChecklists.interventionId, interventions.id))
+    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .where(eq(missionChecklistTaches.id, tacheId))
+    .limit(1);
+  if (!t || t.tache.resultat !== "nok") redirect("/responsable/interventions");
+  const retour = page(t!.interventionId, "#checklist");
+  let ncId: string | null = t!.tache.nonConformiteId;
+  if (decision === "nc" && !ncId) {
+    const [nc] = await db
+      .insert(nonConformites)
+      .values({
+        titre: `Checklist ${t!.numero} : ${t!.tache.libelle}`.slice(0, 200),
+        description: `${t!.tache.commentaire ?? ""}${t!.tache.valeur ? `\nValeur relevée : ${t!.tache.valeur}${t!.tache.unite ? ` ${t!.tache.unite}` : ""}` : ""}`,
+        gravite: "mineure",
+        appareilId: t!.appareilId,
+        interventionId: t!.interventionId,
+        declarantId: t!.technicienId,
+        responsableActionId: user.id,
+      })
+      .returning({ id: nonConformites.id });
+    ncId = nc.id;
+  }
+  await db.update(missionChecklistTaches).set({ traiteLe: new Date(), traiteParId: user.id, nonConformiteId: ncId }).where(eq(missionChecklistTaches.id, tacheId));
+  await journaliser({ entite: "intervention", entiteId: t!.interventionId, action: decision === "nc" ? "checklist_non_conformite" : "checklist_point_traite", utilisateurId: user.id, details: t!.tache.libelle });
+  revalidatePath(page(t!.interventionId));
+  redirect(avecMessage(retour, "ok", decision === "nc" ? "Non-conformité ouverte — suivez-la dans « Non-conformités »." : "Point marqué comme traité."));
 }

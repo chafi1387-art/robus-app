@@ -20,6 +20,7 @@ import { journaliser } from "@/lib/journal";
 import { envoyerAlerteAide, envoyerAlerteDemande } from "@/lib/mail";
 import { destinatairesAlertes } from "@/lib/demandes";
 import { MOTIFS_REFUS, libelleRefus } from "@/lib/missions";
+import { attribuerParDefaut, tachesObligatoiresManquantes } from "@/lib/checklists";
 import { notifierBureau } from "@/lib/push";
 import { peutModifierHeureReelle } from "@/lib/rapport-rules";
 import { revalidatePath } from "next/cache";
@@ -63,6 +64,8 @@ export async function commencerIntervention(formData: FormData) {
     .update(interventions)
     .set({ statut: "en_cours", dateDebut: maintenant })
     .where(eq(interventions.id, interventionId));
+  // Phase 23 : mission sans checklist (créée avant) -> checklist suggérée.
+  await attribuerParDefaut(interventionId);
   await db
     .update(interventions)
     .set({ vueLe: maintenant })
@@ -215,6 +218,12 @@ export async function terminerIntervention(formData: FormData) {
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
 
   await assertOwnIntervention(parsed.data.interventionId, user.id, user.role);
+
+  // Phase 23 : toutes les tâches obligatoires de la checklist doivent être remplies.
+  const manquantes = await tachesObligatoiresManquantes(parsed.data.interventionId);
+  if (manquantes > 0) {
+    redirect(`/technicien/interventions/${parsed.data.interventionId}?erreur=${encodeURIComponent(`Checklist incomplète : ${manquantes} tâche(s) obligatoire(s) à remplir avant d'envoyer le rapport.`)}#checklist`);
+  }
 
   // Phase 18 : les photos envoyées pendant la mission (fil) comptent.
   const fichiers = photosDuFormulaire(formData);

@@ -12,8 +12,6 @@ import { FileField } from "@/components/file-field";
 import { db } from "@/db";
 import {
   appareils,
-  checklistItems,
-  checklistModeles,
   clients,
   documentsFormations,
   interventions,
@@ -24,7 +22,7 @@ import {
   rapportPhotos,
   rapports,
 } from "@/db/schema";
-import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime, toDatetimeLocalValue } from "@/lib/format";
@@ -32,6 +30,8 @@ import { finModificationRapport, peutModifierRapport, tempsRestantModification }
 import { Camera, Lock, Pencil, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { MOTIFS_REFUS, libelleRefus } from "@/lib/missions";
+import { checklistsMission } from "@/lib/checklists";
+import { ChecklistTechnicien } from "@/components/checklist-technicien";
 import { after } from "next/server";
 import { CheckCircle2 } from "lucide-react";
 import {
@@ -59,36 +59,6 @@ const CATEGORIE_DOC_LABEL: Record<string, string> = {
   fournisseur_iso: "Fournisseur / ISO 9001",
   formation: "Formations internes",
 };
-
-async function getChecklistPourAppareil(typeIntervention: string, marque: string | null, typeAppareil: string | null) {
-  const modeles = await db
-    .select()
-    .from(checklistModeles)
-    .where(
-      and(
-        eq(checklistModeles.actif, 1),
-        or(isNull(checklistModeles.typeIntervention), eq(checklistModeles.typeIntervention, typeIntervention as "preventive" | "corrective" | "systematique"))
-      )
-    );
-  const compatibles = modeles.filter(
-    (m) =>
-      (!m.marque || m.marque === marque) && (!m.typeAppareil || m.typeAppareil === typeAppareil)
-  );
-  if (compatibles.length === 0) return null;
-  // On privilégie le modèle le plus spécifique (le plus de critères renseignés).
-  compatibles.sort((a, b) => {
-    const score = (m: (typeof compatibles)[number]) =>
-      (m.typeIntervention ? 1 : 0) + (m.marque ? 1 : 0) + (m.typeAppareil ? 1 : 0);
-    return score(b) - score(a);
-  });
-  const modele = compatibles[0];
-  const items = await db
-    .select()
-    .from(checklistItems)
-    .where(eq(checklistItems.modeleId, modele.id))
-    .orderBy(checklistItems.ordre);
-  return { modele, items };
-}
 
 export default async function InterventionDetailPage({
   params,
@@ -139,7 +109,7 @@ export default async function InterventionDetailPage({
 
   // Phase 17 : toutes les lectures en une seule vague parallèle (avant : 5
   // vagues successives) — la mission s'ouvre plus vite sur le téléphone.
-  const [rapport, listePieces, checklist, documentsAppareil, documentsProjet, piecesUtilisees, fil] = await Promise.all([
+  const [rapport, listePieces, checklistsM, documentsAppareil, documentsProjet, piecesUtilisees, fil] = await Promise.all([
     db.select().from(rapports).where(eq(rapports.interventionId, id)).limit(1).then((r) => r[0]),
     db
       .select({
@@ -151,9 +121,8 @@ export default async function InterventionDetailPage({
       })
       .from(pieces)
       .orderBy(pieces.nom),
-    peutTerminer
-      ? getChecklistPourAppareil(intervention.type, appareil.marque, appareil.typeAppareil)
-      : Promise.resolve(null),
+    // Phase 23 : checklists attribuées à la mission (copie figée du modèle).
+    checklistsMission(id),
     // Documentation (Phase 6) : union dédupliquée des documents rattachés à
     // l'Appareil OU au Projet de cette intervention.
     db.select().from(documentsFormations).where(eq(documentsFormations.appareilId, appareil.id)),
@@ -175,6 +144,7 @@ export default async function InterventionDetailPage({
     db.select().from(missionJournal).where(eq(missionJournal.interventionId, id)).orderBy(asc(missionJournal.createdAt)),
   ]);
   const photosFil = fil.flatMap((f) => f.photos);
+  const manquantesChecklist = checklistsM.reduce((n, c) => n + c.compte.manquantes, 0);
   const modifiable = estTerminee && !!rapport && peutModifierRapport(intervention, user.role);
   const resteModif = tempsRestantModification(intervention.dateFin);
   const photosRapport = rapport
@@ -346,6 +316,20 @@ export default async function InterventionDetailPage({
         </div>
       </Card>
 
+      {checklistsM.length > 0 && (
+        <Card className="p-4">
+          <div id="checklist" className="scroll-mt-20" />
+          <h2 className="font-display font-bold text-sm mb-1">
+            {peutTerminer ? "Checklist" : estTerminee ? "Checklist réalisée" : `Checklist à réaliser (${checklistsM.reduce((n, c) => n + c.taches.length, 0)} tâches)`}
+          </h2>
+          {peutCommencer && <p className="text-xs text-ink-soft mb-2">Vous la cocherez pendant l&apos;intervention : ✓ conforme, ✗ non conforme (avec un commentaire).</p>}
+          <ChecklistTechnicien
+            listes={checklistsM.map((c) => ({ id: c.id, nom: c.nom, taches: c.taches }))}
+            modifiable={peutTerminer}
+          />
+        </Card>
+      )}
+
       {peutCommencer && intervention.accepteeLe && (
         <form action={commencerIntervention}>
           <input type="hidden" name="interventionId" value={intervention.id} />
@@ -451,40 +435,9 @@ export default async function InterventionDetailPage({
             encType="multipart/form-data"
           >
             <input type="hidden" name="interventionId" value={intervention.id} />
-            {checklist && (
-              <div className="flex flex-col gap-2 border border-line rounded-xl p-3">
-                <input type="hidden" name="checklistModeleId" value={checklist.modele.id} />
-                <h3 className="text-sm font-bold">{checklist.modele.nom}</h3>
-                {checklist.items.map((item) => (
-                  <div key={item.id} className="border-b border-line last:border-0 pb-2 last:pb-0">
-                    <div className="text-sm font-medium mb-1.5">{item.libelle}</div>
-                    <div className="flex items-center gap-4 mb-1.5">
-                      <label className="flex items-center gap-1.5 text-xs">
-                        <input type="radio" name={`conforme_${item.id}`} value="oui" defaultChecked />
-                        Conforme
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs">
-                        <input type="radio" name={`conforme_${item.id}`} value="non" />
-                        Non conforme
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs">
-                        <input type="radio" name={`conforme_${item.id}`} value="na" />
-                        N/A
-                      </label>
-                    </div>
-                    <input
-                      type="text"
-                      name={`observation_${item.id}`}
-                      placeholder="Observation (optionnel)"
-                      className={inputClass}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-            {!checklist && (
-              <p className="text-xs text-ink-soft bg-blue-pale rounded-lg px-3 py-2">
-                Aucune checklist configurée pour ce type d&apos;intervention.
+            {checklistsM.length > 0 && (
+              <p className={`text-xs rounded-lg px-3 py-2 ${manquantesChecklist ? "bg-orange-fill text-orange-ink" : "bg-green-fill text-green-ink"}`}>
+                {manquantesChecklist ? `Checklist : ${manquantesChecklist} tâche(s) obligatoire(s) à remplir avant d'envoyer.` : "Checklist complète ✓"}
               </p>
             )}
             <Field label="Travaux réalisés">

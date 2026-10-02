@@ -1,5 +1,6 @@
 "use server";
 
+import { attribuerParDefaut } from "@/lib/checklists";
 import { z } from "zod";
 import { db } from "@/db";
 import { appareils, garantieFormules, garantiePassages, garanties, interventions, users } from "@/db/schema";
@@ -107,6 +108,7 @@ export async function planifierPassage(formData: FormData) {
       })
       .returning({ id: interventions.id });
     missionId = m.id;
+    await attribuerParDefaut(m.id);
     await db.update(garantiePassages).set({ interventionId: missionId }).where(eq(garantiePassages.id, id));
   }
   const manques = await controlerHabilitations(technicienId, [missionId!]);

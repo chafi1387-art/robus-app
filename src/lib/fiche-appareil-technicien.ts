@@ -23,6 +23,7 @@ import {
 } from "@/db/schema";
 import { passagesDAppareils } from "@/lib/garantie-passages";
 import type { ReglagesAcces } from "@/lib/acces-technicien";
+import { progressionMissions } from "@/lib/checklists";
 
 // Phase 22 : fiche complète d'un appareil pour le technicien (QR code ou
 // recherche), limitée aux blocs autorisés par le bureau.
@@ -218,7 +219,7 @@ export async function chargerFicheAppareil(appareilId: string, r: ReglagesAcces,
   // Photos et pièces de l'historique (une requête chacune, pas une par mission).
   const ids = historique.map((h) => h.id);
   const rapportIds = historique.map((h) => h.rapportId).filter((x): x is string => !!x);
-  const [photos, piecesUtilisees] = await Promise.all([
+  const [photos, piecesUtilisees, progCl] = await Promise.all([
     b.historique && rapportIds.length
       ? db.select({ rapportId: rapportPhotos.rapportId, url: rapportPhotos.url }).from(rapportPhotos).where(inArray(rapportPhotos.rapportId, rapportIds))
       : Promise.resolve([] as { rapportId: string; url: string }[]),
@@ -229,6 +230,8 @@ export async function chargerFicheAppareil(appareilId: string, r: ReglagesAcces,
           .innerJoin(pieces, eq(mouvementsStock.pieceId, pieces.id))
           .where(inArray(mouvementsStock.interventionId, ids))
       : Promise.resolve([] as { interventionId: string | null; quantite: number; nom: string; reference: string; type: string }[]),
+    // Phase 23 : résultat des checklists par intervention.
+    b.historique && ids.length ? progressionMissions(ids) : Promise.resolve(new Map<string, { total: number; faites: number; nok: number }>()),
   ]);
 
   // Pièces nettes par mission (sorties − retours).
@@ -280,6 +283,7 @@ export async function chargerFicheAppareil(appareilId: string, r: ReglagesAcces,
       ...h,
       photos: photos.filter((p) => p.rapportId === h.rapportId).map((p) => p.url),
       pieces: (piecesParMission.get(h.id) ?? []).filter((p) => p.quantite > 0),
+      checklist: progCl.get(h.id) ?? null,
     })),
     techniciens: [...parTech.values()].sort((x, y) => (y.dernier?.getTime() ?? 0) - (x.dernier?.getTime() ?? 0)),
     documents: docs,

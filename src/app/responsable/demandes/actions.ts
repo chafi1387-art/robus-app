@@ -1,5 +1,6 @@
 "use server";
 
+import { attribuerParDefaut } from "@/lib/checklists";
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -95,6 +96,7 @@ export async function planifierDepuisDemande(formData: FormData) {
       })
       .returning({ id: interventions.id });
     missionId = m.id;
+    await attribuerParDefaut(m.id);
     await db.update(demandesClient).set({ interventionId: missionId }).where(eq(demandesClient.id, id));
   }
   if (!projetId) redirect(avecMessage(page(id), "erreur", "Mission sans projet : impossible de l'envoyer."));

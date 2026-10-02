@@ -1,4 +1,5 @@
 import "server-only";
+import { attribuerParDefaut } from "@/lib/checklists";
 import { db } from "@/db";
 import {
   appareils,
@@ -179,6 +180,7 @@ export async function creerDemande(p: NouvelleDemande) {
       })
       .returning({ id: interventions.id });
     missionId = m.id;
+    await attribuerParDefaut(m.id);
   }
 
   // Numéro unique DC-AAAA-NNNN (nouvel essai si deux demandes arrivent en même temps).

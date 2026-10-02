@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
-  Ban, CheckCircle2, Clock, Eye, TriangleAlert, FileText, HandHelping, Mail, MapPin, Octagon, PenLine, Play, Send, ShieldCheck, StickyNote, Wrench,
+  Ban, CheckCircle2, Clock, Eye, ListChecks, TriangleAlert, FileText, HandHelping, Mail, MapPin, Octagon, PenLine, Play, Send, ShieldCheck, StickyNote, Wrench,
 } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -27,6 +27,8 @@ import { occupationsTechnicien } from "@/lib/disponibilite";
 import { TYPES_SIGNALEMENT } from "@/lib/signalements-types";
 import { STATUTS_NON_COMMENCES, libelleRefus } from "@/lib/missions";
 import { ListeSignalements } from "@/components/liste-signalements";
+import { checklistsMission, modelesActifs } from "@/lib/checklists";
+import { compter, libelleLimites } from "@/lib/checklists-regles";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { formatDateTime, toDatetimeLocalValue } from "@/lib/format";
 import { piecesNettes } from "@/lib/pieces-mission";
@@ -38,8 +40,11 @@ import {
   actionNoteMission,
   ajouterNoteMission,
   ajouterPhotosBureau,
+  ajouterChecklistMission,
   corrigerPieceBureau,
   deciderMissionRefusee,
+  retirerChecklistMission,
+  traiterTacheNonConforme,
   modifierRapportBureau,
   retirerOuRemplacerPhotoBureau,
   validerRapport,
@@ -141,7 +146,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
   const valide = ["validee", "cloturee"].includes(m.statut);
   const nonCommencee = (STATUTS_NON_COMMENCES as readonly string[]).includes(m.statut);
   // Phase 21 : signalements liés, disponibilité du technicien ce jour-là, choix pour une réaffectation.
-  const [sigs, occupation, techniciensActifs] = await Promise.all([
+  const [sigs, occupation, techniciensActifs, checklistsM, modelesCl] = await Promise.all([
     signalementsDe({ interventionId: id }),
     m.technicienId && m.dateProgrammee && nonCommencee ? occupationsTechnicien(m.technicienId, m.dateProgrammee, id) : Promise.resolve(null),
     m.refuseeLe && nonCommencee
@@ -152,7 +157,10 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
           .where(sql`${users.role} = 'technicien' and ${users.actif} = 1 and coalesce(${technicienFiches.statutRh}::text, '') <> 'sorti_effectifs'`)
           .orderBy(asc(users.nom))
       : Promise.resolve([] as { id: string; nom: string }[]),
+    checklistsMission(id),
+    gestion && !valide && m.statut !== "terminee" ? modelesActifs() : Promise.resolve([]),
   ]);
+  const compteCl = compter(checklistsM.flatMap((c) => c.taches));
 
   const enDirect = m.statut === "en_cours";
   const ev: Evenement[] = [];
@@ -305,6 +313,99 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
           ) : (
             <p className="text-sm text-ink-soft mt-3">L&apos;administrateur ou le responsable qualité doit décider.</p>
           )}
+        </Card>
+      )}
+
+      {(checklistsM.length > 0 || modelesCl.length > 0) && (
+        <Card className="p-5">
+          <div id="checklist" className="scroll-mt-24" />
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 className="font-display font-bold text-sm flex items-center gap-2">
+              <ListChecks className="w-4 h-4 text-blue" /> Checklists
+              {compteCl.total > 0 && (
+                <span className="font-normal text-ink-soft">
+                  — {compteCl.faites}/{compteCl.total} remplie(s){compteCl.nok ? ` · ` : ""}
+                  {compteCl.nok ? <span className="text-red-ink font-semibold">{compteCl.nok} ✗ non conforme(s)</span> : null}
+                </span>
+              )}
+            </h2>
+            {modelesCl.length > 0 && (
+              <form action={ajouterChecklistMission} className="flex items-center gap-2">
+                <input type="hidden" name="interventionId" value={m.id} />
+                <select name="modeleId" required defaultValue="" className={`${inputClass} !py-1.5 !text-sm w-60`}>
+                  <option value="" disabled>Ajouter une checklist…</option>
+                  {modelesCl.filter((x) => !checklistsM.some((c) => c.modeleId === x.id)).map((x) => (
+                    <option key={x.id} value={x.id}>{x.nom} ({x.nbTaches})</option>
+                  ))}
+                </select>
+                <Btn variant="ghost">Ajouter</Btn>
+              </form>
+            )}
+          </div>
+          {checklistsM.length === 0 && <p className="text-sm text-ink-soft">Aucune checklist sur cette mission.</p>}
+          <div className="flex flex-col gap-4">
+            {checklistsM.map((c) => (
+              <div key={c.id}>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="text-sm font-bold">
+                    {c.nom} <span className="text-xs text-ink-soft font-normal">· version {c.versionModele} · {c.compte.faites}/{c.compte.total}</span>
+                  </div>
+                  {gestion && c.compte.faites === 0 && !valide && m.statut !== "terminee" && (
+                    <form action={retirerChecklistMission}>
+                      <input type="hidden" name="interventionId" value={m.id} />
+                      <input type="hidden" name="missionChecklistId" value={c.id} />
+                      <button type="submit" className="text-xs font-semibold text-red-ink">Retirer</button>
+                    </form>
+                  )}
+                </div>
+                <div className="flex flex-col divide-y divide-line border border-line rounded-xl">
+                  {c.taches.map((t, i) => (
+                    <div key={t.id}>
+                      {t.section && t.section !== c.taches[i - 1]?.section && (
+                        <div className="px-3 pt-2 text-[11px] font-bold uppercase tracking-wide text-ink-soft">{t.section}</div>
+                      )}
+                      <div className={`px-3 py-2 flex items-start gap-3 text-sm ${t.resultat === "nok" ? "bg-red-fill/40" : ""}`}>
+                        <span className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 font-bold ${t.resultat === "ok" ? "bg-green-ink text-white" : t.resultat === "nok" ? "bg-red text-white" : "bg-line text-ink-soft"}`}>
+                          {t.resultat === "ok" ? "✓" : t.resultat === "nok" ? "✗" : "–"}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div>
+                            {t.libelle}
+                            {t.obligatoire ? <span className="text-red-ink"> *</span> : null}
+                            {t.type === "mesure" && <span className="text-xs text-ink-soft"> · {libelleLimites(t)}</span>}
+                          </div>
+                          {t.valeur && (
+                            <div className={`text-xs font-semibold ${t.resultat === "nok" ? "text-red-ink" : "text-green-ink"}`}>
+                              Relevé : {Number(t.valeur).toLocaleString("fr-BE")} {t.unite ?? ""}
+                            </div>
+                          )}
+                          {t.commentaire && <div className="text-xs text-ink-soft">« {t.commentaire} »</div>}
+                          {t.resultat === "nok" && gestion && !t.traiteLe && (
+                            <div className="flex gap-2 mt-1.5">
+                              <form action={traiterTacheNonConforme}>
+                                <input type="hidden" name="tacheId" value={t.id} />
+                                <input type="hidden" name="decision" value="nc" />
+                                <button type="submit" className="text-xs font-bold text-red-ink border border-red/40 rounded-lg px-2.5 py-1">Ouvrir une non-conformité</button>
+                              </form>
+                              <form action={traiterTacheNonConforme}>
+                                <input type="hidden" name="tacheId" value={t.id} />
+                                <input type="hidden" name="decision" value="vu" />
+                                <button type="submit" className="text-xs font-semibold border border-line rounded-lg px-2.5 py-1">Marquer traité</button>
+                              </form>
+                            </div>
+                          )}
+                          {t.resultat === "nok" && t.traiteLe && (
+                            <div className="text-xs text-green-ink mt-0.5">{t.nonConformiteId ? "Non-conformité ouverte" : "Traité"} le {formatDateTime(t.traiteLe)}</div>
+                          )}
+                        </div>
+                        {t.rempliLe && <span className="text-[11px] text-ink-soft tabular whitespace-nowrap">{heure(t.rempliLe)}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
       )}
 

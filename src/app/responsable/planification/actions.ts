@@ -1,5 +1,6 @@
 "use server";
 
+import { attribuerParDefaut } from "@/lib/checklists";
 import { z } from "zod";
 import { db } from "@/db";
 import { appareils, garanties, interventions, reglesPlanification } from "@/db/schema";
@@ -124,7 +125,7 @@ export async function genererInterventionsPlanifiees() {
       garantieEpuisee = restantes <= 0;
     }
 
-    await db.insert(interventions).values({
+    const [nouvelle] = await db.insert(interventions).values({
       appareilId: regle.appareilId,
       projetId,
       type: regle.type,
@@ -134,7 +135,8 @@ export async function genererInterventionsPlanifiees() {
         ? "Visite de garantie générée automatiquement (planning)."
         : "Intervention préventive générée automatiquement (planning).",
       dateProgrammee: regle.prochaineDate,
-    });
+    }).returning({ id: interventions.id });
+    await attribuerParDefaut(nouvelle.id);
 
     await db
       .update(reglesPlanification)
