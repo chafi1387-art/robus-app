@@ -1,53 +1,3 @@
-ƒ Proxy (Middleware)
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-
---- curl /responsable/projets : 307
-STATUT: OK dae0368
-=== Deploiement 2026-10-01 16:20:01 : dae0368 -> d4646c2
---- build
-├ ƒ /responsable/rapports
-├ ƒ /responsable/revues-direction
-├ ƒ /responsable/risques
-├ ƒ /responsable/satisfaction
-├ ƒ /responsable/score-iso
-├ ƒ /responsable/sites
-├ ƒ /responsable/sites/[id]
-├ ƒ /responsable/sous-traitance
-├ ƒ /responsable/stock
-├ ƒ /responsable/stock/pieces/[id]
-├ ƒ /responsable/techniciens
-├ ƒ /responsable/techniciens/[id]
-├ ƒ /responsable/utilisateurs
-├ ƒ /technicien
-├ ƒ /technicien/formations
-├ ƒ /technicien/heures
-├ ƒ /technicien/interventions/[id]
-└ ƒ /technicien/profil
-
-
-ƒ Proxy (Middleware)
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-
---- curl /responsable/projets : 307
-STATUT: OK d4646c2
-=== Deploiement 2026-10-01 16:53:02 : d4646c2 -> 4f1175a
---- migration 0017_documents_client_demandes.sql
-CREATE TABLE
-CREATE INDEX
-CREATE TABLE
-CREATE INDEX
-INSERT 0 0
-INSERT 0 0
-UPDATE 0
-CREATE TABLE
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
-CREATE INDEX
 CREATE TABLE
 CREATE INDEX
 INSERT 0 1
@@ -298,3 +248,53 @@ STATUT: OK bd3c31f
 STATUT: OK d141c6e
 === 2026-10-02 12:48:01 : bf0255f (ops seulement, pas de build)
 STATUT: OK bf0255f
+=== Deploiement 2026-10-06 19:38:02 : bf0255f -> ef9c746
+--- migration 0020_prestations_contrat.sql
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+DO
+CREATE INDEX
+CREATE INDEX
+UPDATE 0
+--- build
+├ ƒ /responsable/techniciens/acces-appareils
+├ ƒ /responsable/utilisateurs
+├ ƒ /technicien
+├ ƒ /technicien/appareils
+├ ƒ /technicien/appareils/[id]
+├ ƒ /technicien/formations
+├ ƒ /technicien/formations/[id]
+├ ƒ /technicien/heures
+├ ƒ /technicien/interventions/[id]
+├ ƒ /technicien/profil
+├ ƒ /technicien/signalements
+├ ƒ /technicien/signalements/[id]
+└ ƒ /technicien/signaler
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice
+--- curl /responsable/projets : 307
+STATUT: OK ef9c746
