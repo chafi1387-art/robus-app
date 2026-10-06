@@ -44,6 +44,8 @@ const payloadSchema = z.object({
   prestations: z.array(z.object({ catalogueId: z.string().uuid(), quantite: z.number().int().min(1).max(999) })).max(100),
 });
 
+import { creerContratProjet } from "@/lib/contrats";
+
 export type ResultatCreation = { ok: true; id: string } | { ok: false; erreur: string };
 
 async function genererReference() {
@@ -88,6 +90,8 @@ export async function creerProjetComplet(payload: unknown): Promise<ResultatCrea
     ? await db.select().from(prestationsCatalogue).where(inArray(prestationsCatalogue.id, catIds))
     : [];
   if (catalogue.length !== catIds.length) return { ok: false, erreur: "Une prestation du catalogue n'existe plus." };
+  if (catalogue.some((c) => c.mode === "contrat") && !appareilIds.length)
+    return { ok: false, erreur: "Un contrat à passages a besoin d'au moins un appareil (étape Appareils)." };
   if (catalogue.some((c) => c.categorie === "vente_piece"))
     return { ok: false, erreur: "Les ventes de pièces s'ajoutent depuis la fiche projet (stock)." };
 
@@ -129,6 +133,12 @@ export async function creerProjetComplet(payload: unknown): Promise<ResultatCrea
   if (d.formuleId) await appliquerGarantie(projetId, d.formuleId);
   for (const p of d.prestations) {
     const c = catalogue.find((x) => x.id === p.catalogueId)!;
+    // Phase 24 : contrat à passages -> tous les appareils du projet, à partir du début prévu (sinon aujourd'hui).
+    if (c.mode === "contrat") {
+      if (!appareilIds.length) continue;
+      await creerContratProjet({ projetId, catalogue: c, dateDebut: dateOuNull(d.dateDebutPrevue) ?? new Date(), appareilIds });
+      continue;
+    }
     const prixUnitaire = c.prixIndicatif != null ? Number(c.prixIndicatif) : null;
     await db.insert(prestations).values({
       projetId,

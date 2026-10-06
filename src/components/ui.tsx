@@ -3,12 +3,14 @@ import Link from "next/link";
 export function Card({
   children,
   className = "",
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
+  id?: string;
 }) {
   return (
-    <div className={`bg-surface border border-line rounded-2xl shadow-sm ${className}`}>
+    <div id={id} className={`bg-surface border border-line rounded-2xl shadow-sm scroll-mt-24 ${className}`}>
       {children}
     </div>
   );

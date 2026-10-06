@@ -11,7 +11,7 @@ export type DonneesAssistant = {
   appareils: { id: string; numero: string; marque: string | null; modele: string | null; type: string | null; niveaux: number | null; clientIds: string[] }[];
   techniciens: { id: string; nom: string; statutRh: string; poste: string | null; specialites: string | null; habilitations: string[]; missionsEnCours: number }[];
   formules: { id: string; nom: string; dureeMois: number; visites: number; prix: string; extension: boolean }[];
-  catalogue: { id: string; nom: string; categorie: string; prix: string | null }[];
+  catalogue: { id: string; nom: string; categorie: string; prix: string | null; contrat: { dureeMois: number; nbPassages: number } | null }[];
 };
 
 const ETAPES = ["Projet", "Client", "Appareils", "Équipe", "Garantie", "Prestations", "Récap"] as const;
@@ -620,20 +620,27 @@ export function AssistantProjet({ donnees }: { donnees: DonneesAssistant }) {
                         <div key={c.id} className={`flex items-center gap-4 px-4 py-3 border-b border-[#eef2f6] last:border-0 ${n > 0 ? "bg-[#f7fbfe]" : ""}`}>
                           <div className="flex-1 min-w-0">
                             <div className="font-semibold text-[14.5px] truncate">{c.nom}</div>
-                            <div className="text-xs text-ink-soft">{CAT[c.categorie] ?? c.categorie}</div>
+                            <div className="text-xs text-ink-soft">
+                              {c.contrat
+                                ? `Contrat · ${c.contrat.dureeMois} mois · ${c.contrat.nbPassages} passage(s) par appareil, planifiés automatiquement`
+                                : CAT[c.categorie] ?? c.categorie}
+                            </div>
                           </div>
                           <div className="text-[13px] text-ink-soft w-24 text-right tabular">{euro(c.prix)}</div>
                           <div className="flex items-center rounded-lg border border-[#cfd8e3] bg-white">
                             <button type="button" aria-label="Moins" onClick={() => setQte((q) => ({ ...q, [c.id]: Math.max(0, n - 1) }))} className="w-9 h-9 flex items-center justify-center"><Minus className="w-4 h-4" /></button>
                             <span className="w-8 text-center font-bold tabular">{n}</span>
-                            <button type="button" aria-label="Plus" onClick={() => setQte((q) => ({ ...q, [c.id]: n + 1 }))} className="w-9 h-9 flex items-center justify-center"><Plus className="w-4 h-4" /></button>
+                            <button type="button" aria-label="Plus" disabled={!!c.contrat && n >= 1} onClick={() => setQte((q) => ({ ...q, [c.id]: c.contrat ? 1 : n + 1 }))} className="w-9 h-9 flex items-center justify-center disabled:opacity-30"><Plus className="w-4 h-4" /></button>
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 )}
-                <p className="text-xs text-ink-soft">Les ventes de pièces (avec sortie de stock) se font depuis la fiche du projet.</p>
+                <p className="text-xs text-ink-soft">
+                  Un contrat couvre tous les appareils choisis à l&apos;étape 3 et commence à la date de début du projet (sinon aujourd&apos;hui) — modifiable ensuite depuis la fiche du projet.
+                  Les ventes de pièces (avec sortie de stock) se font depuis la fiche du projet.
+                </p>
               </>
             )}
 
@@ -645,6 +652,13 @@ export function AssistantProjet({ donnees }: { donnees: DonneesAssistant }) {
                   <li className="flex gap-2.5"><Check className="w-5 h-5 text-green-ink shrink-0" /> la référence PRJ-{new Date().getFullYear()}-xxxx est générée</li>
                   {equipe.length > 0 && envoyerOrdre && <li className="flex gap-2.5"><Check className="w-5 h-5 text-green-ink shrink-0" /> {equipe.length} technicien(s) reçoivent leur ordre de mission par email</li>}
                   {formule && formule.visites > 0 && appSel.length > 0 && <li className="flex gap-2.5"><Check className="w-5 h-5 text-green-ink shrink-0" /> les {formule.visites} visites de garantie sont planifiées</li>}
+                  {appSel.length > 0 &&
+                    lignesPresta
+                      .map(([id]) => donnees.catalogue.find((c) => c.id === id))
+                      .filter((c) => c?.contrat)
+                      .map((c) => (
+                        <li key={c!.id} className="flex gap-2.5"><Check className="w-5 h-5 text-green-ink shrink-0" /> contrat « {c!.nom} » : {c!.contrat!.nbPassages * appSel.length} passage(s) planifié(s)</li>
+                      ))}
                   <li className="flex gap-2.5"><Check className="w-5 h-5 text-green-ink shrink-0" /> vous arrivez sur la fiche du projet, onglet Missions</li>
                 </ul>
               </>

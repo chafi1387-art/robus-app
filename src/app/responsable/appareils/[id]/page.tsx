@@ -1,4 +1,7 @@
 import { QrCode } from "lucide-react";
+import { FrisePassages } from "@/components/frise-passages";
+import { passagesDAppareils } from "@/lib/garantie-passages";
+import { contratsDeLAppareil, ETAT_CONTRAT, etatContrat } from "@/lib/contrats";
 import { ajouterDocumentClient, archiverDocumentClient } from "../../observateurs/actions";
 import { TYPES_DOCUMENT_CLIENT } from "@/lib/documents-client";
 import { documentsClient, documentsClientConsultations, observateurAppareils } from "@/db/schema";
@@ -85,6 +88,8 @@ export default async function AppareilDetailPage({
     .leftJoin(users, eq(documentsClient.creeParId, users.id))
     .where(eq(documentsClient.appareilId, id))
     .orderBy(desc(documentsClient.createdAt));
+  // Phase 24 : contrats de maintenance + passages (garantie et contrats) de cet appareil.
+  const [contratsAppareil, passagesAppareil] = await Promise.all([contratsDeLAppareil(id), passagesDAppareils([id])]);
   const [nbObservateurs] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(observateurAppareils)
@@ -174,6 +179,37 @@ export default async function AppareilDetailPage({
               <InfoRow label="Niveaux" value={appareil.niveaux?.toString()} />
               <InfoRow label="Type de portes" value={appareil.typePortes ?? undefined} />
             </dl>
+          </Card>
+
+          <Card className="p-5" id="contrats">
+            <h2 className="font-display font-bold text-sm mb-3">Contrats & passages</h2>
+            {contratsAppareil.length === 0 && !passagesAppareil.some((p) => p.garantieId) && (
+              <p className="text-sm text-ink-soft">Aucun contrat ni garantie — ajoutez un contrat à passages depuis le projet (onglet « Prestations & garantie »).</p>
+            )}
+            {passagesAppareil.some((p) => p.garantieId) && (
+              <div className="mb-4">
+                <div className="text-xs font-semibold text-ink-soft mb-2">Garantie</div>
+                <FrisePassages passages={passagesAppareil.filter((p) => p.garantieId)} />
+              </div>
+            )}
+            {contratsAppareil.map((c) => {
+              const e = ETAT_CONTRAT[etatContrat(c)];
+              return (
+                <div key={c.id} className="mb-4 last:mb-0">
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                    <div className="text-sm">
+                      <span className="font-semibold">{c.titre}</span>{" "}
+                      <span className="text-xs text-ink-soft">
+                        · {c.dateDebut ? formatDate(c.dateDebut) : "—"} → {c.dateFin ? formatDate(c.dateFin) : "—"} ·{" "}
+                        <Link href={`/responsable/projets/${c.projetId}?tab=garantie#contrats`} className="text-blue font-semibold">{c.projetRef}</Link>
+                      </span>
+                    </div>
+                    <Pill tone={e.tone}>{e.label}</Pill>
+                  </div>
+                  <FrisePassages passages={passagesAppareil.filter((p) => p.prestationId === c.id)} />
+                </div>
+              );
+            })}
           </Card>
 
           <Card className="p-5">

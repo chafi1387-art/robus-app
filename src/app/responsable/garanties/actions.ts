@@ -1,9 +1,9 @@
 "use server";
 
-import { attribuerParDefaut } from "@/lib/checklists";
+import { creerMissionPassage, infoMissionPassage } from "@/lib/garantie-passages";
 import { z } from "zod";
 import { db } from "@/db";
-import { appareils, garantieFormules, garantiePassages, garanties, interventions, users } from "@/db/schema";
+import { garantieFormules, garantiePassages, interventions, users } from "@/db/schema";
 import { redirect } from "next/navigation";
 import { journaliser } from "@/lib/journal";
 import { avecMessage } from "@/lib/url";
@@ -46,6 +46,47 @@ export async function createGarantieFormule(formData: FormData) {
   revalidatePath("/responsable/garanties");
 }
 
+// Phase 24 : corriger une formule (nom, durée, passages, prix…). Les garanties
+// déjà attribuées gardent leurs dates et leurs passages (copie figée).
+export async function updateGarantieFormule(formData: FormData) {
+  const user = await requireUser(ROLES_BUREAU);
+  const id = String(formData.get("id") ?? "");
+  const retour = `/responsable/garanties?modifier=${id}`;
+  if (!z.string().uuid().safeParse(id).success) redirect("/responsable/garanties");
+  const parsed = formuleSchema.safeParse({
+    nom: String(formData.get("nom") ?? "").trim(),
+    dureeMois: formData.get("dureeMois"),
+    nombreInterventionsInclues: formData.get("nombreInterventionsInclues"),
+    prix: formData.get("prix"),
+    optionExtensionDisponible: formData.get("optionExtensionDisponible") === "on",
+    prixExtension: formData.get("prixExtension") || undefined,
+  });
+  if (!parsed.success) redirect(avecMessage(retour, "erreur", parsed.error!.issues[0]?.message ?? "Données invalides"));
+  const d = parsed.data!;
+  const [avant] = await db.select().from(garantieFormules).where(eq(garantieFormules.id, id)).limit(1);
+  if (!avant) redirect(avecMessage("/responsable/garanties", "erreur", "Formule introuvable."));
+  await db
+    .update(garantieFormules)
+    .set({
+      nom: d.nom,
+      dureeMois: d.dureeMois,
+      nombreInterventionsInclues: d.nombreInterventionsInclues,
+      prix: String(d.prix),
+      optionExtensionDisponible: d.optionExtensionDisponible ? 1 : 0,
+      prixExtension: d.prixExtension != null ? String(d.prixExtension) : null,
+    })
+    .where(eq(garantieFormules.id, id));
+  await journaliser({
+    entite: "garantie_formule",
+    entiteId: id,
+    action: "formule_modifiee",
+    utilisateurId: user.id,
+    details: avant!.nom === d.nom ? d.nom : `${avant!.nom} → ${d.nom}`,
+  });
+  revalidatePath("/responsable/garanties");
+  redirect(avecMessage("/responsable/garanties", "ok", "Formule enregistrée."));
+}
+
 export async function toggleGarantieFormuleActive(formData: FormData) {
   await requireUser(ROLES_BUREAU);
   const id = formData.get("id") as string;
@@ -77,39 +118,22 @@ export async function planifierPassage(formData: FormData) {
   const date = new Date(String(formData.get("dateProgrammee") ?? ""));
   if (!z.string().uuid().safeParse(technicienId).success) redirect(avecMessage(retour, "erreur", "Choisissez le technicien."));
   if (Number.isNaN(date.getTime())) redirect(avecMessage(retour, "erreur", "Choisissez la date et l'heure du passage."));
-  const [p] = await db
-    .select({ p: garantiePassages, projetId: garanties.projetId, numero: appareils.numeroInterne })
-    .from(garantiePassages)
-    .innerJoin(garanties, eq(garantiePassages.garantieId, garanties.id))
-    .innerJoin(appareils, eq(garantiePassages.appareilId, appareils.id))
-    .where(eq(garantiePassages.id, id))
-    .limit(1);
-  if (!p || p.p.statut === "realise") redirect(retour);
+  const info = await infoMissionPassage(id);
+  if (!info || info.p.statut === "realise") redirect(retour);
+  const p = { p: info!.p, projetId: info!.projetId, numero: info!.numeroAppareil, libelle: info!.libelle };
   const [tech] = await db.select({ nom: users.nom }).from(users).where(and(eq(users.id, technicienId), eq(users.role, "technicien"), eq(users.actif, 1))).limit(1);
   if (!tech) redirect(avecMessage(retour, "erreur", "Technicien introuvable."));
 
-  let missionId = p!.p.interventionId;
+  let missionId = p.p.interventionId;
   if (missionId) {
     const [m] = await db.select({ statut: interventions.statut }).from(interventions).where(eq(interventions.id, missionId)).limit(1);
     if (!m) missionId = null;
     else if (!["creee", "planifiee", "affectee"].includes(m.statut)) redirect(avecMessage(retour, "erreur", "La mission de ce passage a déjà commencé."));
   }
   if (!missionId) {
-    const [m] = await db
-      .insert(interventions)
-      .values({
-        appareilId: p!.p.appareilId,
-        projetId: p!.projetId,
-        type: "preventive",
-        statut: "creee",
-        priorite: "normale",
-        description: `Passage de garantie ${p!.p.numero}/${p!.p.total}`,
-        dateProgrammee: date,
-      })
-      .returning({ id: interventions.id });
-    missionId = m.id;
-    await attribuerParDefaut(m.id);
-    await db.update(garantiePassages).set({ interventionId: missionId }).where(eq(garantiePassages.id, id));
+    const m = await creerMissionPassage(id, date);
+    if (!m) redirect(retour);
+    missionId = m!.id;
   }
   const manques = await controlerHabilitations(technicienId, [missionId!]);
   if (manques.length) redirect(avecMessage(retour, "erreur", messageManques(tech!.nom, manques)));
@@ -118,8 +142,8 @@ export async function planifierPassage(formData: FormData) {
     .update(interventions)
     .set({ technicienId, statut: "affectee", dateProgrammee: date, retardNotifieLe: null })
     .where(eq(interventions.id, missionId!));
-  await envoyerMissionsAuTechnicien({ projetId: p!.projetId, technicienId, interventionIds: [missionId!], envoyeParId: user.id });
-  await journaliser({ entite: "garantie_passage", entiteId: id, action: "planifie", utilisateurId: user.id, details: `${p!.numero} — passage ${p!.p.numero}/${p!.p.total} — ${tech!.nom}` });
+  await envoyerMissionsAuTechnicien({ projetId: p.projetId, technicienId, interventionIds: [missionId!], envoyeParId: user.id });
+  await journaliser({ entite: "garantie_passage", entiteId: id, action: "planifie", utilisateurId: user.id, details: `${p.numero} — ${p.libelle} — passage ${p.p.numero}/${p.p.total} — ${tech!.nom}` });
   revalidatePath("/responsable");
   redirect(avecMessage(retour, "ok", `Passage planifié et envoyé à ${tech!.nom}.`));
 }

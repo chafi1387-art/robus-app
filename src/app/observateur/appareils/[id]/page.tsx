@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { AlertTriangle, CalendarClock, ChevronRight, FileText, History, MapPin, ShieldCheck } from "lucide-react";
 import { db } from "@/db";
-import { appareils, documentsClient, garantieFormules, garanties, projetAppareils, projets, users } from "@/db/schema";
+import { appareils, documentsClient, garantieFormules, garanties, prestationAppareils, prestations, projetAppareils, projets, users } from "@/db/schema";
 import { Card, StatutAppareilPill } from "@/components/ui";
 import { EtapesSuivi } from "@/components/etapes-suivi";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -60,7 +60,17 @@ export default async function AppareilObservateurPage({
     db.select({ telephone: users.telephone }).from(users).where(eq(users.id, ctx.userId)).limit(1),
   ]);
   if (!a) notFound();
-  const passages = d.has("contrat") && garantiesRows.length ? await passagesDAppareils([id]) : [];
+  // Phase 24 : contrats de maintenance (prestations à passages) du client qui couvrent cet appareil.
+  const contrats = d.has("contrat")
+    ? await db
+        .select({ id: prestations.id, titre: prestations.description, dateDebut: prestations.dateDebut, dateFin: prestations.dateFin, statut: prestations.statutContrat })
+        .from(prestationAppareils)
+        .innerJoin(prestations, eq(prestationAppareils.prestationId, prestations.id))
+        .innerJoin(projets, eq(prestations.projetId, projets.id))
+        .where(and(eq(prestationAppareils.appareilId, id), eq(projets.clientId, ctx.clientId), eq(prestations.mode, "contrat")))
+        .orderBy(desc(prestations.dateDebut))
+    : [];
+  const passages = d.has("contrat") && (garantiesRows.length || contrats.length) ? await passagesDAppareils([id]) : [];
   const adresse = adresses.get(id);
   const rapportsVisibles = d.has("rapports");
 
@@ -192,9 +202,29 @@ export default async function AppareilObservateurPage({
                 })()}
               </div>
             ))
-          ) : (
+          ) : contrats.length ? null : (
             <p className="text-sm text-ink-soft">Aucun contrat de garantie enregistré pour cet appareil.</p>
           )}
+          {contrats.map((c) => {
+            const ps = passages.filter((p) => p.prestationId === c.id);
+            const faits = ps.filter((p) => p.etat === "realise").length;
+            const prochain = ps.find((p) => p.etat !== "realise");
+            return (
+              <div key={c.id} className="text-sm flex flex-col gap-1 py-1 border-t border-line first:border-0 mt-1 pt-2" data-contrat-observateur>
+                <div className="font-semibold">{c.titre ?? "Contrat de maintenance"}</div>
+                <div className="text-ink-soft">
+                  Du {c.dateDebut ? formatDate(c.dateDebut) : "—"} au {c.dateFin ? formatDate(c.dateFin) : "—"}
+                  {c.statut === "renouvele" ? " · renouvelé" : ""}
+                </div>
+                {ps.length > 0 && (
+                  <div>
+                    Passages réalisés : <span className="font-semibold">{faits} / {ps[0].total}</span>
+                    {prochain ? <> · prochain passage vers le <span className="font-semibold">{formatDate(prochain.mDate ?? prochain.datePrevue)}</span></> : null}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </Card>
       )}
 

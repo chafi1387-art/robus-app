@@ -2,11 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { garantiePassages, users } from "@/db/schema";
+import { users } from "@/db/schema";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { Btn, Card, Field, Pill, inputClass } from "@/components/ui";
 import { formatDate, formatDateTime, toDatetimeLocalValue } from "@/lib/format";
-import { ETAT_PASSAGE, passagesDeGaranties } from "@/lib/garantie-passages";
+import { ETAT_PASSAGE, passagesDuMemeEchancier } from "@/lib/garantie-passages";
 import { FrisePassages } from "@/components/frise-passages";
 import { decalerPassage, planifierPassage } from "../../actions";
 
@@ -14,13 +14,12 @@ export default async function PassagePage({ params }: { params: Promise<{ id: st
   const user = await requireUser(ROLES_BUREAU);
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-  const [base] = await db.select({ garantieId: garantiePassages.garantieId }).from(garantiePassages).where(eq(garantiePassages.id, id)).limit(1);
-  if (!base) notFound();
   const [tous, techs] = await Promise.all([
-    passagesDeGaranties([base.garantieId]),
+    passagesDuMemeEchancier(id),
     db.select({ id: users.id, nom: users.nom }).from(users).where(and(eq(users.role, "technicien"), eq(users.actif, 1))).orderBy(asc(users.nom)),
   ]);
-  const p = tous.find((x) => x.id === id)!;
+  const p = tous.find((x) => x.id === id);
+  if (!p) notFound();
   const e = ETAT_PASSAGE[p.etat];
   const gestion = user.role === "administrateur" || user.role === "responsable_qualite";
 
@@ -29,7 +28,9 @@ export default async function PassagePage({ params }: { params: Promise<{ id: st
       <Link href={`/responsable/projets/${p.projetId}?tab=garantie`} className="text-xs text-blue font-semibold">&larr; Projet {p.projetRef}</Link>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-extrabold font-display">Passage de garantie {p.numero}/{p.total}</h1>
+          <h1 className="text-2xl font-extrabold font-display">
+            {p.garantieId ? "Passage de garantie" : `${p.libelle} — passage`} {p.numero}/{p.total}
+          </h1>
           <p className="text-sm text-ink-soft">{p.client} · Ascenseur {p.numeroAppareil} · prévu vers le {formatDate(p.datePrevue)} (± 15 jours)</p>
           {p.motifDecalage && <p className="text-xs text-ink-soft mt-1">Décalé (initialement le {formatDate(p.dateInitiale)}) — {p.motifDecalage}</p>}
         </div>

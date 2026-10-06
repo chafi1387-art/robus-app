@@ -1,5 +1,8 @@
 import { FrisePassages } from "@/components/frise-passages";
-import { passagesDeGaranties } from "@/lib/garantie-passages";
+import { BasculeContrat } from "@/components/bascule-contrat";
+import { passagesDeGaranties, passagesDePrestations } from "@/lib/garantie-passages";
+import { contratsDuProjet, ETAT_CONTRAT, etatContrat } from "@/lib/contrats";
+import { fmtMois, moisPassages, TYPE_MISSION_LABEL } from "@/lib/mois-passages";
 import { GaleriePhotos } from "@/components/galerie-photos";
 import { SuiviEnvoi } from "@/components/suivi-envoi";
 import { Card, Btn, Field, Pill, inputClass, StatutInterventionPill, TypeInterventionPill } from "@/components/ui";
@@ -39,6 +42,8 @@ import {
   changerStatutProjetAdmin,
   choisirGarantieProjet,
   createPrestation,
+  ajouterAppareilContrat,
+  renouvelerContratProjet,
   envoyerOrdreMissionAvecMessage,
   getGarantieFormulesActives,
   getPiecesForSelect,
@@ -122,7 +127,7 @@ const ONGLETS = [
   { id: "missions", label: "Missions" },
   { id: "appareils", label: "Appareils" },
   { id: "equipe", label: "Équipe" },
-  { id: "garantie", label: "Garantie & prestations" },
+  { id: "garantie", label: "Prestations & garantie" },
   { id: "documents", label: "Documents" },
   { id: "historique", label: "Historique" },
 ] as const;
@@ -341,6 +346,12 @@ export default async function ProjetDetailPage({
   const garantie = garantieRow[0];
   // Phase 19 : échéancier des passages (onglet Garantie).
   const passagesGarantie = tab === "garantie" && garantie?.garantie ? await passagesDeGaranties([garantie.garantie.id]) : [];
+  // Phase 24 : contrats à passages du projet (abonnements de maintenance).
+  const contrats = tab === "garantie" ? await contratsDuProjet(id) : [];
+  const passagesContrats = contrats.length ? await passagesDePrestations(contrats.map((c) => c.id)) : [];
+  const prestationsPonctuelles = prestationsListe.filter((x) => x.prestation.mode !== "contrat");
+  const aujourdHui = new Date().toISOString().slice(0, 10);
+  const gestionContrat = user.role === "administrateur" || user.role === "responsable_qualite" || user.role === "commercial";
   const indexEtapeActuelle = ETAPES_ISO.indexOf(projet.statut);
   const prochaineEtape = ETAPES_ISO[indexEtapeActuelle + 1];
   const techniciensDejaAffectesIds = new Set(techniciensAffectes.map((t) => t.id));
@@ -922,14 +933,81 @@ export default async function ProjetDetailPage({
         </Card>
       )}
       {tab === "garantie" && (
+        <Card className="p-5 mb-4" id="contrats">
+          <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
+            <h2 className="font-display font-bold text-sm">Contrats à passages ({contrats.length})</h2>
+            <Link href="/responsable/prestations-catalogue" className="text-xs font-semibold text-blue">Catalogue des contrats</Link>
+          </div>
+          <p className="text-xs text-ink-soft mb-4">
+            Abonnements de maintenance : un passage au milieu de chaque période, par appareil · la mission est créée automatiquement avant chaque passage · cliquez sur un passage pour le planifier ou le décaler.
+          </p>
+          {contrats.length === 0 && (
+            <p className="text-sm text-ink-soft">Aucun contrat sur ce projet — ajoutez un contrat du catalogue ci-dessous (bloc « Prestations »).</p>
+          )}
+          <div className="flex flex-col divide-y divide-line">
+            {contrats.map((c) => {
+              const etat = etatContrat(c);
+              const e = ETAT_CONTRAT[etat];
+              const ps = passagesContrats.filter((x) => x.prestationId === c.id);
+              const faits = ps.filter((x) => x.etat === "realise").length;
+              const couverts = new Set(c.appareils.map((a) => a.appareilId));
+              const nonCouverts = appareilsAttaches.filter((a) => !couverts.has(a.id));
+              const dureeMois = c.dateDebut && c.dateFin ? Math.max(1, Math.round((c.dateFin.getTime() - c.dateDebut.getTime()) / (30.4375 * 86400000))) : 0;
+              return (
+                <div key={c.id} className="py-4 first:pt-0" data-contrat={c.id}>
+                  <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold">{c.description}</div>
+                      <div className="text-xs text-ink-soft">
+                        Du {c.dateDebut ? formatDate(c.dateDebut) : "—"} au {c.dateFin ? formatDate(c.dateFin) : "—"} · {dureeMois} mois · {c.nbPassages} passage(s) par appareil
+                        {c.typeMission ? ` · ${TYPE_MISSION_LABEL[c.typeMission] ?? c.typeMission}` : ""} · mission créée {c.anticipationJours ?? 30} j avant
+                        {c.prixEstime ? ` · ${c.prixEstime} €` : ""}
+                      </div>
+                      <div className="text-xs text-ink-soft">
+                        Mois {moisPassages(dureeMois, c.nbPassages ?? 0).map(fmtMois).join(" · ")} · Réalisés {faits}/{ps.length}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Pill tone={e.tone}>{e.label}</Pill>
+                      {gestionContrat && (etat === "fin_proche" || etat === "termine") && (
+                        <form action={renouvelerContratProjet}>
+                          <input type="hidden" name="prestationId" value={c.id} />
+                          <input type="hidden" name="projetId" value={projet.id} />
+                          <Btn className="!px-3 !py-1.5 !text-xs">Renouveler ({dureeMois} mois)</Btn>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                  <FrisePassages passages={ps} />
+                  {nonCouverts.length > 0 && etat !== "renouvele" && etat !== "termine" && (
+                    <form action={ajouterAppareilContrat} className="flex items-end gap-2 flex-wrap mt-3">
+                      <input type="hidden" name="prestationId" value={c.id} />
+                      <Field label="Couvrir aussi un appareil du projet">
+                        <select name="appareilId" required className={inputClass} defaultValue="">
+                          <option value="" disabled>Choisir un appareil</option>
+                          {nonCouverts.map((a) => (
+                            <option key={a.id} value={a.id}>{a.numeroInterne}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Btn variant="ghost" className="!px-3 !py-2 !text-xs">Ajouter au contrat</Btn>
+                    </form>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+      {tab === "garantie" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Prestations */}
         <Card className="p-5">
           <h2 className="font-display font-bold text-sm mb-3">
-            Prestations ({prestationsListe.length})
+            Prestations ({prestationsPonctuelles.length})
           </h2>
           <div className="flex flex-col divide-y divide-line mb-3">
-            {prestationsListe.map(({ prestation: p, catalogueNom, catalogueCategorie }) => (
+            {prestationsPonctuelles.map(({ prestation: p, catalogueNom, catalogueCategorie }) => (
               <div key={p.id} className="py-2 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <Pill tone="neutral">
@@ -947,8 +1025,8 @@ export default async function ProjetDetailPage({
                 {p.prixEstime && <span className="text-xs text-ink-soft whitespace-nowrap">{p.prixEstime} €</span>}
               </div>
             ))}
-            {prestationsListe.length === 0 && (
-              <p className="text-sm text-ink-soft py-2">Aucune prestation pour l&apos;instant.</p>
+            {prestationsPonctuelles.length === 0 && (
+              <p className="text-sm text-ink-soft py-2">Aucune prestation ponctuelle pour l&apos;instant.</p>
             )}
           </div>
           {catalogueOptions.length > 0 ? (
@@ -959,20 +1037,56 @@ export default async function ProjetDetailPage({
                   <option value="" disabled>
                     Choisir une prestation du catalogue
                   </option>
-                  {catalogueOptions.map((c) => (
-                    <option key={c.id} value={c.id} data-prix={c.prixIndicatif ?? ""}>
-                      {CATEGORIE_PRESTATION_LABEL[c.categorie] ?? c.categorie} — {c.nom}
-                      {c.prixIndicatif ? ` (${c.prixIndicatif} €)` : ""}
-                    </option>
-                  ))}
+                  {catalogueOptions.filter((c) => c.mode === "contrat").length > 0 && (
+                    <optgroup label="Contrats à passages">
+                      {catalogueOptions.filter((c) => c.mode === "contrat").map((c) => (
+                        <option key={c.id} value={c.id} data-prix={c.prixIndicatif ?? ""} data-mode="contrat">
+                          {c.nom} — {c.dureeMois} mois / {c.nbPassages} passage(s)
+                          {c.prixIndicatif ? ` (${c.prixIndicatif} €)` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Prestations ponctuelles">
+                    {catalogueOptions.filter((c) => c.mode !== "contrat").map((c) => (
+                      <option key={c.id} value={c.id} data-prix={c.prixIndicatif ?? ""} data-mode="ponctuelle">
+                        {CATEGORIE_PRESTATION_LABEL[c.categorie] ?? c.categorie} — {c.nom}
+                        {c.prixIndicatif ? ` (${c.prixIndicatif} €)` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </Field>
+              {/* Phase 24 : réglages du contrat (affichés si la prestation choisie est un contrat). */}
+              <div data-bloc-contrat hidden>
+              <div className="flex flex-col gap-2 rounded-xl border border-line bg-blue-pale/40 p-3">
+                <Field label="Début du contrat">
+                  <input type="date" name="dateDebut" defaultValue={aujourdHui} className={inputClass} />
+                </Field>
+                <div className="text-xs font-semibold text-ink-soft">Appareils couverts</div>
+                {appareilsAttaches.length === 0 ? (
+                  <p className="text-xs text-red-ink">Ajoutez d&apos;abord les appareils au projet (onglet Appareils).</p>
+                ) : (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {appareilsAttaches.map((a) => (
+                      <label key={a.id} className="flex items-center gap-1.5 text-sm">
+                        <input type="checkbox" name="appareilIds" value={a.id} defaultChecked />
+                        {a.numeroInterne}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-ink-soft">Le titre ci-dessous (facultatif) remplace le nom du catalogue, ex. « Abonnement Confort — Résidence Les Lilas ».</p>
+              </div>
+              </div>
               <Field label="Prix estimé (€)">
                 <input name="prixEstime" type="number" step="0.01" className={inputClass} />
               </Field>
-              <Field label="Description (optionnel)">
+              <Field label="Titre / description (optionnel)">
                 <input name="description" className={inputClass} placeholder="Détail complémentaire..." />
               </Field>
+              <div data-hors-contrat>
+              <div className="flex flex-col gap-2">
               <Field label="Pièce (obligatoire si « Vente de pièce »)">
                 <select name="pieceId" className={inputClass} defaultValue="">
                   <option value="">—</option>
@@ -986,24 +1100,12 @@ export default async function ProjetDetailPage({
               <Field label="Quantité (obligatoire si « Vente de pièce »)">
                 <input name="quantitePieces" type="number" min={1} className={inputClass} />
               </Field>
+              </div>
+              </div>
               <Btn variant="ghost" className="self-start !text-xs">
                 Ajouter la prestation
               </Btn>
-              {/* Pré-remplit le prix estimé avec le prix indicatif du catalogue —
-                  reste modifiable manuellement ensuite (même technique que
-                  /responsable/rapports pour rester en Server Component). */}
-              <script
-                dangerouslySetInnerHTML={{
-                  __html: `
-                    document.currentScript.closest('form').querySelector('[name="catalogueId"]').addEventListener('change', function (e) {
-                      var opt = e.target.selectedOptions[0];
-                      var prix = opt ? opt.getAttribute('data-prix') : '';
-                      var prixInput = e.target.closest('form').querySelector('[name="prixEstime"]');
-                      if (prix) prixInput.value = prix;
-                    });
-                  `,
-                }}
-              />
+              <BasculeContrat />
             </form>
           ) : (
             <p className="text-sm text-ink-soft pt-3 border-t border-line">

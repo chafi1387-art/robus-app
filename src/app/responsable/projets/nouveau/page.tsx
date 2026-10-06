@@ -44,10 +44,18 @@ export default async function NouveauProjetPage() {
       .groupBy(interventions.technicienId),
     db.select().from(garantieFormules).where(eq(garantieFormules.actif, 1)).orderBy(garantieFormules.dureeMois),
     db
-      .select({ id: prestationsCatalogue.id, nom: prestationsCatalogue.nom, categorie: prestationsCatalogue.categorie, prix: prestationsCatalogue.prixIndicatif })
+      .select({
+        id: prestationsCatalogue.id,
+        nom: prestationsCatalogue.nom,
+        categorie: prestationsCatalogue.categorie,
+        prix: prestationsCatalogue.prixIndicatif,
+        mode: prestationsCatalogue.mode,
+        dureeMois: prestationsCatalogue.dureeMois,
+        nbPassages: prestationsCatalogue.nbPassages,
+      })
       .from(prestationsCatalogue)
       .where(and(eq(prestationsCatalogue.actif, 1), ne(prestationsCatalogue.categorie, "vente_piece")))
-      .orderBy(prestationsCatalogue.categorie, prestationsCatalogue.nom),
+      .orderBy(prestationsCatalogue.mode, prestationsCatalogue.categorie, prestationsCatalogue.nom),
   ]);
 
   const clientsParAppareil = new Map<string, string[]>();
@@ -70,7 +78,13 @@ export default async function NouveauProjetPage() {
         missionsEnCours: charges.find((c) => c.technicienId === t.id)?.n ?? 0,
       })),
     formules: formules.map((f) => ({ id: f.id, nom: f.nom, dureeMois: f.dureeMois, visites: f.nombreInterventionsInclues, prix: f.prix, extension: f.optionExtensionDisponible === 1 })),
-    catalogue: catalogue.map((c) => ({ ...c, prix: c.prix })),
+    catalogue: catalogue.map((c) => ({
+      id: c.id,
+      nom: c.nom,
+      categorie: c.categorie,
+      prix: c.prix,
+      contrat: c.mode === "contrat" && c.dureeMois && c.nbPassages ? { dureeMois: c.dureeMois, nbPassages: c.nbPassages } : null,
+    })),
   };
 
   return <AssistantProjet donnees={donnees} />;

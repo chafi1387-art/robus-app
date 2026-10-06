@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Archive, ArrowUpDown, Eye, GraduationCap, Inbox, BookOpen, Building2, CalendarDays, ClipboardList, FileText, FolderKanban,
+  ArrowUpDown, Eye, GraduationCap, Inbox, BookOpen, Building2, CalendarDays, ClipboardList, FileText, FolderKanban,
   HardHat, LayoutDashboard, ListChecks, MapPin, OctagonAlert, Package, Presentation, Receipt, Ruler,
   ScrollText, ShieldCheck, Siren, Smile, Target, Timer, TriangleAlert, UserCog, UserSearch, Search,
 } from "lucide-react";
@@ -33,7 +33,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
       { href: "/responsable/appareils", label: "Appareils", icon: ArrowUpDown, badge: "panne" },
       { href: "/responsable/techniciens", label: "Équipe technique", icon: HardHat },
       { href: "/responsable/stock", label: "Stock", icon: Package },
-      { href: "/responsable/prestations-catalogue", label: "Catalogue prestations", icon: ClipboardList },
+      { href: "/responsable/prestations-catalogue", label: "Prestations & contrats", icon: ClipboardList },
       { href: "/responsable/garanties", label: "Garanties", icon: ShieldCheck },
       { href: "/responsable/devis", label: "Devis", icon: Receipt },
       { href: "/responsable/documents", label: "Bibliothèque documents", icon: BookOpen },
@@ -60,7 +60,6 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
       { href: "/responsable/utilisateurs", label: "Utilisateurs", icon: UserCog, adminOnly: true },
       { href: "/responsable/journal", label: "Journal d'activité", icon: ScrollText, adminOnly: true },
       { href: "/responsable/prestations", label: "Toutes les prestations", icon: FileText },
-      { href: "/responsable/planification", label: "Règles de planification", icon: Archive },
     ],
   },
 ];

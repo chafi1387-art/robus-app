@@ -26,6 +26,7 @@ import { controlerHabilitations, messageManques, nomUtilisateur, type Manque } f
 import { avecMessage } from "@/lib/url";
 import { appliquerGarantie } from "@/lib/projet-garantie";
 import { genererPassages, recalculerRestantes } from "@/lib/garantie-passages";
+import { ajouterAppareilAuContrat, creerContratProjet, renouvelerContrat } from "@/lib/contrats";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
@@ -591,6 +592,39 @@ export async function createPrestation(formData: FormData) {
     .limit(1);
   if (!projet) throw new Error("Projet introuvable.");
 
+  // Phase 24 : contrat à passages -> date de début + appareils couverts + échéancier.
+  if (catalogue.mode === "contrat") {
+    const retour = `/responsable/projets/${parsed.data.projetId}?tab=garantie`;
+    const debutTexte = String(formData.get("dateDebut") ?? "");
+    const debut = /^\d{4}-\d{2}-\d{2}$/.test(debutTexte) ? new Date(`${debutTexte}T08:00:00`) : null;
+    if (!debut || Number.isNaN(debut.getTime())) redirect(avecMessage(retour, "erreur", "Indiquez la date de début du contrat."));
+    const demandes = formData.getAll("appareilIds").map(String);
+    const duProjet = await db
+      .select({ appareilId: projetAppareils.appareilId })
+      .from(projetAppareils)
+      .where(eq(projetAppareils.projetId, parsed.data.projetId));
+    const autorises = new Set(duProjet.map((a) => a.appareilId));
+    const appareilIds = [...new Set(demandes.filter((a) => autorises.has(a)))];
+    if (!appareilIds.length) redirect(avecMessage(retour, "erreur", "Cochez au moins un appareil du projet couvert par le contrat."));
+    const contrat = await creerContratProjet({
+      projetId: parsed.data.projetId,
+      catalogue,
+      dateDebut: debut!,
+      appareilIds,
+      titre: parsed.data.description,
+      prixEstime: parsed.data.prixEstime != null ? String(parsed.data.prixEstime) : null,
+    });
+    await journaliser({
+      entite: "prestation",
+      entiteId: contrat.id,
+      action: "contrat_ajoute",
+      utilisateurId: user.id,
+      details: `${projet.reference} — ${contrat.description} — ${appareilIds.length} appareil(s) × ${contrat.nbPassages} passage(s), du ${debut!.toISOString().slice(0, 10)}`,
+    });
+    revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
+    redirect(avecMessage(retour, "ok", `Contrat ajouté : ${appareilIds.length * (contrat.nbPassages ?? 0)} passage(s) planifié(s).`));
+  }
+
   if (catalogue.categorie === "vente_piece") {
     if (!parsed.data.pieceId || !parsed.data.quantitePieces) {
       throw new Error("Merci de choisir une pièce et une quantité pour une vente de pièce.");
@@ -638,6 +672,56 @@ export async function createPrestation(formData: FormData) {
 
   revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
   revalidatePath("/responsable/stock");
+}
+
+// Phase 24 : renouveler un contrat (même durée, mêmes appareils, à partir de sa fin).
+export async function renouvelerContratProjet(formData: FormData) {
+  const user = await requireUser(["administrateur", "responsable_qualite", "commercial"]);
+  const id = String(formData.get("prestationId") ?? "");
+  const projetId = String(formData.get("projetId") ?? "");
+  const retour = `/responsable/projets/${projetId}?tab=garantie`;
+  if (!z.string().uuid().safeParse(id).success || !z.string().uuid().safeParse(projetId).success) redirect("/responsable/projets");
+  let r: Awaited<ReturnType<typeof renouvelerContrat>>;
+  try {
+    r = await renouvelerContrat(id);
+  } catch (e) {
+    redirect(avecMessage(retour, "erreur", e instanceof Error ? e.message : "Renouvellement impossible."));
+  }
+  await journaliser({
+    entite: "prestation",
+    entiteId: r!.nouveau.id,
+    action: "contrat_renouvele",
+    utilisateurId: user.id,
+    details: `${r!.ancien.description} — ${r!.dureeMois} mois à partir du ${r!.nouveau.dateDebut!.toISOString().slice(0, 10)}`,
+  });
+  revalidatePath(`/responsable/projets/${projetId}`);
+  revalidatePath("/responsable");
+  redirect(avecMessage(retour, "ok", "Contrat renouvelé : nouveaux passages planifiés."));
+}
+
+// Phase 24 : couvrir un appareil supplémentaire du projet par un contrat existant.
+export async function ajouterAppareilContrat(formData: FormData) {
+  const user = await requireUser(ROLES_BUREAU);
+  const id = String(formData.get("prestationId") ?? "");
+  const appareilId = String(formData.get("appareilId") ?? "");
+  const [c] = z.string().uuid().safeParse(id).success
+    ? await db.select({ projetId: prestations.projetId, mode: prestations.mode, titre: prestations.description }).from(prestations).where(eq(prestations.id, id)).limit(1)
+    : [];
+  if (!c || c.mode !== "contrat") redirect("/responsable/projets");
+  const retour = `/responsable/projets/${c!.projetId}?tab=garantie`;
+  const [lie] = z.string().uuid().safeParse(appareilId).success
+    ? await db
+        .select({ numero: appareils.numeroInterne })
+        .from(projetAppareils)
+        .innerJoin(appareils, eq(projetAppareils.appareilId, appareils.id))
+        .where(and(eq(projetAppareils.projetId, c!.projetId), eq(projetAppareils.appareilId, appareilId)))
+        .limit(1)
+    : [];
+  if (!lie) redirect(avecMessage(retour, "erreur", "Choisissez un appareil du projet."));
+  const n = await ajouterAppareilAuContrat(id, appareilId);
+  await journaliser({ entite: "prestation", entiteId: id, action: "contrat_appareil_ajoute", utilisateurId: user.id, details: `${c!.titre} — ${lie!.numero} (${n} passage(s))` });
+  revalidatePath(`/responsable/projets/${c!.projetId}`);
+  redirect(avecMessage(retour, "ok", `${lie!.numero} ajouté au contrat : ${n} passage(s) planifié(s).`));
 }
 
 const choisirGarantieSchema = z.object({

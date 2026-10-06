@@ -113,12 +113,12 @@ export async function POST(req: Request) {
     });
   }
 
-  // Phase 19 : passages de garantie à 30 jours -> mission « à affecter » + alerte bureau.
+  // Phase 19 / 24 : passages (garantie et contrats) à l'approche -> mission « à affecter » + alerte bureau.
   const passages = await creerMissionsPassagesProches();
   if (passages.length) {
     await notifierBureau({
-      titre: `🛡️ ${passages.length} passage(s) de garantie à planifier`,
-      corps: passages.slice(0, 3).map((p) => `${p.numeroAppareil} (${p.numero}/${p.total})`).join(", ") + (passages.length > 3 ? "…" : ""),
+      titre: `🗓️ ${passages.length} passage(s) à planifier`,
+      corps: passages.slice(0, 3).map((p) => `${p.numeroAppareil} — ${p.libelle} (${p.numero}/${p.total})`).join(", ") + (passages.length > 3 ? "…" : ""),
       url: "/responsable",
       tag: "passages-garantie",
     });

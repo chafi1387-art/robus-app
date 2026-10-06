@@ -16,7 +16,8 @@ import {
   projetTechniciens,
   rapportPhotos,
   rapports,
-  reglesPlanification,
+  garantiePassages,
+  prestations,
   signalements,
   sites,
   users,
@@ -198,12 +199,25 @@ export async function chargerFicheAppareil(appareilId: string, r: ReglagesAcces,
           .limit(20)
       : vide<never>(),
     b.prochaine
-      ? db
-          .select({ date: reglesPlanification.prochaineDate, type: reglesPlanification.type })
-          .from(reglesPlanification)
-          .where(and(eq(reglesPlanification.appareilId, appareilId), eq(reglesPlanification.actif, 1), gte(reglesPlanification.prochaineDate, maintenant)))
-          .orderBy(asc(reglesPlanification.prochaineDate))
-          .limit(1)
+      ? // Phase 24 : prochains passages de contrat pas encore transformés en mission.
+        db
+          .select({
+            date: garantiePassages.datePrevue,
+            type: sql<string>`coalesce(${prestations.typeMission}::text, 'preventive')`,
+            libelle: sql<string>`${prestations.description} || ' ' || ${garantiePassages.numero} || '/' || ${garantiePassages.total}`,
+          })
+          .from(garantiePassages)
+          .innerJoin(prestations, eq(garantiePassages.prestationId, prestations.id))
+          .where(
+            and(
+              eq(garantiePassages.appareilId, appareilId),
+              eq(garantiePassages.statut, "a_venir"),
+              isNull(garantiePassages.interventionId),
+              gte(garantiePassages.datePrevue, maintenant)
+            )
+          )
+          .orderBy(asc(garantiePassages.datePrevue))
+          .limit(2)
       : vide<never>(),
     b.prochaine
       ? db
@@ -260,8 +274,8 @@ export async function chargerFicheAppareil(appareilId: string, r: ReglagesAcces,
   const projetCourant = projetsAppareil[0] ?? null;
   const prochaines = [
     ...aVenir.filter((m) => m.date).map((m) => ({ date: m.date as Date, type: m.type as string, technicien: m.technicien, source: "mission" as const })),
-    ...regles.map((x) => ({ date: x.date, type: x.type as string, technicien: null as string | null, source: "planification" as const })),
-    ...passages.filter((p) => p.etat !== "realise").map((p) => ({ date: p.mDate ?? p.datePrevue, type: `garantie ${p.numero}/${p.total}`, technicien: p.technicien, source: "garantie" as const })),
+    ...regles.map((x) => ({ date: x.date, type: `contrat · ${x.libelle}`, technicien: null as string | null, source: "planification" as const })),
+    ...passages.filter((p) => p.etat !== "realise" && p.garantieId).map((p) => ({ date: p.mDate ?? p.datePrevue, type: `garantie ${p.numero}/${p.total}`, technicien: p.technicien, source: "garantie" as const })),
   ].sort((x, y) => x.date.getTime() - y.date.getTime());
 
   return {

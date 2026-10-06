@@ -1,6 +1,7 @@
 import { STATUTS_DEMANDE, TYPES_DEMANDE, delais, echeancePriseEnCharge, statsDemandes } from "@/lib/demandes";
 import { demandesClient } from "@/db/schema";
 import { passagesAVenirTableauDeBord, ETAT_PASSAGE } from "@/lib/garantie-passages";
+import { contratsARenouveler } from "@/lib/contrats";
 import { missionNotes } from "@/db/schema";
 import { Card, Pill, StatutInterventionPill, TypeInterventionPill } from "@/components/ui";
 import { db } from "@/db";
@@ -176,7 +177,7 @@ const TONE_TEXT: Record<"ok" | "warn" | "crit", string> = {
 };
 
 export default async function DashboardPage() {
-  const [[demandesOuvertes, statsDem, dlDem], [stats, alertes, planning, scoreIso, garantiesStats, passages, piecesManquantes, securite]] = await Promise.all([
+  const [[demandesOuvertes, statsDem, dlDem], [stats, alertes, planning, scoreIso, garantiesStats, passages, piecesManquantes, securite, aRenouveler]] = await Promise.all([
     Promise.all([
     db
       .select({ d: demandesClient, appareil: appareils.numeroInterne, client: clients.raisonSociale })
@@ -204,6 +205,7 @@ export default async function DashboardPage() {
       .where(and(eq(missionNotes.type, "piece_manquante"), isNull(missionNotes.regleLe), isNull(missionNotes.archiveLe)))
       .orderBy(asc(missionNotes.createdAt)),
     statsSecurite(),
+    contratsARenouveler(),
   ]),
   ]);
   const ORDRE_PASSAGE: Record<string, number> = { retard: 0, a_planifier: 1, bientot: 2, planifie: 3, a_venir: 4, realise: 5 };
@@ -339,12 +341,12 @@ export default async function DashboardPage() {
         </div>
       </Card>
 
-      {(passages.length > 0 || piecesManquantes.length > 0) && (
+      {(passages.length > 0 || piecesManquantes.length > 0 || aRenouveler.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="p-5">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="font-display font-bold text-sm">Passages de garantie ({passages.length})</h2>
-              <Link href="/responsable/garanties" className="text-xs font-semibold text-blue">Toutes les garanties</Link>
+              <h2 className="font-display font-bold text-sm">Passages à planifier — garanties & contrats ({passages.length})</h2>
+              <Link href="/responsable/garanties" className="text-xs font-semibold text-blue">Garanties</Link>
             </div>
             <div className="flex flex-col divide-y divide-line">
               {passages.slice(0, 8).map((p) => {
@@ -354,7 +356,7 @@ export default async function DashboardPage() {
                 return (
                   <div key={p.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
                     <div className="min-w-0">
-                      <div className="truncate"><span className="font-semibold">{p.client}</span> · {p.numeroAppareil} · Passage {p.numero}/{p.total}</div>
+                      <div className="truncate"><span className="font-semibold">{p.client}</span> · {p.numeroAppareil} · {p.libelle} {p.numero}/{p.total}</div>
                       <div className={`text-xs ${e.tone === "crit" ? "text-red-ink" : e.tone === "warn" ? "text-orange-ink" : "text-ink-soft"}`}>
                         {e.label} · {p.etat === "planifie" && p.mDate ? `le ${p.mDate.toLocaleDateString("fr-BE")}${p.technicien ? ` avec ${p.technicien}` : ""}` : jours >= 0 ? `dans ${jours} j` : `en retard de ${-jours} j`}
                       </div>
@@ -365,8 +367,23 @@ export default async function DashboardPage() {
                   </div>
                 );
               })}
-              {passages.length === 0 && <p className="text-sm text-ink-soft py-1">Aucun passage dans les 30 prochains jours.</p>}
+              {passages.length === 0 && <p className="text-sm text-ink-soft py-1">Aucun passage à planifier pour l&apos;instant.</p>}
             </div>
+            {aRenouveler.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-line" data-contrats-renouveler>
+                <h3 className="font-display font-bold text-xs uppercase tracking-wide text-ink-soft mb-2">Contrats à renouveler ({aRenouveler.length})</h3>
+                {aRenouveler.slice(0, 5).map((c) => (
+                  <div key={c.id} className="py-1.5 flex items-center justify-between gap-3 text-sm">
+                    <div className="min-w-0 truncate">
+                      <span className="font-semibold">{c.client}</span> · {c.titre} · fin le {c.dateFin ? c.dateFin.toLocaleDateString("fr-BE") : "—"}
+                    </div>
+                    <Link href={`/responsable/projets/${c.projetId}?tab=garantie#contrats`} className="shrink-0 text-xs font-bold rounded-lg border border-line px-2.5 py-1.5 hover:bg-blue-pale">
+                      Renouveler
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
           <Card className="p-5">
             <h2 className="font-display font-bold text-sm mb-3">Pièces manquantes ({piecesManquantes.length})</h2>

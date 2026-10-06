@@ -1,5 +1,5 @@
 import "server-only";
-import { attribuerParDefaut } from "@/lib/checklists";
+import { attribuerChecklists, attribuerParDefaut } from "@/lib/checklists";
 import { db } from "@/db";
 import {
   appareils,
@@ -7,14 +7,18 @@ import {
   garantiePassages,
   garanties,
   interventions,
+  prestationAppareils,
+  prestations,
   projetAppareils,
   projets,
   users,
 } from "@/db/schema";
-import { and, asc, eq, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 // ==========================================================================
 // Phase 19 — Échéancier des passages de garantie (par appareil).
+// Phase 24 — même échéancier pour les prestations « contrat à passages »
+// (table commune : un passage a soit garantie_id, soit prestation_id).
 // N passages sur la durée : chacun au MILIEU de sa période
 // (ex. 6 passages / 24 mois -> 2, 6, 10, 14, 18 et 22 mois).
 // ==========================================================================
@@ -49,6 +53,36 @@ export async function genererPassages(garantieId: string, appareilId?: string) {
           appareilId: a.appareilId,
           numero: i + 1,
           total: g.interventionsIncluses,
+          datePrevue: d,
+          dateInitiale: d,
+        }))
+      )
+      .onConflictDoNothing()
+      .returning({ id: garantiePassages.id });
+    crees += rows.length;
+  }
+  return crees;
+}
+
+/** Phase 24 : crée les passages manquants d'un contrat (tous ses appareils, ou un seul). */
+export async function genererPassagesContrat(prestationId: string, appareilId?: string) {
+  const [c] = await db.select().from(prestations).where(eq(prestations.id, prestationId)).limit(1);
+  if (!c || c.mode !== "contrat" || !c.dateDebut || !c.dateFin || !c.nbPassages || c.nbPassages <= 0) return 0;
+  const apps = appareilId
+    ? [{ appareilId }]
+    : await db.select({ appareilId: prestationAppareils.appareilId }).from(prestationAppareils).where(eq(prestationAppareils.prestationId, prestationId));
+  const dates = datesPassages(c.dateDebut, c.dateFin, c.nbPassages);
+  let crees = 0;
+  for (const a of apps) {
+    if (!dates.length) break;
+    const rows = await db
+      .insert(garantiePassages)
+      .values(
+        dates.map((d, i) => ({
+          prestationId,
+          appareilId: a.appareilId,
+          numero: i + 1,
+          total: c.nbPassages!,
           datePrevue: d,
           dateInitiale: d,
         }))
@@ -106,6 +140,9 @@ export function etatPassage(
 const colonnes = {
   id: garantiePassages.id,
   garantieId: garantiePassages.garantieId,
+  prestationId: garantiePassages.prestationId,
+  // « Garantie » ou le nom du contrat (ex. « Abonnement Confort »).
+  libelle: sql<string>`coalesce(${prestations.description}, 'Garantie')`,
   appareilId: garantiePassages.appareilId,
   numero: garantiePassages.numero,
   total: garantiePassages.total,
@@ -138,8 +175,9 @@ function requete() {
     .select(colonnes)
     .from(garantiePassages)
     .innerJoin(appareils, eq(garantiePassages.appareilId, appareils.id))
-    .innerJoin(garanties, eq(garantiePassages.garantieId, garanties.id))
-    .innerJoin(projets, eq(garanties.projetId, projets.id))
+    .leftJoin(garanties, eq(garantiePassages.garantieId, garanties.id))
+    .leftJoin(prestations, eq(garantiePassages.prestationId, prestations.id))
+    .innerJoin(projets, sql`${projets.id} = coalesce(${garanties.projetId}, ${prestations.projetId})`)
     .innerJoin(clients, eq(projets.clientId, clients.id))
     .leftJoin(interventions, eq(garantiePassages.interventionId, interventions.id))
     .leftJoin(users, eq(interventions.technicienId, users.id));
@@ -154,6 +192,77 @@ export async function passagesDeGaranties(garantieIds: string[]) {
   );
 }
 
+export async function passagesDePrestations(prestationIds: string[]) {
+  if (!prestationIds.length) return [];
+  return enrichir(
+    await requete()
+      .where(inArray(garantiePassages.prestationId, prestationIds))
+      .orderBy(asc(appareils.numeroInterne), asc(garantiePassages.numero))
+  );
+}
+
+/** Tous les passages du même échéancier (garantie ou contrat) qu'un passage donné. */
+export async function passagesDuMemeEchancier(passageId: string) {
+  const [b] = await db
+    .select({ garantieId: garantiePassages.garantieId, prestationId: garantiePassages.prestationId })
+    .from(garantiePassages)
+    .where(eq(garantiePassages.id, passageId))
+    .limit(1);
+  if (!b) return [];
+  return b.garantieId ? passagesDeGaranties([b.garantieId]) : passagesDePrestations([b.prestationId!]);
+}
+
+/** Ce qu'il faut pour créer la mission d'un passage (garantie ou contrat). */
+export async function infoMissionPassage(passageId: string) {
+  const [p] = await db
+    .select({
+      p: garantiePassages,
+      projetId: sql<string>`coalesce(${garanties.projetId}, ${prestations.projetId})`,
+      libelle: sql<string>`coalesce(${prestations.description}, 'Passage de garantie')`,
+      typeMission: prestations.typeMission,
+      checklistModeleId: prestations.checklistModeleId,
+      numeroAppareil: appareils.numeroInterne,
+    })
+    .from(garantiePassages)
+    .leftJoin(garanties, eq(garantiePassages.garantieId, garanties.id))
+    .leftJoin(prestations, eq(garantiePassages.prestationId, prestations.id))
+    .innerJoin(appareils, eq(garantiePassages.appareilId, appareils.id))
+    .where(eq(garantiePassages.id, passageId))
+    .limit(1);
+  return p ?? null;
+}
+
+/** Crée la mission « à affecter » d'un passage, avec la checklist du contrat ou la plus adaptée. */
+export async function creerMissionPassage(passageId: string, dateProgrammee?: Date) {
+  const info = await infoMissionPassage(passageId);
+  if (!info) return null;
+  const { p } = info;
+  const [m] = await db
+    .insert(interventions)
+    .values({
+      appareilId: p.appareilId,
+      projetId: info.projetId,
+      type: info.typeMission ?? "preventive",
+      statut: "creee",
+      priorite: "normale",
+      description: `${info.libelle} — passage ${p.numero}/${p.total} — prévu vers le ${p.datePrevue.toLocaleDateString("fr-BE", { timeZone: "Europe/Brussels" })}`,
+      dateProgrammee: dateProgrammee ?? p.datePrevue,
+    })
+    .returning({ id: interventions.id });
+  if (info.checklistModeleId) {
+    try {
+      const n = await attribuerChecklists(m.id, [info.checklistModeleId], null);
+      if (!n) await attribuerParDefaut(m.id);
+    } catch {
+      await attribuerParDefaut(m.id);
+    }
+  } else {
+    await attribuerParDefaut(m.id);
+  }
+  await db.update(garantiePassages).set({ interventionId: m.id }).where(and(eq(garantiePassages.id, passageId), isNull(garantiePassages.interventionId)));
+  return { id: m.id, projetId: info.projetId, numeroAppareil: info.numeroAppareil, numero: p.numero, total: p.total, libelle: info.libelle };
+}
+
 export async function passagesDAppareils(appareilIds: string[]) {
   if (!appareilIds.length) return [];
   return enrichir(
@@ -165,54 +274,35 @@ export async function passagesDAppareils(appareilIds: string[]) {
 
 /** Pour le tableau de bord : passages non réalisés dans les 30 jours, ou en retard. */
 export async function passagesAVenirTableauDeBord() {
-  const limite = new Date(Date.now() + JOURS_BIENTOT * 86400000);
   const rows = enrichir(
     await requete()
-      .where(and(eq(garantiePassages.statut, "a_venir"), lte(garantiePassages.datePrevue, limite)))
+      .where(and(eq(garantiePassages.statut, "a_venir"), delaiAtteint()))
       .orderBy(asc(garantiePassages.datePrevue))
       .limit(200)
   );
   return rows.filter((r) => r.etat !== "realise");
 }
 
+/** Passage dont la date entre dans le délai d'anticipation (30 j garantie, réglage du contrat sinon). */
+function delaiAtteint() {
+  return sql`${garantiePassages.datePrevue} <= now() + make_interval(days => coalesce(${prestations.anticipationJours}, ${JOURS_BIENTOT}))`;
+}
+
 /**
- * Tâche planifiée (cron) : 30 jours avant un passage, crée la mission
- * « Passage de garantie k/N » à affecter (une seule fois).
+ * Tâche planifiée (cron) : à l'approche d'un passage (garantie : 30 jours ;
+ * contrat : son délai), crée la mission à affecter (une seule fois).
  */
 export async function creerMissionsPassagesProches() {
-  const limite = new Date(Date.now() + JOURS_BIENTOT * 86400000);
   const aCreer = await db
-    .select({
-      id: garantiePassages.id,
-      appareilId: garantiePassages.appareilId,
-      numero: garantiePassages.numero,
-      total: garantiePassages.total,
-      datePrevue: garantiePassages.datePrevue,
-      projetId: garanties.projetId,
-      numeroAppareil: appareils.numeroInterne,
-    })
+    .select({ id: garantiePassages.id })
     .from(garantiePassages)
-    .innerJoin(garanties, eq(garantiePassages.garantieId, garanties.id))
-    .innerJoin(appareils, eq(garantiePassages.appareilId, appareils.id))
-    .where(and(eq(garantiePassages.statut, "a_venir"), isNull(garantiePassages.interventionId), lte(garantiePassages.datePrevue, limite)))
+    .leftJoin(prestations, eq(garantiePassages.prestationId, prestations.id))
+    .where(and(eq(garantiePassages.statut, "a_venir"), isNull(garantiePassages.interventionId), delaiAtteint()))
     .limit(200);
-  const crees: { numeroAppareil: string; numero: number; total: number }[] = [];
+  const crees: { numeroAppareil: string; numero: number; total: number; libelle: string }[] = [];
   for (const p of aCreer) {
-    const [m] = await db
-      .insert(interventions)
-      .values({
-        appareilId: p.appareilId,
-        projetId: p.projetId,
-        type: "preventive",
-        statut: "creee",
-        priorite: "normale",
-        description: `Passage de garantie ${p.numero}/${p.total} — prévu vers le ${p.datePrevue.toLocaleDateString("fr-BE", { timeZone: "Europe/Brussels" })}`,
-        dateProgrammee: p.datePrevue,
-      })
-      .returning({ id: interventions.id });
-    await attribuerParDefaut(m.id);
-    await db.update(garantiePassages).set({ interventionId: m.id }).where(and(eq(garantiePassages.id, p.id), isNull(garantiePassages.interventionId)));
-    crees.push(p);
+    const m = await creerMissionPassage(p.id);
+    if (m) crees.push(m);
   }
   return crees;
 }
@@ -224,5 +314,5 @@ export async function marquerPassageRealise(interventionId: string) {
     .set({ statut: "realise", realiseLe: new Date() })
     .where(and(eq(garantiePassages.interventionId, interventionId), eq(garantiePassages.statut, "a_venir")))
     .returning({ garantieId: garantiePassages.garantieId });
-  for (const r of rows) await recalculerRestantes(r.garantieId);
+  for (const r of rows) if (r.garantieId) await recalculerRestantes(r.garantieId);
 }

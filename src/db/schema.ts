@@ -778,6 +778,14 @@ export const prestationsCatalogue = pgTable("prestations_catalogue", {
   description: text("description"),
   prixIndicatif: numeric("prix_indicatif"),
   actif: integer("actif").notNull().default(1),
+  // Phase 24 : « ponctuelle » ou « contrat » (durée + nombre de passages,
+  // un passage au milieu de chaque période, par appareil — comme la garantie).
+  mode: varchar("mode", { length: 20 }).notNull().default("ponctuelle"),
+  dureeMois: integer("duree_mois"),
+  nbPassages: integer("nb_passages"),
+  typeMission: typeInterventionEnum("type_mission"),
+  anticipationJours: integer("anticipation_jours").notNull().default(30),
+  checklistModeleId: uuid("checklist_modele_id").references(() => checklistModeles.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -802,8 +810,36 @@ export const prestations = pgTable("prestations", {
   description: text("description"),
   quantitePieces: integer("quantite_pieces"),
   prixEstime: numeric("prix_estime"),
+  // Phase 24 : contrat à passages — copie figée des paramètres du catalogue
+  // au moment de l'ajout (modifier le catalogue ne change jamais un contrat donné).
+  mode: varchar("mode", { length: 20 }).notNull().default("ponctuelle"),
+  dateDebut: timestamp("date_debut"),
+  dateFin: timestamp("date_fin"),
+  nbPassages: integer("nb_passages"),
+  typeMission: typeInterventionEnum("type_mission"),
+  anticipationJours: integer("anticipation_jours"),
+  checklistModeleId: uuid("checklist_modele_id").references(() => checklistModeles.id, { onDelete: "set null" }),
+  statutContrat: varchar("statut_contrat", { length: 20 }), // actif | renouvele
+  renouveleeParId: uuid("renouvelee_par_id"),
+  alerteFinLe: timestamp("alerte_fin_le"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// Phase 24 : appareils couverts par une prestation « contrat ».
+export const prestationAppareils = pgTable(
+  "prestation_appareils",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    prestationId: uuid("prestation_id")
+      .notNull()
+      .references(() => prestations.id, { onDelete: "cascade" }),
+    appareilId: uuid("appareil_id")
+      .notNull()
+      .references(() => appareils.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("prestation_appareils_idx").on(t.prestationId, t.appareilId)]
+);
 
 // ---------- Garantie ----------
 // Catalogue de formules (créées par l'utilisateur) : durée, nombre
@@ -1400,9 +1436,9 @@ export const garantiePassages = pgTable(
   "garantie_passages",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    garantieId: uuid("garantie_id")
-      .notNull()
-      .references(() => garanties.id, { onDelete: "cascade" }),
+    // Phase 24 : un passage vient soit d'une garantie, soit d'une prestation « contrat ».
+    garantieId: uuid("garantie_id").references(() => garanties.id, { onDelete: "cascade" }),
+    prestationId: uuid("prestation_id").references(() => prestations.id, { onDelete: "cascade" }),
     appareilId: uuid("appareil_id")
       .notNull()
       .references(() => appareils.id, { onDelete: "cascade" }),
@@ -1416,7 +1452,10 @@ export const garantiePassages = pgTable(
     realiseLe: timestamp("realise_le"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("garantie_passages_idx").on(t.garantieId, t.appareilId, t.numero)]
+  (t) => [
+    uniqueIndex("garantie_passages_idx").on(t.garantieId, t.appareilId, t.numero),
+    uniqueIndex("garantie_passages_prestation_idx").on(t.prestationId, t.appareilId, t.numero),
+  ]
 );
 
 // ==========================================================================

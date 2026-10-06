@@ -1,4 +1,5 @@
 import { db } from "@/db";
+import { contratsARenouveler } from "@/lib/contrats";
 import {
   appareils,
   demandesAide,
@@ -8,7 +9,6 @@ import {
   interventions,
   nonConformites,
   pushAbonnements,
-  reglesPlanification,
   demandesClient,
   formationsParticipants,
   formationsSessions,
@@ -89,16 +89,8 @@ export async function getNotifications(): Promise<Notification[]> {
       .select({ id: instrumentsMesure.id, nom: instrumentsMesure.nom, dateProchainEtalonnage: instrumentsMesure.dateProchainEtalonnage })
       .from(instrumentsMesure)
       .where(isNotNull(instrumentsMesure.dateProchainEtalonnage)),
-    db
-      .select({
-        id: reglesPlanification.id,
-        prochaineDate: reglesPlanification.prochaineDate,
-        anticipationJours: reglesPlanification.anticipationJours,
-        numeroInterne: appareils.numeroInterne,
-      })
-      .from(reglesPlanification)
-      .innerJoin(appareils, eq(reglesPlanification.appareilId, appareils.id))
-      .where(eq(reglesPlanification.actif, 1)),
+    // Phase 24 : contrats à passages qui se terminent (60 j) — à renouveler.
+    contratsARenouveler(),
     habilitationsCourantes(),
     // Phase 17 : mission envoyée depuis plus de 30 min et pas encore ouverte.
     db
@@ -298,14 +290,12 @@ export async function getNotifications(): Promise<Notification[]> {
   }
 
   for (const r of regles) {
-    if (r.prochaineDate <= dansNJours(r.anticipationJours)) {
-      notifications.push({
-        id: `planif-${r.id}`,
-        gravite: r.prochaineDate < now ? "crit" : "warn",
-        titre: `Échéance planning — ${r.numeroInterne}`,
-        href: "/responsable/planification",
-      });
-    }
+    notifications.push({
+      id: `contrat-fin-${r.id}`,
+      gravite: r.dateFin && r.dateFin < now ? "crit" : "warn",
+      titre: `Contrat ${r.dateFin && r.dateFin < now ? "terminé" : "qui se termine"} — ${r.client} · ${r.titre ?? "contrat"} — renouveler ?`,
+      href: `/responsable/projets/${r.projetId}?tab=garantie#contrats`,
+    });
   }
 
   // Phase 19 : statut calculé selon le catalogue (délai d'alerte propre à chaque habilitation).

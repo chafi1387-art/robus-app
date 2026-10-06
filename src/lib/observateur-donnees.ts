@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/db";
-import { appareils, interventions, rapports, reglesPlanification, users } from "@/db/schema";
-import { and, asc, desc, eq, gte, inArray, notInArray } from "drizzle-orm";
+import { appareils, garantiePassages, interventions, prestations, rapports, users } from "@/db/schema";
+import { and, asc, desc, eq, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { DROIT_HISTO_12_MOIS, type ContexteObservateur } from "@/lib/observateur";
 
 // Phase 18 : lectures de l'espace Observateur (toujours limitées aux
@@ -73,10 +73,23 @@ export async function prochainesVisites(appareilIds: string[]) {
           gte(interventions.dateProgrammee, maintenant)
         )
       ),
+    // Phase 24 : passages (garantie et contrats) pas encore transformés en mission.
     db
-      .select({ appareilId: reglesPlanification.appareilId, date: reglesPlanification.prochaineDate, type: reglesPlanification.type })
-      .from(reglesPlanification)
-      .where(and(inArray(reglesPlanification.appareilId, appareilIds), eq(reglesPlanification.actif, 1), gte(reglesPlanification.prochaineDate, maintenant))),
+      .select({
+        appareilId: garantiePassages.appareilId,
+        date: garantiePassages.datePrevue,
+        type: sql<"preventive" | "corrective" | "systematique">`coalesce(${prestations.typeMission}::text, 'preventive')`,
+      })
+      .from(garantiePassages)
+      .leftJoin(prestations, eq(garantiePassages.prestationId, prestations.id))
+      .where(
+        and(
+          inArray(garantiePassages.appareilId, appareilIds),
+          eq(garantiePassages.statut, "a_venir"),
+          isNull(garantiePassages.interventionId),
+          gte(garantiePassages.datePrevue, maintenant)
+        )
+      ),
   ]);
   return [...missions, ...regles]
     .filter((v): v is { appareilId: string; date: Date; type: "preventive" | "corrective" | "systematique" } => !!v.date)
