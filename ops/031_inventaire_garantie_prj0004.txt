@@ -1,0 +1,41 @@
+== projet
+ERROR:  column "nom" does not exist
+LINE 1: select id, reference, nom, statut, created_at from projets w...
+                              ^
+== garantie(s) du projet
+                  id                  | date_debut |  date_fin  | interventions_inclues | interventions_restantes 
+--------------------------------------+------------+------------+-----------------------+-------------------------
+ 3cce36b1-7c3f-41cd-a7df-8098e7aeb9f8 | 2026-10-06 | 2027-10-06 |                     4 |                       3
+(1 row)
+
+== passages
+ numero | total |  numero_interne   | date_prevue | statut  |           intervention_id            
+--------+-------+-------------------+-------------+---------+--------------------------------------
+      1 |     4 | B1020-1 HOME LIFT | 2026-11-21  | realise | 569135f6-25b7-4562-854b-10601e308806
+      2 |     4 | B1020-1 HOME LIFT | 2027-02-20  | a_venir | 239fcb5d-d496-4a84-ab8f-c5394a268ca0
+      3 |     4 | B1020-1 HOME LIFT | 2027-05-22  | a_venir | 
+      4 |     4 | B1020-1 HOME LIFT | 2027-08-22  | a_venir | 
+(4 rows)
+
+== toutes les missions du projet
+ERROR:  column i.date_prevue does not exist
+LINE 1: select i.id, i.type, i.statut, i.date_prevue, u.nom as techn...
+                                       ^
+== autres éléments du projet
+ prestations | techniciens | appareils 
+-------------+-------------+-----------
+           1 |           2 |         1
+(1 row)
+
+== tables qui référencent interventions (lignes liées aux missions du projet)
+  rapports.intervention_id : 4
+  enquetes_satisfaction.intervention_id : 1
+  mission_journal.intervention_id : 7
+  rapport_versions.intervention_id : 10
+  garantie_passages.intervention_id : 2
+  demandes_client.intervention_id : 1
+  signalements.intervention_id : 1
+  mission_checklists.intervention_id : 4
+  devis.intervention_id : 1
+== fin (rien n'a été modifié)
+(code retour 0, 2026-10-08 20:18:03)
