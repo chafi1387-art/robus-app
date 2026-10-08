@@ -1,44 +1,18 @@
-=== Deploiement 2026-10-08 10:00:04 : ef9c746 -> 23a34e1
---- migration 0021_temps_reel.sql
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "projets" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "projet_techniciens" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "projet_appareils" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "prestations" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "prestation_appareils" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "formations_sessions" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "formations_participants" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "habilitations_technicien" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "mouvements_stock" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "pieces" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "non_conformites" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "heures_sous_traitance" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "clients" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "sites" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "devis" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "observateurs" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "observateur_appareils" does not exist, skipping
-psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "enquetes_satisfaction" does not exist, skipping
-DO
-UPDATE 0
---- migration 0022_devis_mission.sql
+=== Deploiement 2026-10-08 10:22:02 : 23a34e1 -> a954485
+--- migration 0023_historique_etats_appareils.sql
 ALTER TABLE
-ALTER TABLE
-CREATE INDEX
-CREATE INDEX
-DO
-CREATE TABLE
-CREATE INDEX
 CREATE TABLE
 CREATE INDEX
 CREATE INDEX
-CREATE INDEX
-CREATE TABLE
-CREATE INDEX
+UPDATE 23
+INSERT 0 23
 ALTER TABLE
-psql:/tmp/0022_devis_mission.sql:93: NOTICE:  trigger "robus_temps_reel" for relation "devis_destinataires" does not exist, skipping
+CREATE FUNCTION
+CREATE FUNCTION
+psql:/tmp/0023_historique_etats_appareils.sql:60: NOTICE:  trigger "robus_appareil_etat_avant" for relation "appareils" does not exist, skipping
 DROP TRIGGER
 CREATE TRIGGER
-psql:/tmp/0022_devis_mission.sql:95: NOTICE:  trigger "robus_temps_reel" for relation "mission_passages" does not exist, skipping
+psql:/tmp/0023_historique_etats_appareils.sql:62: NOTICE:  trigger "robus_appareil_etat_apres" for relation "appareils" does not exist, skipping
 DROP TRIGGER
 CREATE TRIGGER
 --- build
@@ -68,4 +42,4 @@ CREATE TRIGGER
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK 23a34e1
+STATUT: OK a954485
