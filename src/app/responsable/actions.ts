@@ -388,13 +388,15 @@ const assignerInterventionSchema = z.object({
 
 export async function assignerIntervention(formData: FormData) {
   const user = await requireUser(ROLES_BUREAU);
+  // Phase 27 : retour sur la page d'origine (planning, vue, jour) avec un message.
+  const retour = retourPlanning(formData.get("retour"));
   const technicienId = formData.get("technicienId");
   const parsed = assignerInterventionSchema.safeParse({
     interventionId: formData.get("interventionId"),
     technicienId: technicienId && technicienId !== "" ? technicienId : undefined,
     dateProgrammee: formData.get("dateProgrammee") || undefined,
   });
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
+  if (!parsed.success) redirect(avecMessage(retour, "erreur", parsed.error.issues[0]?.message ?? "Données invalides"));
 
   const [existing] = await db
     .select({
@@ -406,20 +408,20 @@ export async function assignerIntervention(formData: FormData) {
     .from(interventions)
     .where(eq(interventions.id, parsed.data.interventionId))
     .limit(1);
-  if (!existing) throw new Error("Intervention introuvable.");
+  if (!existing) redirect(avecMessage(retour, "erreur", "Mission introuvable."));
   // Phase 19 : contrôle des habilitations obligatoires avant l'envoi.
   if (parsed.data.technicienId && parsed.data.technicienId !== existing.technicienId) {
     const manques = await controlerHabilitations(parsed.data.technicienId, [parsed.data.interventionId]);
     if (manques.length) {
-      redirect(avecMessage("/responsable/interventions", "erreur", messageManques(await nomUtilisateur(parsed.data.technicienId), manques)));
+      redirect(avecMessage(retour, "erreur", messageManques(await nomUtilisateur(parsed.data.technicienId), manques)));
     }
   }
   // Phase 17 : pas d'envoi sans date.
   if (parsed.data.technicienId && !parsed.data.dateProgrammee && !existing.dateProgrammee) {
-    throw new Error("Cette mission n'a pas de date : choisissez la date et l'heure avant de l'affecter.");
+    redirect(avecMessage(retour, "erreur", "Cette mission n'a pas de date : choisissez la date et l'heure avant de l'affecter."));
   }
   if (STATUTS_INTERVENTION_VERROUILLES.has(existing.statut)) {
-    throw new Error("Cette intervention est déjà engagée — le technicien ne peut plus être changé.");
+    redirect(avecMessage(retour, "erreur", "Cette mission est déjà commencée — le technicien ne peut plus être changé."));
   }
 
   await db
@@ -457,8 +459,47 @@ export async function assignerIntervention(formData: FormData) {
     });
   }
 
-  revalidatePath("/responsable/interventions");
+  revalidatePath("/", "layout");
+  const nom = parsed.data.technicienId ? await nomUtilisateur(parsed.data.technicienId) : null;
+  redirect(
+    avecMessage(
+      retour,
+      "ok",
+      nom
+        ? existing.projetId
+          ? `Mission affectée à ${nom} et envoyée (application, téléphone, email).`
+          : `Mission affectée à ${nom}.`
+        : "Mission remise « à affecter »."
+    )
+  );
 }
+
+function retourPlanning(v: FormDataEntryValue | null) {
+  const s = typeof v === "string" ? v : "";
+  return s.startsWith("/responsable/") && !s.startsWith("//") ? s : "/responsable/interventions";
+}
+
+// Phase 27 : « Relancer » depuis le planning — renvoie la mission au même
+// technicien (application + téléphone + email) ; nouvel accusé de réception.
+export async function relancerMission(formData: FormData) {
+  const user = await requireUser(ROLES_BUREAU);
+  const retour = retourPlanning(formData.get("retour"));
+  const id = String(formData.get("interventionId") ?? "");
+  if (!z.string().uuid().safeParse(id).success) redirect(avecMessage(retour, "erreur", "Mission introuvable."));
+  const [m] = await db
+    .select({ statut: interventions.statut, technicienId: interventions.technicienId, projetId: interventions.projetId })
+    .from(interventions)
+    .where(eq(interventions.id, id))
+    .limit(1);
+  if (!m || !m.technicienId || !m.projetId) redirect(avecMessage(retour, "erreur", "Cette mission n'a pas de technicien à relancer."));
+  if (STATUTS_INTERVENTION_VERROUILLES.has(m.statut)) redirect(avecMessage(retour, "erreur", "Cette mission est déjà commencée."));
+  await envoyerEtJournaliserOrdreMission({ projetId: m.projetId, technicienId: m.technicienId, interventionIds: [id], envoyeParId: user.id });
+  await journaliser({ utilisateurId: user.id, action: "mission_relancee", entite: "intervention", entiteId: id, details: "Mission relancée depuis le planning" });
+  revalidatePath("/", "layout");
+  redirect(avecMessage(retour, "ok", `Mission renvoyée à ${await nomUtilisateur(m.technicienId)} (application, téléphone, email).`));
+}
+
+
 
 const contactSchema = z.object({
   clientId: z.string().uuid(),

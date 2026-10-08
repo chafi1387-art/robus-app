@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Download, Plus, Search } from "lucide-react";
 import { Card, Btn, Field, inputClass } from "@/components/ui";
 import { RafraichissementAuto } from "@/components/rafraichissement-auto";
+import { Compteur, type TonCompteur } from "@/components/kit-tableau";
 import { ArretDepuis, BadgePriorite, CarteAppareil, LignePriorite, PastilleEtat } from "@/components/parc";
 import { chargerParc, estArret, indicateursParc, jourCourt, type LigneParc } from "@/lib/parc";
 import { createAppareil } from "../actions";
@@ -52,13 +53,14 @@ export default async function AppareilsPage({ searchParams }: { searchParams: Pr
   const pct = (n: number) => (k.total ? Math.round((n / k.total) * 100) : 0);
   const arretTotal = k.horsService + k.enPanne;
 
-  const compteurs: { cle: string; titre: string; valeur: number; sous: string; style: string; couleur: string }[] = [
-    { cle: "arret", titre: "Hors service / en panne", valeur: arretTotal, sous: `${k.horsService} hors service · ${k.enPanne} en panne`, style: arretTotal ? "bg-red text-white border-red" : "bg-surface border-line", couleur: arretTotal ? "text-white" : "text-green-ink" },
-    { cle: "surveillance", titre: "Sous surveillance", valeur: k.surveillance, sous: k.repetees ? `dont ${k.repetees} pannes répétées` : "à suivre", style: "bg-surface border-[#F0C9A5]", couleur: "text-orange-ink" },
-    { cle: "encours", titre: "Missions en cours", valeur: k.missionsEnCours, sous: k.techniciensSurPlace ? `${k.techniciensSurPlace} technicien(s) sur place` : "personne sur place", style: "bg-surface border-line", couleur: "text-blue" },
-    { cle: "affecter", titre: "Missions à affecter", valeur: k.aAffecter, sous: "sans technicien", style: "bg-surface border-line", couleur: k.aAffecter ? "text-orange-ink" : "text-navy" },
-    { cle: "visites", titre: "Visites ≤ 7 jours", valeur: k.visites7, sous: "préventives & passages", style: "bg-surface border-line", couleur: "text-navy" },
-    { cle: "service", titre: "En service", valeur: k.enService, sous: `${pct(k.enService)} % du parc`, style: "bg-surface border-[#C9E8D4]", couleur: "text-green-ink" },
+  // Phase 27 : compteurs du kit commun (même rendu que le Planning).
+  const compteurs: { cle: string; titre: string; valeur: number; sous: string; ton: TonCompteur }[] = [
+    { cle: "arret", titre: "Hors service / en panne", valeur: arretTotal, sous: `${k.horsService} hors service · ${k.enPanne} en panne`, ton: arretTotal ? "rouge-plein" : "vert" },
+    { cle: "surveillance", titre: "Sous surveillance", valeur: k.surveillance, sous: k.repetees ? `dont ${k.repetees} pannes répétées` : "à suivre", ton: "orange" },
+    { cle: "encours", titre: "Missions en cours", valeur: k.missionsEnCours, sous: k.techniciensSurPlace ? `${k.techniciensSurPlace} technicien(s) sur place` : "personne sur place", ton: "bleu" },
+    { cle: "affecter", titre: "Missions à affecter", valeur: k.aAffecter, sous: "sans technicien", ton: k.aAffecter ? "orange" : "neutre" },
+    { cle: "visites", titre: "Visites ≤ 7 jours", valeur: k.visites7, sous: "préventives & passages", ton: "neutre" },
+    { cle: "service", titre: "En service", valeur: k.enService, sous: `${pct(k.enService)} % du parc`, ton: "vert" },
   ];
 
   return (
@@ -92,16 +94,7 @@ export default async function AppareilsPage({ searchParams }: { searchParams: Pr
       {/* Compteurs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         {compteurs.map((c) => (
-          <Link
-            key={c.cle}
-            href={lien({ f: filtre === c.cle ? null : c.cle })}
-            aria-pressed={filtre === c.cle}
-            className={`rounded-2xl border p-4 flex flex-col gap-1.5 transition-shadow hover:shadow-md ${c.style} ${filtre === c.cle ? "ring-2 ring-navy ring-offset-2" : ""}`}
-          >
-            <span className={`text-xs font-semibold ${c.cle === "arret" && c.valeur ? "text-white/90" : "text-ink-soft"}`}>{c.titre}</span>
-            <span className={`font-display font-extrabold text-[34px] leading-none ${c.couleur}`}>{c.valeur}</span>
-            <span className={`text-xs ${c.cle === "arret" && c.valeur ? "text-white/90" : "text-ink-soft"}`}>{c.sous}</span>
-          </Link>
+          <Compteur key={c.cle} titre={c.titre} valeur={c.valeur} sous={c.sous} ton={c.ton} href={lien({ f: filtre === c.cle ? null : c.cle })} actif={filtre === c.cle} />
         ))}
       </div>
 

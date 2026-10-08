@@ -259,7 +259,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
         </div>
         {m.description && <p className="text-sm mt-3 bg-blue-pale/50 rounded-lg px-3 py-2">{m.description}</p>}
         {!m.technicienId && (
-          <Link href="/responsable/interventions" className="inline-block mt-3 text-sm font-bold text-blue">Affecter un technicien dans le Planning des missions →</Link>
+          <Link href={`/responsable/interventions?affecter=${m.id}#m-${m.id}`} className="inline-block mt-3 text-sm font-bold text-blue">Affecter un technicien dans le Planning des missions →</Link>
         )}
         {enDirect && (
           <div className="mt-3">

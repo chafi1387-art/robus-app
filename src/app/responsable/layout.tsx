@@ -4,30 +4,38 @@ import { TempsReel } from "@/components/temps-reel";
 import Link from "next/link";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { db } from "@/db";
-import { interventions, appareils, demandesClient, signalements } from "@/db/schema";
-import { and, eq, count, ne, isNull } from "drizzle-orm";
+import { demandesClient, signalements } from "@/db/schema";
+import { eq, count } from "drizzle-orm";
 import { signOut } from "@/auth";
 import { getNotifications } from "@/lib/notifications";
 import { NavBureau } from "@/components/nav-bureau";
 import { nbAppareilsArret } from "@/lib/parc";
+import { compteursMenuPlanning } from "@/lib/planning";
 import { MenuMobile } from "@/components/menu-mobile";
 import { Bell, FileText } from "lucide-react";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 async function getBadgeCounts() {
-  const [arret, [{ n: nonAffectees }], [{ n: demandes }], [{ n: sig }]] = await Promise.all([
+  const [arret, planning, [{ n: demandes }], [{ n: sig }]] = await Promise.all([
     // Phase 26 : appareils à l'arrêt = en panne + hors service.
     nbAppareilsArret(),
-    db
-      .select({ n: count() })
-      .from(interventions)
-      .where(and(ne(interventions.statut, "cloturee"), isNull(interventions.technicienId))),
+    // Phase 27 : missions en cours (pastille rouge) + à affecter / en retard.
+    compteursMenuPlanning(),
     // Phase 20 : demandes client à prendre en charge.
     db.select({ n: count() }).from(demandesClient).where(eq(demandesClient.statut, "nouvelle")),
     // Phase 21 : signalements des techniciens à prendre en charge.
     db.select({ n: count() }).from(signalements).where(eq(signalements.statut, "nouveau")),
   ]);
-  return { retard: arret.total, enPanne: arret.enPanne, horsService: arret.horsService, nonAffectees: Number(nonAffectees), demandes: Number(demandes), signalements: Number(sig) };
+  return {
+    panne: arret.total,
+    enPanne: arret.enPanne,
+    horsService: arret.horsService,
+    enCours: planning.enCours,
+    aAffecter: planning.aAffecter,
+    enRetard: planning.enRetard,
+    demandes: Number(demandes),
+    signalements: Number(sig),
+  };
 }
 
 export default async function ResponsableLayout({ children }: { children: React.ReactNode }) {
@@ -49,7 +57,7 @@ export default async function ResponsableLayout({ children }: { children: React.
           </div>
         </div>
 
-        <NavBureau role={user.role} badges={{ panne: badges.retard, enPanne: badges.enPanne, horsService: badges.horsService, nonAffectees: badges.nonAffectees, demandes: badges.demandes, signalements: badges.signalements }} />
+        <NavBureau role={user.role} badges={badges} />
 
         <div className="mt-auto px-5 py-4 border-t border-white/10 text-xs text-blue-accent/80">
           ROBUS · Pilotage ISO 9001
@@ -58,7 +66,7 @@ export default async function ResponsableLayout({ children }: { children: React.
 
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="print:hidden sticky top-0 z-20 bg-surface/95 backdrop-blur border-b border-line flex items-center gap-2 sm:gap-4 px-3 sm:px-8 h-16">
-          <MenuMobile role={user.role} badges={{ panne: badges.retard, enPanne: badges.enPanne, horsService: badges.horsService, nonAffectees: badges.nonAffectees, demandes: badges.demandes, signalements: badges.signalements }} />
+          <MenuMobile role={user.role} badges={badges} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-robus.png" alt="ROBUS" className="lg:hidden h-7 w-auto object-contain" />
           <div className="flex-1" />

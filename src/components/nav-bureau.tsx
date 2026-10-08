@@ -8,7 +8,7 @@ import {
   ScrollText, ShieldCheck, Siren, Smile, Target, Timer, TriangleAlert, UserCog, UserSearch, Search,
 } from "lucide-react";
 
-type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; adminOnly?: boolean; badge?: "panne" | "nonAffectees" | "demandes" | "signalements" };
+type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; adminOnly?: boolean; badge?: "panne" | "enCours" | "demandes" | "signalements" };
 
 // Refonte Phase 13 : plus d'entrée « Interventions » — les missions vivent
 // dans chaque Projet ; « Planning des missions » les montre toutes.
@@ -20,7 +20,7 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
       { href: "/responsable/demandes", label: "Demandes clients", icon: Inbox, badge: "demandes" },
       { href: "/responsable/signalements", label: "Signalements", icon: Siren, badge: "signalements" },
       { href: "/responsable/projets", label: "Projets", icon: FolderKanban },
-      { href: "/responsable/interventions", label: "Planning des missions", icon: CalendarDays, badge: "nonAffectees" },
+      { href: "/responsable/interventions", label: "Planning des missions", icon: CalendarDays, badge: "enCours" },
       { href: "/responsable/sous-traitance", label: "Sous-traitance", icon: Timer },
     ],
   },
@@ -64,7 +64,29 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
   },
 ];
 
-type Badges = { panne: number; nonAffectees: number; demandes?: number; signalements?: number; enPanne?: number; horsService?: number };
+export type Badges = {
+  panne: number;
+  enPanne?: number;
+  horsService?: number;
+  // Phase 27 : planning — missions en cours (pastille), à affecter, en retard.
+  enCours: number;
+  aAffecter?: number;
+  enRetard?: number;
+  demandes?: number;
+  signalements?: number;
+};
+
+/** Ligne de détail sous un lien du menu (appareils à l'arrêt, planning). */
+function detailBadge(badge: Item["badge"], b: Badges) {
+  const pl = (n: number, s: string, p = s + "s") => `${n} ${n > 1 ? p : s}`;
+  if (badge === "panne" && b.panne > 0)
+    return [b.enPanne ? `${b.enPanne} en panne` : null, b.horsService ? `${b.horsService} hors service` : null].filter(Boolean).join(" · ");
+  if (badge === "enCours")
+    return [b.enCours ? `${b.enCours} en cours` : null, b.aAffecter ? `${b.aAffecter} à affecter` : null, b.enRetard ? pl(b.enRetard, "en retard", "en retard") : null]
+      .filter(Boolean)
+      .join(" · ");
+  return "";
+}
 
 export function NavBureau({ role, badges }: { role: string; badges: Badges }) {
   const pathname = usePathname();
@@ -81,11 +103,14 @@ export function NavBureau({ role, badges }: { role: string; badges: Badges }) {
               const on = actif(item.href);
               const Icon = item.icon;
               const n = item.badge ? badges[item.badge] ?? 0 : 0;
-              // Phase 26 : appareils à l'arrêt (en panne + hors service), détail sous le lien.
-              const detailArret =
+              // Phase 26/27 : détail sous le lien (appareils à l'arrêt, planning).
+              const detail = detailBadge(item.badge, badges);
+              const aria =
                 item.badge === "panne" && n > 0
-                  ? [badges.enPanne ? `${badges.enPanne} en panne` : null, badges.horsService ? `${badges.horsService} hors service` : null].filter(Boolean).join(" · ")
-                  : "";
+                  ? `${n} appareils à l'arrêt : ${detail}`
+                  : item.badge === "enCours" && n > 0
+                    ? `${n} mission${n > 1 ? "s" : ""} en cours`
+                    : undefined;
               return (
                 <div key={item.href}>
                 <Link
@@ -98,17 +123,16 @@ export function NavBureau({ role, badges }: { role: string; badges: Badges }) {
                   <span className="flex-1 truncate">{item.label}</span>
                   {n > 0 && (
                     <span
-                      title={detailArret || undefined}
-                      aria-label={detailArret ? `${n} appareils à l'arrêt : ${detailArret}` : undefined}
-                      className={`min-w-5 h-5 px-1.5 rounded-full text-white text-[11px] font-bold flex items-center justify-center ${
-                        item.badge === "panne" || item.badge === "demandes" || item.badge === "signalements" ? "bg-red" : "bg-orange"
-                      } ${item.badge === "panne" ? "ring-[3px] ring-red/30" : ""}`}
+                      title={detail || undefined}
+                      aria-label={aria}
+                      className={`min-w-5 h-5 px-1.5 gap-1 rounded-full text-white text-[11px] font-bold flex items-center justify-center bg-red ${item.badge === "panne" || item.badge === "enCours" ? "ring-[3px] ring-red/30" : ""}`}
                     >
+                      {item.badge === "enCours" && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" />}
                       {n}
                     </span>
                   )}
                 </Link>
-                {detailArret && <div className="pl-[42px] pr-3 -mt-0.5 mb-0.5 text-[11px] text-[#f3b4ac]">{detailArret}</div>}
+                {detail && <div className={`pl-[42px] pr-3 -mt-0.5 mb-0.5 text-[11px] ${n > 0 ? "text-[#f3b4ac]" : "text-[#f6c99f]"}`}>{detail}</div>}
                 </div>
               );
             })}

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, X } from "lucide-react";
-import { NavBureau } from "@/components/nav-bureau";
+import { NavBureau, type Badges } from "@/components/nav-bureau";
 
 // Phase 15 : sur téléphone/tablette, le menu latéral se replie derrière ☰.
 // Rendu dans <body> (portail) : l'en-tête a un flou d'arrière-plan qui
 // empêcherait le panneau de couvrir tout l'écran.
-export function MenuMobile({ role, badges }: { role: string; badges: { panne: number; nonAffectees: number; demandes?: number; signalements?: number; enPanne?: number; horsService?: number } }) {
+export function MenuMobile({ role, badges }: { role: string; badges: Badges }) {
   const [ouvert, setOuvert] = useState(false);
   return (
     <>
@@ -19,10 +19,13 @@ export function MenuMobile({ role, badges }: { role: string; badges: { panne: nu
         className="lg:hidden relative w-10 h-10 -ml-1 rounded-xl flex items-center justify-center text-navy hover:bg-blue-pale"
       >
         <Menu className="w-6 h-6" />
-        {/* Phase 26 : appareils à l'arrêt, visibles même menu fermé. */}
-        {badges.panne > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red text-white text-[11px] font-bold flex items-center justify-center" aria-label={`${badges.panne} appareils à l'arrêt`}>
-            {badges.panne}
+        {/* Phase 26/27 : appareils à l'arrêt + missions en cours, visibles même menu fermé. */}
+        {badges.panne + badges.enCours > 0 && (
+          <span
+            className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red text-white text-[11px] font-bold flex items-center justify-center"
+            aria-label={[badges.panne ? `${badges.panne} appareils à l'arrêt` : null, badges.enCours ? `${badges.enCours} missions en cours` : null].filter(Boolean).join(", ")}
+          >
+            {badges.panne + badges.enCours}
           </span>
         )}
       </button>
