@@ -1,0 +1,33 @@
+== sauvegarde : /root/robus-backups/base-avant-suppr-b1020-20261008-202502.sql.gz (54602 octets)
+ appareils | garanties | missions 
+-----------+-----------+----------
+         1 |         1 |        5
+(1 row)
+
+DO
+               quoi               | n  
+----------------------------------+----
+ mouvements_stock (stock remis)   |  0
+ rapports (missions)              |  4
+ enquetes_satisfaction (missions) |  1
+ mission_journal (missions)       |  7
+ rapport_versions (missions)      | 10
+ demandes_client (missions)       |  1
+ signalements (missions)          |  1
+ mission_checklists (missions)    |  4
+ devis (missions)                 |  1
+ interventions (missions)         |  5
+ garanties                        |  1
+ projet_appareils (appareil)      |  1
+ appareils                        |  1
+(13 rows)
+
+COMMIT
+ appareil_restant | garantie_restante | projet_conserve 
+------------------+-------------------+-----------------
+                0 |                 0 |               1
+(1 row)
+
+/connexion 200
+/responsable/projets 307
+(code retour 0, 2026-10-08 20:25:03)
