@@ -1,4 +1,7 @@
-=== Deploiement 2026-10-08 11:18:02 : c75c948 -> d1cf81b
+=== Deploiement 2026-10-08 11:47:02 : d1cf81b -> d1f3013
+--- migration 0024_derniere_connexion.sql
+ALTER TABLE
+UPDATE 10
 --- build
 ├ ƒ /responsable/sous-traitance
 ├ ƒ /responsable/stock
@@ -26,4 +29,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK d1cf81b
+STATUT: OK d1f3013
