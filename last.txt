@@ -1,20 +1,4 @@
-=== Deploiement 2026-10-08 10:22:02 : 23a34e1 -> a954485
---- migration 0023_historique_etats_appareils.sql
-ALTER TABLE
-CREATE TABLE
-CREATE INDEX
-CREATE INDEX
-UPDATE 23
-INSERT 0 23
-ALTER TABLE
-CREATE FUNCTION
-CREATE FUNCTION
-psql:/tmp/0023_historique_etats_appareils.sql:60: NOTICE:  trigger "robus_appareil_etat_avant" for relation "appareils" does not exist, skipping
-DROP TRIGGER
-CREATE TRIGGER
-psql:/tmp/0023_historique_etats_appareils.sql:62: NOTICE:  trigger "robus_appareil_etat_apres" for relation "appareils" does not exist, skipping
-DROP TRIGGER
-CREATE TRIGGER
+=== Deploiement 2026-10-08 10:25:02 : a954485 -> c75c948
 --- build
 ├ ƒ /responsable/sous-traitance
 ├ ƒ /responsable/stock
@@ -42,4 +26,4 @@ CREATE TRIGGER
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK a954485
+STATUT: OK c75c948
