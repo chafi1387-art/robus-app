@@ -9,6 +9,7 @@ import { CarteApplication } from "@/components/app-installable";
 import { clePubliqueVapid } from "@/lib/push";
 import { formatDate } from "@/lib/format";
 import { DROITS, PARAM_TELEPHONE, getParametre, requireObservateur } from "@/lib/observateur";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 export default async function CompteObservateurPage() {
   const ctx = await requireObservateur();
@@ -58,9 +59,9 @@ export default async function CompteObservateurPage() {
             <div className="text-xs text-ink-soft">Interventions du mois, prochaines visites, demandes en cours — le 1er du mois.</div>
           </div>
           <form action={basculerResumeMensuel}>
-            <button type="submit" className={`text-xs font-bold rounded-full px-3 py-1.5 ${obs?.resume ? "bg-green-fill text-green-ink" : "bg-bg text-ink-soft border border-line"}`}>
+            <BoutonEnvoi type="submit" className={`text-xs font-bold rounded-full px-3 py-1.5 ${obs?.resume ? "bg-green-fill text-green-ink" : "bg-bg text-ink-soft border border-line"}`}>
               {obs?.resume ? "Activé" : "Désactivé"}
-            </button>
+            </BoutonEnvoi>
           </form>
         </Card>
       )}

@@ -8,6 +8,7 @@ import { Card, inputClass } from "@/components/ui";
 import { ListeSignalements } from "@/components/liste-signalements";
 import { TYPES_SIGNALEMENT } from "@/lib/signalements-types";
 import { statsSecurite } from "@/lib/signalements-stats";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 // Phase 21 : tous les signalements des techniciens — filtres, indicateurs
 // sécurité (jours sans accident), export pour l'audit.
@@ -116,7 +117,7 @@ export default async function SignalementsPage({
               ))}
             </select>
           </label>
-          <button type="submit" className="rounded-lg px-4 py-2 text-sm font-bold bg-blue text-white">Filtrer</button>
+          <BoutonEnvoi type="submit" className="rounded-lg px-4 py-2 text-sm font-bold bg-blue text-white">Filtrer</BoutonEnvoi>
         </form>
       </Card>
 

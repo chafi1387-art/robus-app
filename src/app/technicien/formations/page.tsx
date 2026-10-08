@@ -8,6 +8,7 @@ import { and, desc, eq, ilike, ne } from "drizzle-orm";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { consulterDocument } from "./actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const LIEU_SESSION: Record<string, string> = { terrain: "Sur le terrain", bureau: "Au bureau", ecole: "École / organisme" };
 
@@ -164,12 +165,12 @@ export default async function FormationsPage({
               </option>
             ))}
           </select>
-          <button
+          <BoutonEnvoi
             type="submit"
             className="text-sm font-bold rounded-lg px-3 py-2 bg-blue text-white hover:bg-blue-light"
           >
             Filtrer
-          </button>
+          </BoutonEnvoi>
         </form>
 
         <div className="flex flex-col gap-3">

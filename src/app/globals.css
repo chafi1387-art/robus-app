@@ -79,3 +79,48 @@ html { font-size: 17px; }
   main table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   main pre { max-width: 100%; overflow-x: auto; }
 }
+
+/* Phase 25 — retour visuel des boutons et des messages */
+.bouton-roue {
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 0.15em;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: bouton-roue 0.7s linear infinite;
+  vertical-align: -0.12em;
+  flex-shrink: 0;
+}
+@keyframes bouton-roue {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Formulaire en cours d'envoi (ex. tuile photo « Retirer ») : grisé. */
+form:has([data-envoi]) [data-pendant-envoi="griser"],
+form:has([data-envoi])[data-pendant-envoi="griser"] {
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+.toast-entree {
+  animation: toast-entree 0.18s ease-out;
+}
+@keyframes toast-entree {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+/* Barre de chargement en haut de l'écran (navigation) */
+.barre-navigation {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  z-index: 70;
+  background: var(--blue-accent);
+  box-shadow: 0 0 8px var(--blue-accent);
+  transition: width 0.25s ease, opacity 0.3s ease;
+}

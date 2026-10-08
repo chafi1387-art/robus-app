@@ -11,6 +11,8 @@ import { requireObservateur } from "@/lib/observateur";
 import { ETAPES_DEMANDE, STATUTS_DEMANDE, TYPES_DEMANDE } from "@/lib/demandes";
 import { prenom } from "@/lib/observateur-donnees";
 import { noterDemande, repondreDemandeClient } from "../../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
+import { EnvoiFichiers } from "@/components/envoi-fichiers";
 
 // Phase 20 : suivi d'une demande par l'observateur (étapes, discussion, note).
 export default async function DemandeObservateurPage({
@@ -121,10 +123,8 @@ export default async function DemandeObservateurPage({
         <form action={repondreDemandeClient} className="flex flex-col gap-2 mt-4 pt-3 border-t border-line">
           <input type="hidden" name="demandeId" value={d.id} />
           <textarea name="texte" rows={2} placeholder={fini ? "Un problème persiste ? Écrivez-nous (la demande sera rouverte)…" : "Votre message à ROBUS…"} className="rounded-xl border border-line px-3 py-2.5 text-[15px]" />
-          <div className="flex items-center justify-between gap-2">
-            <input type="file" name="fichiers" multiple className="text-xs max-w-[55%]" />
-            <button type="submit" className="bg-blue text-white font-bold text-sm rounded-xl px-4 py-2.5">Envoyer</button>
-          </div>
+          <EnvoiFichiers type="fichier" name="fichiers" dossier="missions" max={5} compact />
+          <BoutonEnvoi type="submit" className="self-end bg-blue text-white font-bold text-sm rounded-xl px-4 py-2.5" enCours="Envoi…">Envoyer</BoutonEnvoi>
         </form>
       </Card>
 
@@ -148,7 +148,7 @@ export default async function DemandeObservateurPage({
                 ))}
               </div>
               <textarea name="commentaire" rows={2} maxLength={1000} placeholder="Un commentaire ? (facultatif)" className="rounded-xl border border-line px-3 py-2.5 text-[15px]" />
-              <button type="submit" className="bg-blue text-white font-display font-bold rounded-xl py-3">Envoyer ma note{d.statut === "resolue" ? " et clôturer" : ""}</button>
+              <BoutonEnvoi type="submit" className="bg-blue text-white font-display font-bold rounded-xl py-3">Envoyer ma note{d.statut === "resolue" ? " et clôturer" : ""}</BoutonEnvoi>
             </form>
           )}
         </Card>

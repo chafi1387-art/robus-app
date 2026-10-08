@@ -11,6 +11,7 @@ import { formatDateTime, toDatetimeLocalValue } from "@/lib/format";
 import { adressesAppareils } from "@/lib/observateur";
 import { ETAPES_DEMANDE, STATUTS_DEMANDE, TYPES_DEMANDE, delais, echeancePriseEnCharge } from "@/lib/demandes";
 import { cloturerDemande, planifierDepuisDemande, prendreEnCharge, repondreDemande, resoudreDemande } from "../actions";
+import { EnvoiFichiers } from "@/components/envoi-fichiers";
 
 const ACCEPT = "application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -156,10 +157,8 @@ export default async function DemandePage({ params }: { params: Promise<{ id: st
             <form action={repondreDemande} className="flex flex-col gap-2 mt-4 pt-3 border-t border-line">
               <input type="hidden" name="demandeId" value={d.id} />
               <textarea name="texte" rows={3} placeholder="Votre réponse au client (il la reçoit par email et dans son espace)…" className={inputClass} />
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <input type="file" name="fichiers" multiple accept={ACCEPT} className="text-sm" />
-                <Btn>Envoyer au client</Btn>
-              </div>
+              <EnvoiFichiers type="fichier" name="fichiers" dossier="missions" max={5} compact />
+              <Btn className="self-end" enCours="Envoi…">Envoyer au client</Btn>
             </form>
           ) : (
             <p className="text-xs text-ink-soft mt-4 pt-3 border-t border-line">Demandeur sans compte ni email : contactez-le par téléphone.</p>

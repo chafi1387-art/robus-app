@@ -7,6 +7,8 @@ import { StatutAppareilPill } from "@/components/ui";
 import { CarteApplication } from "@/components/app-installable";
 import { EtapesSuivi } from "@/components/etapes-suivi";
 import { clePubliqueVapid } from "@/lib/push";
+import { devisDeLObservateur } from "@/lib/devis";
+import { ListeDevisObservateur } from "@/components/liste-devis-observateur";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { ETAPES, adressesAppareils, etapeObservateur, requireObservateur } from "@/lib/observateur";
 import { interventionsEnCours, interventionsTerminees, prochainesVisites } from "@/lib/observateur-donnees";
@@ -16,7 +18,7 @@ export default async function MesAscenseursPage({ searchParams }: { searchParams
   const { acces } = await searchParams;
   const ids = ctx.appareilIds;
   const d = ctx.droits;
-  const [liste, adresses, enCours, terminees, visites] = await Promise.all([
+  const [liste, adresses, enCours, terminees, visites, mesDevis] = await Promise.all([
     ids.length
       ? db
           .select({ id: appareils.id, numero: appareils.numeroInterne, marque: appareils.marque, modele: appareils.modele, statut: appareils.statut })
@@ -28,7 +30,10 @@ export default async function MesAscenseursPage({ searchParams }: { searchParams
     d.has("temps_reel") ? interventionsEnCours(ids) : Promise.resolve([]),
     d.has("historique") ? interventionsTerminees(ctx, ids, 200) : Promise.resolve([]),
     d.has("prochaines_visites") ? prochainesVisites(ids) : Promise.resolve([]),
+    devisDeLObservateur(ctx.userId),
   ]);
+  // Phase 25b : en premier les devis qui attendent une réponse, puis les 3 derniers.
+  const devisAffiches = [...mesDevis.filter((x) => x.statut === "envoye"), ...mesDevis.filter((x) => x.statut !== "envoye").slice(0, 3)];
 
   return (
     <div className="flex flex-col gap-4">
@@ -40,6 +45,7 @@ export default async function MesAscenseursPage({ searchParams }: { searchParams
         <div className="text-sm bg-red-fill text-red-ink rounded-lg px-3 py-2">Vous n&apos;avez pas accès à cet appareil — contactez ROBUS.</div>
       )}
       {d.has("notifications") && <CarteApplication cleVapid={clePubliqueVapid()} seulementSiAction compact />}
+      <ListeDevisObservateur devis={devisAffiches} titre="Vos devis" />
 
       {liste.map((a) => {
         const encours = enCours.find((i) => i.appareilId === a.id);

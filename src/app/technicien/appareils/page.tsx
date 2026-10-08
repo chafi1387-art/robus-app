@@ -5,6 +5,7 @@ import { reglagesAcces } from "@/lib/acces-technicien";
 import { appareilsRecents, rechercherAppareils } from "@/lib/fiche-appareil-technicien";
 import { ScannerQr } from "@/components/scanner-qr";
 import { StatutAppareilPill } from "@/components/ui";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 // Phase 22 : trouver un appareil — scanner son QR code ou taper son numéro,
 // sa référence, son adresse ou le nom du client.
@@ -31,9 +32,9 @@ export default async function TrouverAppareilPage({ searchParams }: { searchPara
           placeholder="N° d'appareil, n° de série, adresse, client…"
           className="w-full rounded-xl border border-line bg-surface pl-9 pr-24 py-3.5 text-[16px]"
         />
-        <button type="submit" className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-blue text-white font-bold text-sm rounded-lg px-3.5 py-2">
+        <BoutonEnvoi type="submit" className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-blue text-white font-bold text-sm rounded-lg px-3.5 py-2">
           Chercher
-        </button>
+        </BoutonEnvoi>
       </form>
 
       {q.trim().length >= 2 && (

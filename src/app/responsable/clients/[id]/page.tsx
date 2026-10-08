@@ -8,6 +8,7 @@ import { formatMinutes, libelleMois } from "@/lib/sous-traitance";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createContact, createSite, updateClientType } from "../../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const TYPE_LABEL: Record<string, string> = {
   copropriete: "Copropriété",
@@ -76,9 +77,9 @@ export default async function ClientDetailPage({
               </option>
             ))}
           </select>
-          <button type="submit" className="text-xs font-semibold text-blue border border-line rounded-lg px-2.5 py-1 hover:bg-blue-pale">
+          <BoutonEnvoi type="submit" className="text-xs font-semibold text-blue border border-line rounded-lg px-2.5 py-1 hover:bg-blue-pale">
             Changer le type
-          </button>
+          </BoutonEnvoi>
         </form>
       </div>
 

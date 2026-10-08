@@ -1,8 +1,11 @@
 "use client";
 
+import { BoutonEnvoi } from "@/components/bouton-envoi";
+
 /**
  * Phase 11 : bouton de soumission avec confirmation navigateur — utilisé
  * pour les actions irréversibles (ex. suppression définitive d'une pièce).
+ * Phase 25 : roue + non cliquable pendant l'envoi.
  */
 export function ConfirmSubmitButton({
   children,
@@ -16,17 +19,8 @@ export function ConfirmSubmitButton({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="submit"
-      disabled={disabled}
-      className={className}
-      onClick={(e) => {
-        if (!window.confirm(confirmMessage)) {
-          e.preventDefault();
-        }
-      }}
-    >
+    <BoutonEnvoi disabled={disabled} className={className} confirmation={confirmMessage}>
       {children}
-    </button>
+    </BoutonEnvoi>
   );
 }

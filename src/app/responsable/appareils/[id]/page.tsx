@@ -30,6 +30,7 @@ import {
 } from "../../actions";
 import { getProjetsPourAppareil } from "../../projets/actions";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const CATEGORIE_DOC_LABEL: Record<string, string> = {
   securite: "Sécurité",
@@ -360,7 +361,7 @@ export default async function AppareilDetailPage({
                   <form action={archiverDocumentClient}>
                     <input type="hidden" name="documentId" value={d.id} />
                     <input type="hidden" name="appareilId" value={appareil.id} />
-                    <button type="submit" className="text-xs font-bold text-ink-soft hover:text-red-ink">{d.archiveLe ? "Remettre" : "Retirer"}</button>
+                    <BoutonEnvoi type="submit" className="text-xs font-bold text-ink-soft hover:text-red-ink">{d.archiveLe ? "Remettre" : "Retirer"}</BoutonEnvoi>
                   </form>
                 </div>
               ))}

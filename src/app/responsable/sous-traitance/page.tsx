@@ -17,6 +17,7 @@ import {
 } from "@/lib/sous-traitance";
 import { chargerHeures } from "./donnees";
 import { modifierHeuresSousTraitance, supprimerHeuresSousTraitance } from "@/app/technicien/heures/actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const uuidOk = (v?: string) => (v && /^[0-9a-f-]{36}$/i.test(v) ? v : undefined);
 
@@ -106,9 +107,9 @@ export default async function SousTraitancePage({
               ))}
             </select>
           </label>
-          <button type="submit" className="rounded-lg px-4 py-2 text-sm font-bold font-display bg-blue text-white hover:bg-blue-light">
+          <BoutonEnvoi type="submit" className="rounded-lg px-4 py-2 text-sm font-bold font-display bg-blue text-white hover:bg-blue-light">
             Filtrer
-          </button>
+          </BoutonEnvoi>
         </form>
         <div className="flex items-center gap-4 mt-3 text-sm">
           <Link href={`/responsable/sous-traitance?${qs(moisDecale(mois, -1))}`} className="font-semibold text-blue">‹ Mois précédent</Link>
@@ -188,9 +189,9 @@ export default async function SousTraitancePage({
                             <form action={supprimerHeuresSousTraitance}>
                               <input type="hidden" name="id" value={l.id} />
                               <input type="hidden" name="retour" value={retour} />
-                              <button type="submit" className="w-full text-xs font-semibold text-red-ink border border-red-ink/30 rounded-lg py-1.5">
+                              <BoutonEnvoi type="submit" className="w-full text-xs font-semibold text-red-ink border border-red-ink/30 rounded-lg py-1.5">
                                 Supprimer
-                              </button>
+                              </BoutonEnvoi>
                             </form>
                           </div>
                         </details>

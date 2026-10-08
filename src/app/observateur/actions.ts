@@ -10,9 +10,11 @@ import { journaliser } from "@/lib/journal";
 import { requireObservateur } from "@/lib/observateur";
 import { after } from "next/server";
 import { creerDemande, ajouterMessage, tropDeDemandes } from "@/lib/demandes";
-import { enregistrerPhotos, photosDuFormulaire } from "@/lib/photos";
-import { enregistrerFichiers, fichiersDuFormulaire } from "@/lib/fichiers";
+import { photosRecues } from "@/lib/photos";
+import { fichiersRecus } from "@/lib/fichiers";
 import { notifierBureau } from "@/lib/push";
+import { deciderDevis } from "@/lib/devis";
+import { devisDestinataires } from "@/db/schema";
 
 // Phase 18/20 : actions de l'observateur (demandes client, notes, préférences).
 
@@ -51,8 +53,7 @@ export async function creerDemandeObservateur(formData: FormData) {
   if (await tropDeDemandes(d.appareilId, ctx.userId, null)) retourErreur("Vous avez déjà envoyé plusieurs demandes pour cet ascenseur — ROBUS est prévenu.");
   let photos: string[] = [];
   try {
-    const fichiers = photosDuFormulaire(formData, "photos");
-    photos = fichiers.length ? await enregistrerPhotos(fichiers.slice(0, 5), `demande-${ctx.userId}`) : [];
+    photos = await photosRecues(formData, `demande-${ctx.userId}`, ctx.userId, "photos", 5);
   } catch (e) {
     retourErreur((e as Error).message);
   }
@@ -91,8 +92,7 @@ export async function repondreDemandeClient(formData: FormData) {
   const texte = String(formData.get("texte") ?? "").trim().slice(0, 5000);
   let joints: { url: string; nom: string }[] = [];
   try {
-    const fichiers = fichiersDuFormulaire(formData, "fichiers", 5);
-    joints = fichiers.length ? await enregistrerFichiers(fichiers, "missions", `demande-${id}`) : [];
+    joints = await fichiersRecus(formData, "missions", `demande-${id}`, ctx.userId, "fichiers", 5);
   } catch (e) {
     redirect(`/observateur/demandes/${id}?erreur=${encodeURIComponent((e as Error).message)}`);
   }
@@ -161,4 +161,31 @@ export async function noterIntervention(formData: FormData) {
   }
   revalidatePath(`/observateur/interventions/${id}`);
   redirect(`/observateur/interventions/${id}?merci=1`);
+}
+
+/** Phase 25b : réponse à un devis depuis l'espace observateur. */
+export async function repondreDevisObservateur(formData: FormData) {
+  const ctx = await requireObservateur();
+  const devisId = String(formData.get("devisId") ?? "");
+  if (!z.string().uuid().safeParse(devisId).success) redirect("/observateur");
+  const retour = `/observateur/devis/${devisId}`;
+  const [dest] = await db
+    .select({ peutDecider: devisDestinataires.peutDecider })
+    .from(devisDestinataires)
+    .where(and(eq(devisDestinataires.devisId, devisId), eq(devisDestinataires.userId, ctx.userId), eq(devisDestinataires.canal, "observateur")))
+    .limit(1);
+  if (!dest) redirect("/observateur");
+  if (dest!.peutDecider !== 1) redirect(`${retour}?erreur=${encodeURIComponent("Ce devis vous est transmis pour information.")}`);
+  const decision = formData.get("decision") === "refuse" ? "refuse" : "accepte";
+  const nom = String(formData.get("nom") ?? "").trim().slice(0, 150) || ctx.nom;
+  if (decision === "accepte" && formData.get("bonPourAccord") !== "on") {
+    redirect(`${retour}?erreur=${encodeURIComponent("Cochez « Bon pour accord » pour accepter le devis.")}`);
+  }
+  try {
+    await deciderDevis({ devisId, decision, nom, canal: "espace", userId: ctx.userId, motif: String(formData.get("motif") ?? "").trim() || null });
+  } catch (e) {
+    redirect(`${retour}?erreur=${encodeURIComponent((e as Error).message)}`);
+  }
+  revalidatePath(retour);
+  redirect(`${retour}?reponse=${decision}`);
 }

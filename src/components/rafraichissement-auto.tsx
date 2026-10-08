@@ -1,30 +1,21 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEtatDirect } from "@/components/temps-reel";
 
-// Phase 18 : met la page à jour toute seule (mission en direct) — en pause
-// quand l'onglet n'est pas visible.
-export function RafraichissementAuto({ secondes = 15 }: { secondes?: number }) {
-  const router = useRouter();
-  const [maj, setMaj] = useState<string>("");
-  useEffect(() => {
-    const tick = () => {
-      if (document.visibilityState !== "visible") return;
-      router.refresh();
-      setMaj(new Date().toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-    };
-    const t = setInterval(tick, secondes * 1000);
-    document.addEventListener("visibilitychange", tick);
-    return () => {
-      clearInterval(t);
-      document.removeEventListener("visibilitychange", tick);
-    };
-  }, [router, secondes]);
+// Phase 18 : indicateur « mise à jour automatique ».
+// Phase 25 : la page est mise à jour en temps réel (signal du serveur) —
+// ce composant affiche seulement l'état de la connexion et l'heure de la
+// dernière mise à jour.
+export function RafraichissementAuto(_props: { secondes?: number }) {
+  const { connecte, derniere } = useEtatDirect();
+  const heure = derniere
+    ? new Date(derniere).toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : null;
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-soft">
-      <span className="w-2 h-2 rounded-full bg-red-ink animate-pulse" />
-      Mise à jour automatique{maj ? ` · ${maj}` : ` toutes les ${secondes} s`}
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-soft" data-direct={connecte ? "oui" : "non"}>
+      <span className={`w-2 h-2 rounded-full ${connecte ? "bg-green animate-pulse" : "bg-orange"}`} />
+      {connecte ? "En direct" : "Reconnexion…"}
+      {heure ? ` · mis à jour à ${heure}` : ""}
     </span>
   );
 }

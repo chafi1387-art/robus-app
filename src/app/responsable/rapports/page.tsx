@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { clients, appareils, projets, sites, users } from "@/db/schema";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { asc, inArray } from "drizzle-orm";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const TYPES = [
   { value: "global", label: "Rapport global de pilotage (réunion direction)" },
@@ -145,12 +146,12 @@ export default async function RapportsPage() {
             }}
           />
 
-          <button
+          <BoutonEnvoi
             type="submit"
             className="mt-2 bg-blue hover:bg-blue-light text-white font-display font-bold text-sm rounded-lg py-2.5 transition-colors"
           >
             Générer le PDF
-          </button>
+          </BoutonEnvoi>
         </form>
       </Card>
     </div>

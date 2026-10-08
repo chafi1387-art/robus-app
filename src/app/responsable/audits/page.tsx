@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/format";
 import { createAudit, updateAuditResultats } from "./actions";
 import { createDocument } from "../documents/actions";
 import { FICHIER_MAX_BYTES, FICHIER_TYPES } from "@/lib/document-file-rules";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const TYPE_LABEL: Record<string, string> = {
   interne: "Interne",
@@ -173,14 +174,14 @@ export default async function AuditsPage() {
                         <Btn variant="ghost" type="submit">
                           Enregistrer
                         </Btn>
-                        <button
+                        <BoutonEnvoi
                           type="submit"
                           name="terminer"
                           value="true"
                           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold font-display bg-blue text-white hover:bg-blue-light transition-colors"
                         >
                           Marquer terminé
-                        </button>
+                        </BoutonEnvoi>
                       </div>
                     </form>
                   )}

@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
     // Phase 21 : une page déjà visitée se réaffiche instantanément pendant
     // 30 s (retour arrière, changement d'onglet). Toute action (envoi,
     // validation…) vide ce cache : les données restent à jour.
+    // Phase 25 : le contrôle de session (proxy) garde une copie du corps de
+    // la requête ; sans cette limite, un fichier de plus de 10 Mo serait tronqué.
+    proxyClientMaxBodySize: "250mb",
     staleTimes: {
       dynamic: 30,
     },

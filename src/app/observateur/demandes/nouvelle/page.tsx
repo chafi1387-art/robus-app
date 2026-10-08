@@ -7,6 +7,8 @@ import { requireObservateur } from "@/lib/observateur";
 import { TYPES_DEMANDE } from "@/lib/demandes";
 import { creerDemandeObservateur } from "../../actions";
 import { ChoixTypeDemande } from "@/components/choix-type-demande";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
+import { EnvoiFichiers } from "@/components/envoi-fichiers";
 
 export default async function NouvelleDemandePage({ searchParams }: { searchParams: Promise<{ appareil?: string; type?: string; erreur?: string }> }) {
   const ctx = await requireObservateur();
@@ -40,15 +42,12 @@ export default async function NouvelleDemandePage({ searchParams }: { searchPara
             <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Votre message</span>
             <textarea name="description" required minLength={5} maxLength={2000} rows={4} className={champ} placeholder="Décrivez la situation…" />
           </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Photos (facultatif, 5 max)</span>
-            <input type="file" name="photos" multiple accept="image/jpeg,image/png,image/webp" className="text-sm" />
-          </label>
+          <EnvoiFichiers type="photo" max={5} libelle="Photos (facultatif, 5 max)" />
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Téléphone pour vous joindre</span>
             <input name="telephone" inputMode="tel" className={champ} />
           </label>
-          <button type="submit" className="bg-blue text-white font-display font-bold rounded-xl py-3.5">Envoyer à ROBUS</button>
+          <BoutonEnvoi type="submit" className="bg-blue text-white font-display font-bold rounded-xl py-3.5" enCours="Envoi à ROBUS…">Envoyer à ROBUS</BoutonEnvoi>
           <p className="text-xs text-ink-soft text-center">Vous serez prévenu par email et notification à chaque étape.</p>
         </form>
       </Card>

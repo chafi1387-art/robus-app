@@ -3,8 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth-helpers";
-import { enregistrerPhotos, photosDuFormulaire } from "@/lib/photos";
-import { enregistrerFichiers, fichiersDuFormulaire } from "@/lib/fichiers";
+import { photosRecues } from "@/lib/photos";
+import { fichiersRecus } from "@/lib/fichiers";
 import { creerSignalement } from "@/lib/signalements";
 import { TYPES_SIGNALEMENT } from "@/lib/signalements-types";
 
@@ -21,19 +21,15 @@ export async function envoyerSignalement(formData: FormData) {
   if (!TYPES_SIGNALEMENT[type]) redirect("/technicien/signaler");
   if (description.length < 5) retour("Décrivez ce qui s'est passé (quelques mots suffisent).");
   if (interventionId && !/^[0-9a-f-]{36}$/i.test(interventionId)) retour("Mission invalide.");
-  let photos: File[] = [];
-  let fichiers: File[] = [];
+  const prefixe = `sig-${user.id.slice(0, 8)}`;
+  let urls: string[] = [];
+  let docs: { url: string; nom: string }[] = [];
   try {
-    photos = photosDuFormulaire(formData, "photos");
-    fichiers = fichiersDuFormulaire(formData, "fichiers", 5);
+    urls = await photosRecues(formData, prefixe, user.id, "photos", 20);
+    docs = await fichiersRecus(formData, "signalements", prefixe, user.id, "fichiers", 5);
   } catch (e) {
     retour((e as Error).message);
   }
-  const prefixe = `sig-${user.id.slice(0, 8)}`;
-  const [urls, docs] = await Promise.all([
-    photos.length ? enregistrerPhotos(photos, prefixe) : Promise.resolve([] as string[]),
-    fichiers.length ? enregistrerFichiers(fichiers, "signalements", prefixe) : Promise.resolve([] as { url: string; nom: string }[]),
-  ]);
   let id = "";
   try {
     const r = await creerSignalement({

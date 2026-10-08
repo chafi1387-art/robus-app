@@ -3,6 +3,7 @@ import { appareils, habilitationsTechnicien, interventions, projets, users } fro
 import { creerMissionsPassagesProches } from "@/lib/garantie-passages";
 import { habilitationsCourantes } from "@/lib/habilitations";
 import { relancerDemandesEnRetard } from "@/lib/demandes";
+import { relancerDevisSansReponse } from "@/lib/devis";
 import { envoyerResumesMensuels } from "@/lib/resume-mensuel";
 import { rappelerFormations } from "@/lib/formations";
 import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
@@ -142,9 +143,11 @@ export async function POST(req: Request) {
 
   // Phase 20 : demandes client non prises en charge dans le délai + résumé mensuel.
   const demandesRelancees = await relancerDemandesEnRetard();
+  // Phase 25b : devis sans réponse depuis 7 jours → un rappel au client.
+  const devisRelances = await relancerDevisSansReponse();
   const resumes = await envoyerResumesMensuels(new URL(req.url).searchParams.get("resume") === "forcer");
   // Phase 21 : rappel des formations du lendemain / du jour.
   const rappelsFormations = await rappelerFormations();
 
-  return Response.json({ notifiees: retards.length, nonVues: nonVues.length, passagesCrees: passages.length, alertesHabilitations: alertesHab, demandesRelancees, resumes, rappelsFormations });
+  return Response.json({ notifiees: retards.length, nonVues: nonVues.length, passagesCrees: passages.length, alertesHabilitations: alertesHab, demandesRelancees, devisRelances, resumes, rappelsFormations });
 }

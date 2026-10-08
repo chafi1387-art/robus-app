@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { PassagesPrecedents } from "@/components/carte-devis-mission";
+import { passagesDeMission } from "@/lib/devis";
 import { notFound } from "next/navigation";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { Star } from "lucide-react";
@@ -12,6 +14,7 @@ import { DROIT_HISTO_12_MOIS, etapeObservateur, exigerAppareil, requireObservate
 import { prenom } from "@/lib/observateur-donnees";
 import { piecesNettes } from "@/lib/pieces-mission";
 import { noterIntervention } from "../../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const TYPE: Record<string, string> = { preventive: "Maintenance préventive", corrective: "Dépannage", systematique: "Contrôle systématique" };
 const STATUT_APPAREIL: Record<string, string> = {
@@ -66,6 +69,8 @@ export default async function InterventionObservateurPage({
           .limit(1)
       : Promise.resolve([]),
   ]);
+  // Phase 25b : passages précédents (ex. diagnostic avant devis) — rapport validé seulement.
+  const passages = d.has("rapports") ? (await passagesDeMission(id)).filter((x) => x.p.valideeLe) : [];
   // Phase 19 : rapports du bureau rendus visibles au client.
   const rapportsBureau = d.has("rapports")
     ? await db
@@ -175,11 +180,12 @@ export default async function InterventionObservateurPage({
               </div>
               {sp.erreur === "note" && <p className="text-xs text-red-ink">Choisissez une note de 1 à 5.</p>}
               <textarea name="commentaire" rows={2} maxLength={1000} placeholder="Un commentaire ? (facultatif)" className="rounded-lg border border-line px-3 py-2.5 text-[15px]" />
-              <button type="submit" className="bg-blue text-white font-display font-bold rounded-xl py-3">Envoyer ma note</button>
+              <BoutonEnvoi type="submit" className="bg-blue text-white font-display font-bold rounded-xl py-3">Envoyer ma note</BoutonEnvoi>
             </form>
           )}
         </Card>
       )}
+      <PassagesPrecedents passages={passages.map((x) => ({ ...x, technicien: prenom(x.technicien) }))} />
     </div>
   );
 }

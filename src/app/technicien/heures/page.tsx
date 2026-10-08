@@ -22,6 +22,7 @@ import {
   modifierHeuresSousTraitance,
   supprimerHeuresSousTraitance,
 } from "./actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 export default async function HeuresTechnicienPage({
   searchParams,
@@ -158,9 +159,9 @@ export default async function HeuresTechnicienPage({
                       <form action={supprimerHeuresSousTraitance}>
                         <input type="hidden" name="id" value={s.id} />
                         <input type="hidden" name="retour" value={retour} />
-                        <button type="submit" className="w-full text-sm font-semibold text-red-ink border border-red-ink/30 rounded-lg py-2">
+                        <BoutonEnvoi type="submit" className="w-full text-sm font-semibold text-red-ink border border-red-ink/30 rounded-lg py-2">
                           Supprimer cette saisie
-                        </button>
+                        </BoutonEnvoi>
                       </form>
                     </div>
                   </details>

@@ -8,7 +8,11 @@ import {
   StatutInterventionPill,
   PrioritePill,
 } from "@/components/ui";
-import { FileField } from "@/components/file-field";
+import { EnvoiFichiers } from "@/components/envoi-fichiers";
+import { TuilePhoto } from "@/components/tuile-photo";
+import { ImageMini } from "@/components/image-mini";
+import { PassagesPrecedents } from "@/components/carte-devis-mission";
+import { devisDeMission, passagesDeMission } from "@/lib/devis";
 import { db } from "@/db";
 import {
   appareils,
@@ -21,13 +25,14 @@ import {
   missionJournal,
   rapportPhotos,
   rapports,
+  devisLignes,
 } from "@/db/schema";
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime, toDatetimeLocalValue } from "@/lib/format";
 import { finModificationRapport, peutModifierRapport, tempsRestantModification } from "@/lib/rapport-rules";
-import { Camera, Lock, Pencil, TriangleAlert } from "lucide-react";
+import { Camera, Lock, Pencil, TriangleAlert, Wrench } from "lucide-react";
 import Link from "next/link";
 import { MOTIFS_REFUS, libelleRefus } from "@/lib/missions";
 import { checklistsMission } from "@/lib/checklists";
@@ -37,6 +42,7 @@ import { CheckCircle2 } from "lucide-react";
 import {
   accepterMission,
   ajouterAuFil,
+  ajouterPhotoAuFil,
   ajouterPhotosRapport,
   commencerIntervention,
   declarerNonConformite,
@@ -47,6 +53,7 @@ import {
   retirerPhotoRapport,
   terminerIntervention,
 } from "../../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const CATEGORIE_DOC_LABEL: Record<string, string> = {
   securite: "Sécurité",
@@ -69,7 +76,7 @@ export default async function InterventionDetailPage({
 }) {
   const user = await requireUser(ROLES_TECHNICIEN);
   const { id } = await params;
-  const { nc, aide, modifie, erreur, refusee } = await searchParams;
+  const { nc, aide, modifie, refusee } = await searchParams;
 
   // Phase 6 : l'Appareil n'est plus rattaché à un Site — le client, l'adresse
   // et les instructions d'accès d'une intervention se dérivent désormais du
@@ -100,6 +107,14 @@ export default async function InterventionDetailPage({
         .where(and(eq(interventions.id, id), isNull(interventions.vueLe)));
     });
   }
+
+  // Phase 25b : devis de la mission (besoin signalé, travaux à faire) et passages précédents.
+  const [devisM, passagesM] = await Promise.all([devisDeMission(id), passagesDeMission(id)]);
+  const devisTravaux = devisM.find((d) => (d.statut === "accepte" && d.travauxPlanifiesLe) || d.statut === "realise");
+  const lignesTravaux = devisTravaux
+    ? await db.select({ designation: devisLignes.designation, quantite: devisLignes.quantite }).from(devisLignes).where(eq(devisLignes.devisId, devisTravaux.id)).orderBy(asc(devisLignes.ordre))
+    : [];
+  const devisEnCours = devisM.find((d) => ["a_preparer", "brouillon", "envoye"].includes(d.statut));
 
   const peutCommencer = ["creee", "planifiee", "affectee"].includes(intervention.statut);
   const estRefusee = peutCommencer && !!intervention.refuseeLe;
@@ -185,8 +200,33 @@ export default async function InterventionDetailPage({
         )}
       </div>
 
-      {erreur && <div className="text-sm bg-red-fill text-red-ink rounded-lg px-3 py-2">{erreur}</div>}
       {refusee && <div className="text-sm bg-green-fill text-green-ink rounded-lg px-3 py-2">Refus envoyé — le bureau est prévenu et va décider.</div>}
+
+      {devisTravaux && intervention.passage > 1 && !estTerminee && (
+        <Card className="p-4 border-[1.5px] border-green bg-green-fill/30">
+          <div className="font-display font-bold text-[15px] text-navy flex items-center gap-2">
+            <Wrench className="w-4 h-4" /> Travaux du devis {devisTravaux.numero} (accepté par le client)
+          </div>
+          {lignesTravaux.length > 0 ? (
+            <ul className="mt-2 text-sm list-disc pl-5 flex flex-col gap-0.5">
+              {lignesTravaux.map((l, i) => (
+                <li key={i}>
+                  {l.designation}
+                  {Number(l.quantite) !== 1 ? ` × ${Number(l.quantite).toLocaleString("fr-BE")}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm mt-1">Voir le devis joint au bureau.</p>
+          )}
+          <p className="text-xs text-ink-soft mt-2">Passage {intervention.passage} de cette mission — le rapport précédent est conservé plus bas.</p>
+        </Card>
+      )}
+      {devisEnCours && (
+        <div className="text-sm bg-orange-fill text-orange-ink rounded-lg px-3 py-2">
+          🧾 Devis {devisEnCours.numero} : {devisEnCours.statut === "envoye" ? "envoyé au client, en attente de sa réponse." : "le bureau le prépare."} Si le client accepte, la mission repartira pour les travaux.
+        </div>
+      )}
 
       {aAccepter && (
         <Card className="p-4 border-[1.5px] border-blue bg-blue-pale/40">
@@ -212,7 +252,7 @@ export default async function InterventionDetailPage({
                 ))}
               </div>
               <textarea name="commentaire" rows={2} maxLength={500} placeholder="Précision pour le bureau (obligatoire si « Autre »)…" className={inputClass} />
-              <button type="submit" className="w-full rounded-xl bg-red text-white font-bold text-[15px] py-3">Envoyer mon refus au bureau</button>
+              <BoutonEnvoi type="submit" className="w-full rounded-xl bg-red text-white font-bold text-[15px] py-3">Envoyer mon refus au bureau</BoutonEnvoi>
             </form>
           </details>
         </Card>
@@ -343,17 +383,18 @@ export default async function InterventionDetailPage({
             <Camera className="w-4 h-4 text-blue" /> Photos &amp; notes en direct
           </h2>
           <p className="text-xs text-ink-soft mt-0.5 mb-3">Le bureau les voit tout de suite. Elles seront aussi jointes au rapport.</p>
-          <form action={ajouterAuFil} className="flex flex-col gap-2">
+          <div id="direct" className="scroll-mt-20" />
+          <EnvoiFichiers
+            type="photo"
+            apresEnvoi={ajouterPhotoAuFil}
+            contexte={intervention.id}
+            texteOk="envoyée(s) au bureau"
+            aide="Chaque photo part tout de suite, une par une : ✓ = bien reçue par le bureau."
+          />
+          <form action={ajouterAuFil} className="flex gap-2 mt-3">
             <input type="hidden" name="interventionId" value={intervention.id} />
-            <input
-              type="file"
-              name="photos"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue file:text-white file:font-bold file:px-3 file:py-2"
-            />
-            <input name="texte" maxLength={1000} placeholder="Note (ex. câble usé gaine 3)…" className={inputClass} />
-            <Btn variant="ghost" className="justify-center">Envoyer au bureau</Btn>
+            <input name="texte" required maxLength={1000} placeholder="Note (ex. câble usé gaine 3)…" className={inputClass} />
+            <Btn variant="ghost" className="justify-center shrink-0" enCours="Envoi…">Envoyer</Btn>
           </form>
           {fil.length > 0 && (
             <ol className="mt-3 pt-3 border-t border-line flex flex-col gap-2.5">
@@ -364,8 +405,9 @@ export default async function InterventionDetailPage({
                   {f.photos.length > 0 && (
                     <div className="flex gap-1.5 mt-1 flex-wrap">
                       {f.photos.map((u) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={u} src={u} alt="Photo envoyée" className="w-14 h-14 rounded-lg object-cover bg-blue-pale" />
+                        <a key={u} href={u} target="_blank" rel="noreferrer">
+                          <ImageMini src={u} alt="Photo envoyée" className="w-14 h-14 rounded-lg object-cover bg-blue-pale" />
+                        </a>
                       ))}
                     </div>
                   )}
@@ -427,7 +469,7 @@ export default async function InterventionDetailPage({
       )}
 
       {peutTerminer && (
-        <Card className="p-4">
+        <Card className="p-4" id="rapport">
           <h2 className="font-display font-bold text-sm mb-3">Rapport d&apos;intervention</h2>
           <form
             action={terminerIntervention}
@@ -469,22 +511,38 @@ export default async function InterventionDetailPage({
                 <option value="en_travaux">En travaux</option>
               </select>
             </Field>
-            <FileField
-              label={
+            <div className="group rounded-xl border border-line px-3 py-2.5 has-[input[name=devisNecessaire]:checked]:border-orange has-[input[name=devisNecessaire]:checked]:bg-orange-fill/40">
+              <label className="flex items-center gap-2 text-sm font-bold text-navy cursor-pointer select-none">
+                <input type="checkbox" name="devisNecessaire" className="w-5 h-5" />
+                Un devis est nécessaire (travaux / pièces à prévoir)
+              </label>
+              <div className="hidden group-has-[input[name=devisNecessaire]:checked]:block">
+                <textarea
+                  name="besoinDevis"
+                  rows={3}
+                  maxLength={4000}
+                  className={`${inputClass} mt-2`}
+                  placeholder="Ex. remplacer le contacteur KM1 + câble de commande porte palière 3e…"
+                />
+                <p className="text-xs text-ink-soft mt-1">Le bureau prépare le devis et l&apos;envoie au client. S&apos;il est accepté, cette même mission vous sera redonnée (ou à un collègue) pour les travaux.</p>
+              </div>
+            </div>
+            <EnvoiFichiers
+              type="photo"
+              libelle={photosFil.length > 0 ? "Photos supplémentaires (facultatif)" : "Photos de la mission — au moins 1"}
+              aide={
                 photosFil.length > 0
-                  ? `Photo(s) supplémentaire(s) — ${photosFil.length} photo(s) déjà envoyée(s) en direct seront jointes`
-                  : "Photo(s) de la mission — au moins 1 obligatoire (JPEG / PNG / WEBP, 8 Mo max chacune)"
+                  ? `${photosFil.length} photo(s) déjà envoyée(s) en direct seront jointes au rapport.`
+                  : "Chaque photo part une par une : attendez le ✓ vert avant d'envoyer le rapport."
               }
-              name="photos"
-              accept="image/jpeg,image/png,image/webp"
-              maxBytes={8 * 1024 * 1024}
-              multiple
-              required={photosFil.length === 0}
+              requis={photosFil.length === 0}
             />
-            <Btn className="w-full justify-center">Terminer &amp; envoyer le rapport</Btn>
+            <Btn className="w-full justify-center" enCours="Envoi du rapport…">Terminer &amp; envoyer le rapport</Btn>
           </form>
         </Card>
       )}
+
+      <PassagesPrecedents passages={passagesM} />
 
       {!estTerminee && (
         <Card className="p-4">
@@ -607,22 +665,18 @@ export default async function InterventionDetailPage({
             <p className="text-xs text-ink-soft mt-2">Rapport validé par le bureau — verrouillé.</p>
           )}
 
+          <div id="rapport-photos" className="scroll-mt-20" />
           {photosRapport.length > 0 && (
             <div className="mt-3 grid grid-cols-3 gap-2">
               {photosRapport.map((p) => (
-                <div key={p.id} className="relative">
-                  <a href={p.url} target="_blank" rel="noreferrer">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.url} alt="Photo de la mission" className="w-full aspect-square object-cover rounded-lg bg-blue-pale" />
-                  </a>
-                  {modifiable && photosRapport.length > 1 && (
-                    <form action={retirerPhotoRapport} className="absolute top-1 right-1">
-                      <input type="hidden" name="interventionId" value={intervention.id} />
-                      <input type="hidden" name="photoId" value={p.id} />
-                      <button type="submit" aria-label="Retirer la photo" className="w-7 h-7 rounded-full bg-white/90 text-red-ink font-bold text-sm shadow">×</button>
-                    </form>
-                  )}
-                </div>
+                <TuilePhoto
+                  key={p.id}
+                  url={p.url}
+                  alt="Photo de la mission"
+                  action={retirerPhotoRapport}
+                  champs={{ interventionId: intervention.id, photoId: p.id }}
+                  retirable={modifiable && photosRapport.length > 1}
+                />
               ))}
             </div>
           )}
@@ -655,8 +709,8 @@ export default async function InterventionDetailPage({
               </form>
               <form action={ajouterPhotosRapport} className="flex flex-col gap-2 mt-4 pt-3 border-t border-line">
                 <input type="hidden" name="interventionId" value={intervention.id} />
-                <FileField label="Ajouter des photos" name="photos" accept="image/jpeg,image/png,image/webp" maxBytes={8 * 1024 * 1024} multiple required />
-                <Btn variant="ghost" className="justify-center">Ajouter au rapport</Btn>
+                <EnvoiFichiers type="photo" libelle="Ajouter des photos" requis />
+                <Btn variant="ghost" className="justify-center" enCours="Ajout…">Ajouter au rapport</Btn>
               </form>
             </details>
           )}

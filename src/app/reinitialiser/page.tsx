@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { reinitialiserMotDePasse } from "./actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const ERREURS: Record<string, string> = {
   lien: "Ce lien n'est plus valable (expiré ou déjà utilisé). Demandez-en un nouveau.",
@@ -41,7 +42,7 @@ export default async function ReinitialiserPage({ searchParams }: { searchParams
               <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Confirmer</span>
               <input name="confirmation" type="password" required minLength={8} autoComplete="new-password" className={champ} />
             </label>
-            <button type="submit" className="bg-blue hover:bg-blue-light text-white font-display font-bold text-sm rounded-lg py-2.5">Enregistrer</button>
+            <BoutonEnvoi type="submit" className="bg-blue hover:bg-blue-light text-white font-display font-bold text-sm rounded-lg py-2.5">Enregistrer</BoutonEnvoi>
           </form>
         )}
       </div>

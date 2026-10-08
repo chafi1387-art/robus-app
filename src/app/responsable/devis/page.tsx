@@ -1,89 +1,81 @@
+import Link from "next/link";
+import { desc, eq, sql } from "drizzle-orm";
 import { Card, Pill, Btn, Field, inputClass } from "@/components/ui";
 import { db } from "@/db";
-import { clients, devis, sites } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { appareils, clients, devis, sites } from "@/db/schema";
 import { formatDate } from "@/lib/format";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
-import { createDevis, updateDevisStatut } from "./actions";
+import { STATUTS_DEVIS, montant } from "@/lib/devis";
+import { createDevis } from "./actions";
 
-const STATUT_LABEL: Record<string, string> = {
-  brouillon: "Brouillon",
-  envoye: "Envoyé",
-  accepte: "Accepté",
-  refuse: "Refusé",
+// Phase 25b : liste des devis (missions et clients) — un clic ouvre le devis.
+const FILTRES: Record<string, { label: string; statuts: string[] | null }> = {
+  ouverts: { label: "À traiter", statuts: ["a_preparer", "brouillon", "envoye", "accepte"] },
+  tous: { label: "Tous", statuts: null },
 };
 
-const STATUT_TONE: Record<string, "ok" | "warn" | "crit" | "neutral"> = {
-  brouillon: "neutral",
-  envoye: "warn",
-  accepte: "ok",
-  refuse: "crit",
-};
-
-const STATUTS_SUIVANTS: Record<string, { statut: string; label: string }[]> = {
-  brouillon: [{ statut: "envoye", label: "Envoyer" }],
-  envoye: [
-    { statut: "accepte", label: "Accepter" },
-    { statut: "refuse", label: "Refuser" },
-  ],
-  accepte: [],
-  refuse: [],
-};
-
-function formatMontant(v: string | null) {
-  if (v === null) return "—";
-  const n = Number(v);
-  if (Number.isNaN(n)) return "—";
-  return n.toLocaleString("fr-BE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
-}
-
-async function getDevis() {
-  return db
-    .select({
-      id: devis.id,
-      numero: devis.numero,
-      statut: devis.statut,
-      montantHt: devis.montantHt,
-      description: devis.description,
-      createdAt: devis.createdAt,
-      dateEnvoi: devis.dateEnvoi,
-      dateReponse: devis.dateReponse,
-      raisonSociale: clients.raisonSociale,
-      siteAdresse: sites.adresse,
-    })
-    .from(devis)
-    .innerJoin(clients, eq(devis.clientId, clients.id))
-    .leftJoin(sites, eq(devis.siteId, sites.id))
-    .orderBy(desc(devis.createdAt));
-}
-
-async function getClientsEtSites() {
-  const clientRows = await db
-    .select({ id: clients.id, raisonSociale: clients.raisonSociale })
-    .from(clients)
-    .orderBy(clients.raisonSociale);
-
-  const sitesByClient = await Promise.all(
-    clientRows.map(async (c) => {
-      const siteRows = await db
-        .select({ id: sites.id, adresse: sites.adresse })
-        .from(sites)
-        .where(eq(sites.clientId, c.id));
-      return { client: c, siteRows };
-    })
-  );
-  return sitesByClient;
-}
-
-export default async function DevisPage() {
+export default async function DevisPage({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
   await requireUser(ROLES_BUREAU);
-  const [rows, clientsAvecSites] = await Promise.all([getDevis(), getClientsEtSites()]);
+  const sp = await searchParams;
+  const filtre = FILTRES[sp.f ?? ""] ? (sp.f as string) : "ouverts";
+  const statuts = FILTRES[filtre].statuts;
+  const [rows, listeClients, compteurs] = await Promise.all([
+    db
+      .select({
+        id: devis.id,
+        numero: devis.numero,
+        statut: devis.statut,
+        titre: devis.titre,
+        montantHt: devis.montantHt,
+        description: devis.description,
+        createdAt: devis.createdAt,
+        dateEnvoi: devis.dateEnvoi,
+        interventionId: devis.interventionId,
+        travauxPlanifiesLe: devis.travauxPlanifiesLe,
+        raisonSociale: clients.raisonSociale,
+        siteAdresse: sites.adresse,
+        appareil: appareils.numeroInterne,
+      })
+      .from(devis)
+      .innerJoin(clients, eq(devis.clientId, clients.id))
+      .leftJoin(sites, eq(devis.siteId, sites.id))
+      .leftJoin(appareils, eq(devis.appareilId, appareils.id))
+      .where(statuts ? sql`${devis.statut}::text in (${sql.join(statuts.map((s) => sql`${s}`), sql`, `)})` : undefined)
+      .orderBy(desc(devis.createdAt))
+      .limit(300),
+    db.select({ id: clients.id, raisonSociale: clients.raisonSociale }).from(clients).orderBy(clients.raisonSociale),
+    db.select({ statut: devis.statut, n: sql<number>`count(*)::int` }).from(devis).groupBy(devis.statut),
+  ]);
+  const nb = (s: string) => compteurs.find((c) => c.statut === s)?.n ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-extrabold font-display">Devis</h1>
-        <p className="text-sm text-ink-soft">{rows.length} devis enregistré(s)</p>
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-extrabold font-display">Devis</h1>
+          <p className="text-sm text-ink-soft">Montants hors taxes — la facturation se fait dans Odoo.</p>
+        </div>
+        <div className="flex gap-2">
+          {Object.entries(FILTRES).map(([k, f]) => (
+            <Link key={k} href={`/responsable/devis?f=${k}`} className={`text-sm font-bold rounded-lg px-3 py-1.5 border ${filtre === k ? "bg-navy text-white border-navy" : "border-line hover:bg-blue-pale"}`}>
+              {f.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          ["a_preparer", "À préparer", "warn"],
+          ["envoye", "En attente du client", "warn"],
+          ["accepte", "Acceptés", "ok"],
+          ["refuse", "Refusés", "crit"],
+        ].map(([s, l]) => (
+          <Card key={s} className="p-4">
+            <div className="text-xs font-bold uppercase tracking-wide text-ink-soft">{l}</div>
+            <div className="font-display font-extrabold text-2xl text-navy">{nb(s)}</div>
+          </Card>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -93,111 +85,59 @@ export default async function DevisPage() {
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-ink-soft border-b border-line">
                   <th className="pb-2 pr-3">Numéro</th>
-                  <th className="pb-2 pr-3">Client</th>
+                  <th className="pb-2 pr-3">Client / ascenseur</th>
                   <th className="pb-2 pr-3">Montant HT</th>
                   <th className="pb-2 pr-3">Statut</th>
                   <th className="pb-2 pr-3">Créé le</th>
-                  <th className="pb-2 pr-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((d) => (
-                  <tr key={d.id} className="border-b border-line last:border-0 align-top">
-                    <td className="py-2.5 pr-3 font-semibold whitespace-nowrap">{d.numero}</td>
-                    <td className="py-2.5 pr-3">
-                      <div>{d.raisonSociale}</div>
-                      {d.siteAdresse && (
-                        <div className="text-xs text-ink-soft">{d.siteAdresse}</div>
-                      )}
-                    </td>
-                    <td className="py-2.5 pr-3 whitespace-nowrap">{formatMontant(d.montantHt)}</td>
-                    <td className="py-2.5 pr-3">
-                      <Pill tone={STATUT_TONE[d.statut] ?? "neutral"}>
-                        {STATUT_LABEL[d.statut] ?? d.statut}
-                      </Pill>
-                    </td>
-                    <td className="py-2.5 pr-3 whitespace-nowrap text-ink-soft">
-                      {formatDate(d.createdAt)}
-                    </td>
-                    <td className="py-2.5 pr-3">
-                      <div className="flex flex-wrap gap-1.5">
-                        {(STATUTS_SUIVANTS[d.statut] ?? []).map((next) => (
-                          <form key={next.statut} action={updateDevisStatut}>
-                            <input type="hidden" name="id" value={d.id} />
-                            <input type="hidden" name="statut" value={next.statut} />
-                            <button
-                              type="submit"
-                              className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-line hover:bg-blue-pale hover:border-blue-pale"
-                            >
-                              {next.label}
-                            </button>
-                          </form>
-                        ))}
-                        {(STATUTS_SUIVANTS[d.statut] ?? []).length === 0 && (
-                          <span className="text-xs text-ink-soft">—</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((d) => {
+                  const st = STATUTS_DEVIS[d.statut] ?? { label: d.statut, ton: "neutral" as const };
+                  return (
+                    <tr key={d.id} className="border-b border-line last:border-0 align-top hover:bg-blue-pale/30">
+                      <td className="py-2.5 pr-3 font-semibold whitespace-nowrap">
+                        <Link href={`/responsable/devis/${d.id}`} className="text-blue hover:underline">{d.numero}</Link>
+                        {d.interventionId && <div className="text-[11px] text-ink-soft font-normal">Lié à une mission</div>}
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <div>{d.raisonSociale}</div>
+                        <div className="text-xs text-ink-soft">{[d.appareil ? `Ascenseur ${d.appareil}` : null, d.titre ?? d.description, d.siteAdresse].filter(Boolean).join(" · ")}</div>
+                      </td>
+                      <td className="py-2.5 pr-3 whitespace-nowrap tabular-nums">{d.montantHt !== null ? montant(Number(d.montantHt)) : "—"}</td>
+                      <td className="py-2.5 pr-3">
+                        <Pill tone={st.ton}>{d.statut === "accepte" && d.travauxPlanifiesLe ? "Accepté — travaux planifiés" : d.statut === "accepte" ? "Accepté — travaux à planifier" : st.label}</Pill>
+                      </td>
+                      <td className="py-2.5 pr-3 whitespace-nowrap text-ink-soft">{formatDate(d.createdAt)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-            {rows.length === 0 && (
-              <p className="text-sm text-ink-soft py-3">Aucun devis pour l&apos;instant.</p>
-            )}
+            {rows.length === 0 && <p className="text-sm text-ink-soft py-3">Aucun devis {filtre === "ouverts" ? "à traiter" : ""} pour l&apos;instant.</p>}
           </div>
         </Card>
 
-        <Card className="p-5">
-          <h2 className="font-display font-bold text-sm mb-3">Nouveau devis</h2>
+        <Card className="p-5 self-start">
+          <h2 className="font-display font-bold text-sm mb-1">Nouveau devis (hors mission)</h2>
+          <p className="text-xs text-ink-soft mb-3">Pour un devis lié à une intervention, ouvrez la mission → « Devis ».</p>
           <form action={createDevis} className="flex flex-col gap-3">
             <Field label="Client">
               <select name="clientId" required className={inputClass} defaultValue="">
                 <option value="" disabled>
                   Choisir un client...
                 </option>
-                {clientsAvecSites.map(({ client }) => (
-                  <option key={client.id} value={client.id}>
-                    {client.raisonSociale}
+                {listeClients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.raisonSociale}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Site (optionnel)">
-              <select name="siteId" className={inputClass} defaultValue="">
-                <option value="">Aucun site précis</option>
-                {clientsAvecSites.map(({ client, siteRows }) =>
-                  siteRows.length > 0 ? (
-                    <optgroup key={client.id} label={client.raisonSociale}>
-                      {siteRows.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.adresse}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ) : null
-                )}
-              </select>
+            <Field label="Objet">
+              <input name="description" maxLength={200} className={inputClass} placeholder="Ex. Modernisation de la cabine" />
             </Field>
-            <Field label="Montant HT (€)">
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                name="montantHt"
-                className={inputClass}
-                placeholder="0.00"
-              />
-            </Field>
-            <Field label="Description">
-              <textarea
-                name="description"
-                rows={3}
-                className={inputClass}
-                placeholder="Objet du devis..."
-              />
-            </Field>
-            <Btn>Créer le devis</Btn>
+            <Btn enCours="Création…">Créer et compléter le devis</Btn>
           </form>
         </Card>
       </div>

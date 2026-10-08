@@ -13,6 +13,7 @@ import { desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { assignerIntervention, getDemandesAideOuvertes, getTechniciens, resoudreDemandeAide } from "../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 // Une intervention est encore modifiable tant que le travail n'a pas
 // commencé — au-delà, changer le technicien fausserait l'historique.
@@ -213,12 +214,12 @@ export default async function InterventionsPage() {
                                 </option>
                               ))}
                             </select>
-                            <button
+                            <BoutonEnvoi
                               type="submit"
                               className="text-xs font-bold px-2 py-1 rounded-lg border border-line hover:bg-blue-pale"
                             >
                               OK
-                            </button>
+                            </BoutonEnvoi>
                           </form>
                         ) : (
                           <span className="text-ink-soft">{i.technicien ?? "Non affecté"}</span>

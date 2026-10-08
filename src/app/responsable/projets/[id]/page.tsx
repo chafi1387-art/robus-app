@@ -62,6 +62,7 @@ import { signalementsDe } from "@/lib/signalements";
 import { modelesActifs, progressionMissions } from "@/lib/checklists";
 import { ChoixChecklists } from "@/components/choix-checklists";
 import { ListeSignalements } from "@/components/liste-signalements";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 function truncate(texte: string | null | undefined, n: number) {
   if (!texte) return "—";
@@ -888,7 +889,7 @@ export default async function ProjetDetailPage({
                         <p className="text-xs text-ink-soft">
                           {ouvertes > 0 ? `Ses ${ouvertes} mission(s) non commencée(s) repasseront « à affecter ».` : "Aucune mission ouverte à réaffecter."}
                         </p>
-                        <button type="submit" className="self-start rounded-lg bg-red-ink text-white px-3 py-1.5 text-xs font-bold">Confirmer le retrait</button>
+                        <BoutonEnvoi type="submit" className="self-start rounded-lg bg-red-ink text-white px-3 py-1.5 text-xs font-bold">Confirmer le retrait</BoutonEnvoi>
                       </form>
                     </details>
                   </div>
@@ -1268,9 +1269,9 @@ export default async function ProjetDetailPage({
                   <form action={supprimerDocument}>
                     <input type="hidden" name="documentId" value={d.id} />
                     <input type="hidden" name="projetId" value={projet.id} />
-                    <button type="submit" className="text-xs font-semibold text-red-ink hover:underline">
+                    <BoutonEnvoi type="submit" className="text-xs font-semibold text-red-ink hover:underline">
                       Supprimer
-                    </button>
+                    </BoutonEnvoi>
                   </form>
                 </div>
               </div>

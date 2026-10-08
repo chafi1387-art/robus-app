@@ -24,6 +24,8 @@ export default auth((req) => {
     pathname.startsWith("/icons/") ||
     // Phase 18 : étiquette QR d'un appareil (page publique, sans donnée sensible).
     pathname.startsWith("/a/") ||
+    // Phase 25b : devis reçu par email (lien personnel, sans compte).
+    pathname.startsWith("/devis/") ||
     pathname.startsWith("/api/auth");
   const session = req.auth;
 
@@ -57,7 +59,16 @@ export default auth((req) => {
   if (pathname.startsWith("/observateur") && role !== "observateur") {
     return NextResponse.redirect(home);
   }
-  if (role === "observateur" && !pathname.startsWith("/observateur") && !pathname.startsWith("/api/auth") && pathname !== "/api/auth-check" && !pathname.startsWith("/notifications")) {
+  // Phase 25 : flux temps réel et envoi de photos, aussi pour l'observateur.
+  if (
+    role === "observateur" &&
+    !pathname.startsWith("/observateur") &&
+    !pathname.startsWith("/api/auth") &&
+    pathname !== "/api/auth-check" &&
+    pathname !== "/api/temps-reel" &&
+    pathname !== "/api/televersement" &&
+    !pathname.startsWith("/notifications")
+  ) {
     return NextResponse.redirect(home);
   }
   if (pathname === "/") {

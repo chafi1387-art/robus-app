@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
-  Ban, CheckCircle2, Clock, Eye, ListChecks, TriangleAlert, FileText, HandHelping, Mail, MapPin, Octagon, PenLine, Play, Send, ShieldCheck, StickyNote, Wrench,
+  Ban, CheckCircle2, Clock, Eye, ListChecks, TriangleAlert, FileText, HandHelping, Mail, MapPin, Octagon, PenLine, Play, Send, ShieldCheck, StickyNote, Wrench, FileSignature,
 } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -35,7 +35,11 @@ import { piecesNettes } from "@/lib/pieces-mission";
 import { Btn, Card, Field, Pill, PrioritePill, StatutInterventionPill, TypeInterventionPill, inputClass } from "@/components/ui";
 import { SuiviEnvoi } from "@/components/suivi-envoi";
 import { GaleriePhotos } from "@/components/galerie-photos";
+import { EnvoiFichiers } from "@/components/envoi-fichiers";
+import { TuilePhoto } from "@/components/tuile-photo";
 import { RafraichissementAuto } from "@/components/rafraichissement-auto";
+import { CarteDevisMission, PassagesPrecedents } from "@/components/carte-devis-mission";
+import { devisDeMission, passagesDeMission } from "@/lib/devis";
 import {
   actionNoteMission,
   ajouterNoteMission,
@@ -49,6 +53,7 @@ import {
   retirerOuRemplacerPhotoBureau,
   validerRapport,
 } from "../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const ACCEPT_FICHIERS = "application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -146,6 +151,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
   const valide = ["validee", "cloturee"].includes(m.statut);
   const nonCommencee = (STATUTS_NON_COMMENCES as readonly string[]).includes(m.statut);
   // Phase 21 : signalements liés, disponibilité du technicien ce jour-là, choix pour une réaffectation.
+  const [devisM, passagesM] = await Promise.all([devisDeMission(id), passagesDeMission(id)]);
   const [sigs, occupation, techniciensActifs, checklistsM, modelesCl] = await Promise.all([
     signalementsDe({ interventionId: id }),
     m.technicienId && m.dateProgrammee && nonCommencee ? occupationsTechnicien(m.technicienId, m.dateProgrammee, id) : Promise.resolve(null),
@@ -190,6 +196,16 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
   }
   for (const { n, auteur } of notes) {
     ev.push({ quand: n.createdAt, icone: <StickyNote className="w-4 h-4" />, titre: `${TYPE_NOTE[n.type]?.label ?? "Note"} — ${auteur ?? "bureau"}`, detail: n.titre ?? n.texte, ton: n.type === "piece_manquante" && !n.regleLe ? "crit" : undefined });
+  }
+  // Phase 25b : devis et passages précédents dans le fil de la mission.
+  for (const dv of devisM) {
+    ev.push({ quand: dv.createdAt, icone: <FileSignature className="w-4 h-4" />, titre: dv.statut === "a_preparer" || dv.besoinTechnicien ? `Devis ${dv.numero} demandé` : `Devis ${dv.numero} créé`, detail: dv.besoinTechnicien });
+    if (dv.dateEnvoi) ev.push({ quand: dv.dateEnvoi, icone: <Send className="w-4 h-4" />, titre: `Devis ${dv.numero} envoyé au client` });
+    if (dv.decideLe) ev.push({ quand: dv.decideLe, icone: <FileSignature className="w-4 h-4" />, titre: `Devis ${dv.numero} ${dv.statut === "refuse" ? "refusé" : "accepté"} par ${dv.decideParNom ?? "le client"}`, detail: dv.motifRefus, ton: dv.statut === "refuse" ? "crit" : "ok" });
+    if (dv.travauxPlanifiesLe) ev.push({ quand: dv.travauxPlanifiesLe, icone: <Wrench className="w-4 h-4" />, titre: `Travaux du devis ${dv.numero} planifiés — la mission repart` });
+  }
+  for (const { p, technicien } of passagesM) {
+    if (p.dateFin) ev.push({ quand: p.dateFin, icone: <FileText className="w-4 h-4" />, titre: `Passage ${p.numero} terminé${technicien ? ` (${technicien})` : ""} — rapport archivé`, ton: "ok" });
   }
   ev.sort((a, b) => a.quand.getTime() - b.quand.getTime());
 
@@ -354,7 +370,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                     <form action={retirerChecklistMission}>
                       <input type="hidden" name="interventionId" value={m.id} />
                       <input type="hidden" name="missionChecklistId" value={c.id} />
-                      <button type="submit" className="text-xs font-semibold text-red-ink">Retirer</button>
+                      <BoutonEnvoi type="submit" className="text-xs font-semibold text-red-ink">Retirer</BoutonEnvoi>
                     </form>
                   )}
                 </div>
@@ -385,12 +401,12 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                               <form action={traiterTacheNonConforme}>
                                 <input type="hidden" name="tacheId" value={t.id} />
                                 <input type="hidden" name="decision" value="nc" />
-                                <button type="submit" className="text-xs font-bold text-red-ink border border-red/40 rounded-lg px-2.5 py-1">Ouvrir une non-conformité</button>
+                                <BoutonEnvoi type="submit" className="text-xs font-bold text-red-ink border border-red/40 rounded-lg px-2.5 py-1">Ouvrir une non-conformité</BoutonEnvoi>
                               </form>
                               <form action={traiterTacheNonConforme}>
                                 <input type="hidden" name="tacheId" value={t.id} />
                                 <input type="hidden" name="decision" value="vu" />
-                                <button type="submit" className="text-xs font-semibold border border-line rounded-lg px-2.5 py-1">Marquer traité</button>
+                                <BoutonEnvoi type="submit" className="text-xs font-semibold border border-line rounded-lg px-2.5 py-1">Marquer traité</BoutonEnvoi>
                               </form>
                             </div>
                           )}
@@ -408,6 +424,9 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
           </div>
         </Card>
       )}
+
+      <CarteDevisMission interventionId={m.id} devis={devisM} peutCreer={!!m.projetId} />
+      <PassagesPrecedents passages={passagesM} />
 
       {sigs.length > 0 && (
         <Card className="p-5">
@@ -464,23 +483,26 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
               <details className="mt-3 pt-3 border-t border-line">
                 <summary className="text-sm font-bold text-blue cursor-pointer select-none">Gérer les photos du rapport</summary>
                 <div className="flex flex-col gap-3 mt-3">
-                  {photosRapport.map((ph, i) => (
-                    <form key={ph.id} action={retirerOuRemplacerPhotoBureau} className="flex items-center gap-2 flex-wrap" encType="multipart/form-data">
-                      <input type="hidden" name="interventionId" value={m.id} />
-                      <input type="hidden" name="photoId" value={ph.id} />
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={ph.url} alt={`Photo ${i + 1}`} className="w-12 h-12 rounded-lg object-cover bg-blue-pale" />
-                      <input type="file" name="remplacement" accept="image/jpeg,image/png,image/webp" className="text-xs max-w-[150px]" />
-                      {valide && <input name="motif" required placeholder="Motif" className={`${inputClass} !py-1 !text-xs w-28`} />}
-                      <button type="submit" className="text-xs font-bold text-blue">Remplacer / retirer</button>
-                    </form>
-                  ))}
-                  <p className="text-[11px] text-ink-soft">Avec un fichier : la photo est remplacée. Sans fichier : elle est retirée (au moins une photo reste).</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                    {photosRapport.map((ph, i) => (
+                      <TuilePhoto
+                        key={ph.id}
+                        url={ph.url}
+                        alt={`Photo ${i + 1}`}
+                        action={retirerOuRemplacerPhotoBureau}
+                        champs={{ interventionId: m.id, photoId: ph.id }}
+                        retirable={photosRapport.length > 1}
+                        remplacable
+                        motifRequis={valide}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-ink-soft">↻ remplace la photo, ✕ la retire (au moins une photo reste ; le fichier d&apos;origine reste archivé).</p>
                   <form action={ajouterPhotosBureau} className="flex flex-col gap-2 pt-2 border-t border-line">
                     <input type="hidden" name="interventionId" value={m.id} />
-                    <input type="file" name="photos" multiple accept="image/jpeg,image/png,image/webp" className="text-sm" required />
+                    <EnvoiFichiers type="photo" requis />
                     {valide && <input name="motif" required placeholder="Motif (rapport validé)" className={inputClass} />}
-                    <Btn variant="ghost" className="self-start">Ajouter les photos</Btn>
+                    <Btn variant="ghost" className="self-start" enCours="Ajout…">Ajouter les photos</Btn>
                   </form>
                 </div>
               </details>
@@ -604,7 +626,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                       <input type="hidden" name="pieceId" value={p.pieceId} />
                       <input type="number" name="quantite" min={0} defaultValue={p.quantite} className={`${inputClass} !py-1 !text-xs w-16`} />
                       {valide && <input name="motif" required placeholder="Motif" className={`${inputClass} !py-1 !text-xs w-24`} />}
-                      <button type="submit" className="text-xs font-bold text-blue">Corriger</button>
+                      <BoutonEnvoi type="submit" className="text-xs font-bold text-blue">Corriger</BoutonEnvoi>
                     </form>
                   )}
                 </div>
@@ -662,9 +684,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                 <textarea name="texte" rows={3} className={inputClass} placeholder="Votre commentaire, la pièce manquante, votre rapport…" />
               </Field>
             </div>
-            <Field label="Fichiers joints (PDF, Word, Excel, photos — 20 Mo max)">
-              <input type="file" name="fichiers" multiple accept={ACCEPT_FICHIERS} className="text-sm" />
-            </Field>
+            <EnvoiFichiers type="fichier" name="fichiers" dossier="missions" libelle="Fichiers joints (PDF, Word, Excel, photos — 20 Mo max)" />
             <label className="flex items-center gap-2 text-sm self-end pb-2">
               <input type="checkbox" name="visibleClient" /> Visible par le client <span className="text-xs text-ink-soft">(rapport du bureau seulement)</span>
             </label>
@@ -704,7 +724,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                         <input type="hidden" name="interventionId" value={m.id} />
                         <input type="hidden" name="noteId" value={n.id} />
                         <input type="hidden" name="action" value="regle" />
-                        <button type="submit" className="text-green-ink">{n.regleLe ? "Rouvrir" : "Réglé ✓"}</button>
+                        <BoutonEnvoi type="submit" className="text-green-ink">{n.regleLe ? "Rouvrir" : "Réglé ✓"}</BoutonEnvoi>
                       </form>
                     )}
                     {n.type === "rapport_bureau" && (
@@ -712,14 +732,14 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                         <input type="hidden" name="interventionId" value={m.id} />
                         <input type="hidden" name="noteId" value={n.id} />
                         <input type="hidden" name="action" value="visible" />
-                        <button type="submit" className="text-blue">{n.visibleClient ? "Rendre interne" : "Rendre visible au client"}</button>
+                        <BoutonEnvoi type="submit" className="text-blue">{n.visibleClient ? "Rendre interne" : "Rendre visible au client"}</BoutonEnvoi>
                       </form>
                     )}
                     <form action={actionNoteMission}>
                       <input type="hidden" name="interventionId" value={m.id} />
                       <input type="hidden" name="noteId" value={n.id} />
                       <input type="hidden" name="action" value="archiver" />
-                      <button type="submit" className="text-ink-soft">{n.archiveLe ? "Désarchiver" : "Archiver"}</button>
+                      <BoutonEnvoi type="submit" className="text-ink-soft">{n.archiveLe ? "Désarchiver" : "Archiver"}</BoutonEnvoi>
                     </form>
                   </div>
                 )}

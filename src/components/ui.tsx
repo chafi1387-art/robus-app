@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 export function Card({
   children,
@@ -115,12 +116,16 @@ export function Btn({
   type = "submit",
   href,
   className = "",
+  enCours,
+  confirmation,
 }: {
   children: React.ReactNode;
   variant?: "primary" | "ghost";
   type?: "submit" | "button";
   href?: string;
   className?: string;
+  enCours?: string;
+  confirmation?: string;
 }) {
   const base =
     "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold font-display transition-colors";
@@ -135,10 +140,18 @@ export function Btn({
       </Link>
     );
   }
+  if (type === "button") {
+    return (
+      <button type="button" className={`${base} ${styles} ${className}`}>
+        {children}
+      </button>
+    );
+  }
+  // Phase 25 : bouton d'envoi → roue + non cliquable pendant l'envoi.
   return (
-    <button type={type} className={`${base} ${styles} ${className}`}>
+    <BoutonEnvoi className={`${base} ${styles} disabled:opacity-70 ${className}`} enCours={enCours} confirmation={confirmation}>
       {children}
-    </button>
+    </BoutonEnvoi>
   );
 }
 

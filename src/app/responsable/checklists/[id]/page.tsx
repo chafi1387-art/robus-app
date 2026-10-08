@@ -17,6 +17,7 @@ import {
   removeChecklistItem,
   toggleChecklistModeleActif,
 } from "../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const TYPE_INTERVENTION_LABEL: Record<string, string> = {
   preventive: "Préventive",
@@ -98,9 +99,9 @@ export default async function ChecklistModeleDetailPage({ params }: { params: Pr
                         <input type="hidden" name="modeleId" value={modele.id} />
                         <input type="hidden" name="itemId" value={item.id} />
                         <input type="hidden" name="sens" value="haut" />
-                        <button type="submit" aria-label="Monter" className="w-7 h-7 rounded-md border border-line flex items-center justify-center hover:bg-blue-pale">
+                        <BoutonEnvoi type="submit" aria-label="Monter" className="w-7 h-7 rounded-md border border-line flex items-center justify-center hover:bg-blue-pale">
                           <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
+                        </BoutonEnvoi>
                       </form>
                     )}
                     {i < items.length - 1 && (
@@ -108,15 +109,15 @@ export default async function ChecklistModeleDetailPage({ params }: { params: Pr
                         <input type="hidden" name="modeleId" value={modele.id} />
                         <input type="hidden" name="itemId" value={item.id} />
                         <input type="hidden" name="sens" value="bas" />
-                        <button type="submit" aria-label="Descendre" className="w-7 h-7 rounded-md border border-line flex items-center justify-center hover:bg-blue-pale">
+                        <BoutonEnvoi type="submit" aria-label="Descendre" className="w-7 h-7 rounded-md border border-line flex items-center justify-center hover:bg-blue-pale">
                           <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
+                        </BoutonEnvoi>
                       </form>
                     )}
                     <form action={removeChecklistItem}>
                       <input type="hidden" name="itemId" value={item.id} />
                       <input type="hidden" name="modeleId" value={modele.id} />
-                      <button type="submit" className="text-xs font-semibold text-red-ink px-2">Retirer</button>
+                      <BoutonEnvoi type="submit" className="text-xs font-semibold text-red-ink px-2">Retirer</BoutonEnvoi>
                     </form>
                   </div>
                 </div>

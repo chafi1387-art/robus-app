@@ -35,6 +35,7 @@ import { Mail, Phone, Pencil } from "lucide-react";
 import { StatutInterventionPill } from "@/components/ui";
 import { updateTechnicienFiche, uploadTechnicienDocument, uploadTechnicienPhoto } from "../actions";
 import { getSitesForSelect } from "../../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 const STATUT_RH_LABEL: Record<string, string> = {
   actif: "Actif",
@@ -436,7 +437,7 @@ export default async function TechnicienDetailPage({
                         <input type="hidden" name="habilitationId" value={h.id} />
                         <input type="hidden" name="decision" value="valider" />
                         <input type="hidden" name="retour" value={`/responsable/techniciens/${id}?tab=habilitations`} />
-                        <button type="submit" className="bg-green-ink text-white font-bold text-xs rounded-lg px-3 py-1.5">Valider le certificat</button>
+                        <BoutonEnvoi type="submit" className="bg-green-ink text-white font-bold text-xs rounded-lg px-3 py-1.5">Valider le certificat</BoutonEnvoi>
                       </form>
                       <details className="text-xs">
                         <summary className="font-bold text-red-ink cursor-pointer select-none">Refuser</summary>
@@ -445,7 +446,7 @@ export default async function TechnicienDetailPage({
                           <input type="hidden" name="decision" value="refuser" />
                           <input type="hidden" name="retour" value={`/responsable/techniciens/${id}?tab=habilitations`} />
                           <input name="motif" required placeholder="Motif du refus" className={`${inputClass} !py-1 !text-xs w-40`} />
-                          <button type="submit" className="font-bold text-red-ink">OK</button>
+                          <BoutonEnvoi type="submit" className="font-bold text-red-ink">OK</BoutonEnvoi>
                         </form>
                       </details>
                     </div>
@@ -457,7 +458,7 @@ export default async function TechnicienDetailPage({
                       <input type="hidden" name="habilitationId" value={h.id} />
                       <input type="hidden" name="technicienId" value={id} />
                       <input name="motif" required placeholder="Motif" className={`${inputClass} !py-1 !text-xs w-40`} />
-                      <button type="submit" className="font-bold text-red-ink">OK</button>
+                      <BoutonEnvoi type="submit" className="font-bold text-red-ink">OK</BoutonEnvoi>
                     </form>
                   </details>
                   )}

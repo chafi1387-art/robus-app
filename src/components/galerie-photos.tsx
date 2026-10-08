@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ImageMini } from "@/components/image-mini";
 
 // Phase 18 : miniatures cliquables -> plein écran, flèches / glisser du doigt / Échap.
 export function GaleriePhotos({
@@ -48,8 +49,7 @@ export function GaleriePhotos({
             className={`${dim} rounded-lg overflow-hidden bg-blue-pale ring-offset-2 hover:ring-2 hover:ring-blue focus:ring-2 focus:ring-blue`}
             aria-label={`Agrandir la photo ${i + 1}`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.url} alt={p.legende ?? `Photo ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+            <ImageMini src={p.url} alt={p.legende ?? `Photo ${i + 1}`} className="w-full h-full object-cover" />
           </button>
         ))}
       </div>

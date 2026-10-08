@@ -7,7 +7,9 @@ import "@fontsource/ibm-plex-sans/latin-500.css";
 import "@fontsource/ibm-plex-sans/latin-600.css";
 import "@fontsource/ibm-plex-sans/latin-700.css";
 import "./globals.css";
+import { Suspense } from "react";
 import { EnregistrementSW } from "@/components/app-installable";
+import { BarreNavigation } from "@/components/barre-navigation";
 
 export const metadata: Metadata = {
   title: "ROBUS — Dashboard Qualité ISO 9001",
@@ -29,6 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-bg text-ink">
         <EnregistrementSW />
+        <Suspense fallback={null}>
+          <BarreNavigation />
+        </Suspense>
         {children}
       </body>
     </html>

@@ -1,6 +1,7 @@
 import "server-only";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { estReference, lireReference } from "@/lib/televersement";
 
 // Phase 18 : enregistrement des photos de mission (fil en direct, rapport,
 // corrections 24 h) — mêmes règles que le rapport de fin de mission.
@@ -32,4 +33,19 @@ export async function enregistrerPhotos(fichiers: File[], prefixe: string) {
     urls.push(`/uploads/rapports/${nom}`);
   }
   return urls;
+}
+
+/**
+ * Phase 25 : photos d'un formulaire — références de photos déjà envoyées une
+ * par une (/api/televersement) et, en secours, fichiers joints directement.
+ * Renvoie les URLs, dans l'ordre d'envoi.
+ */
+export async function photosRecues(formData: FormData, prefixe: string, userId: string, champ = "photos", max = 30) {
+  const valeurs = formData.getAll(champ);
+  const refs = valeurs.filter(estReference);
+  if (refs.length > max) throw new Error(`${max} photos maximum.`);
+  const urls: string[] = [];
+  for (const r of refs) urls.push((await lireReference(r, userId, ["rapports"])).url);
+  const fichiers = photosDuFormulaire(formData, champ);
+  return [...urls, ...(await enregistrerPhotos(fichiers, prefixe))];
 }

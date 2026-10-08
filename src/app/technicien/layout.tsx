@@ -1,6 +1,10 @@
+import { Suspense } from "react";
+import { BandeauMessages } from "@/components/bandeau-messages";
+import { TempsReel } from "@/components/temps-reel";
 import { NavTechnicien } from "@/components/nav-technicien";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { signOut } from "@/auth";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 export default async function TechnicienLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser(ROLES_TECHNICIEN);
@@ -21,16 +25,20 @@ export default async function TechnicienLayout({ children }: { children: React.R
             await signOut({ redirectTo: "/connexion" });
           }}
         >
-          <button
+          <BoutonEnvoi
             type="submit"
             className="text-[11px] font-semibold text-white/70 hover:text-white border border-white/20 rounded-lg px-2.5 py-1.5"
           >
             Déconnexion
-          </button>
+          </BoutonEnvoi>
         </form>
       </header>
 
       <main className="flex-1 max-w-lg w-full mx-auto px-4 py-4 pb-28">{children}</main>
+      <Suspense fallback={null}>
+        <BandeauMessages espace="technicien" />
+        <TempsReel />
+      </Suspense>
 
       <NavTechnicien />
     </div>

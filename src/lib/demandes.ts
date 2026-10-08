@@ -18,6 +18,7 @@ import { journaliser } from "@/lib/journal";
 import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
 import { envoyerAlerteDemande, envoyerAvisObservateur } from "@/lib/mail";
 import { adressesAppareils, dernierProjetAppareil, getParametre } from "@/lib/observateur";
+import { etatApresPanne } from "@/lib/etat-appareil";
 
 // ==========================================================================
 // Phase 20 — Demandes client : panne, demande d'intervention, question /
@@ -181,6 +182,8 @@ export async function creerDemande(p: NouvelleDemande) {
       .returning({ id: interventions.id });
     missionId = m.id;
     await attribuerParDefaut(m.id);
+    // Phase 25 : l'ascenseur apparaît « En panne » tout de suite.
+    await etatApresPanne(p.appareilId, p.auteurId ?? null);
   }
 
   // Numéro unique DC-AAAA-NNNN (nouvel essai si deux demandes arrivent en même temps).

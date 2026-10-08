@@ -379,7 +379,7 @@ export async function envoyerInvitationObservateur(params: {
   }
 }
 
-export async function envoyerAvisObservateur(params: { email: string; nom: string; titre: string; texte: string; lien: string }) {
+export async function envoyerAvisObservateur(params: { email: string; nom: string; titre: string; texte: string; lien: string; bouton?: string }) {
   const transport = getTransport();
   if (!transport) return "non_configure" as const;
   try {
@@ -387,12 +387,12 @@ export async function envoyerAvisObservateur(params: { email: string; nom: strin
       from: process.env.MAIL_FROM || process.env.SMTP_USER,
       to: params.email,
       subject: `ROBUS — ${params.titre.replace(/^[^\p{L}\p{N}]+/u, "")}`,
-      text: `Bonjour ${params.nom},\n\n${params.texte}\n\nVoir le détail : ${params.lien}\n\nROBUS`,
+      text: `Bonjour ${params.nom},\n\n${params.texte}\n\n${params.bouton ?? "Voir le détail"} : ${params.lien}\n\nROBUS`,
       html: `${enteteHtml()}<div style="font-family:Arial,sans-serif;padding:20px;color:#1f2a37;">
         <p>Bonjour ${echapperHtml(params.nom)},</p>
         <p style="font-size:15px;"><strong>${echapperHtml(params.titre)}</strong></p>
         <p>${echapperHtml(params.texte)}</p>
-        <p><a href="${params.lien}" style="display:inline-block;background:#0055a4;color:#ffffff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Voir le détail</a></p>
+        <p><a href="${params.lien}" style="display:inline-block;background:#0055a4;color:#ffffff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">${echapperHtml(params.bouton ?? "Voir le détail")}</a></p>
       </div>`,
       attachments: logoAttachment(),
     });

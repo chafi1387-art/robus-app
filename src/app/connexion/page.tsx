@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 
 import { ROLE_HOME } from "@/lib/auth-helpers";
 import { accesObservateurValide } from "@/lib/observateur-acces";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 export default async function ConnexionPage({
   searchParams,
@@ -123,12 +124,12 @@ export default async function ConnexionPage({
                   placeholder="••••••••"
                 />
               </div>
-              <button
+              <BoutonEnvoi
                 type="submit"
                 className="mt-2 bg-blue hover:bg-blue-light text-white font-display font-bold text-sm rounded-lg py-2.5 transition-colors"
               >
                 Se connecter
-              </button>
+              </BoutonEnvoi>
               <a href="/mot-de-passe-oublie" className="text-center text-sm font-semibold text-blue hover:underline">
                 Mot de passe oublié ?
               </a>

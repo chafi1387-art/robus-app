@@ -19,6 +19,8 @@ import {
   reporterSession,
   retirerParticipant,
 } from "../../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
+import { EnvoiFichiers } from "@/components/envoi-fichiers";
 
 // Phase 21 : une formation vue par le bureau — réponses des techniciens,
 // signatures de présence, documents, validation finale (admin / RQ),
@@ -157,7 +159,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
                       <form action={retirerParticipant} className="ml-auto">
                         <input type="hidden" name="sessionId" value={s.id} />
                         <input type="hidden" name="participantId" value={p.id} />
-                        <button type="submit" className="text-xs font-semibold text-red-ink">Retirer</button>
+                        <BoutonEnvoi type="submit" className="text-xs font-semibold text-red-ink">Retirer</BoutonEnvoi>
                       </form>
                     )}
                   </div>
@@ -217,7 +219,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
                     <form action={detacherDocumentSession}>
                       <input type="hidden" name="sessionId" value={s.id} />
                       <input type="hidden" name="documentId" value={d.id} />
-                      <button type="submit" className="text-xs font-semibold text-red-ink whitespace-nowrap">Retirer</button>
+                      <BoutonEnvoi type="submit" className="text-xs font-semibold text-red-ink whitespace-nowrap">Retirer</BoutonEnvoi>
                     </form>
                   )}
                 </div>
@@ -227,7 +229,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
             {gestion && s.statut !== "annulee" && (
               <form action={ajouterDocumentsSession} className="flex flex-col gap-2 mt-3 pt-3 border-t border-line">
                 <input type="hidden" name="sessionId" value={s.id} />
-                <input type="file" name="documents" multiple required accept={ACCEPT_FICHIERS_JOINTS} className="text-sm" />
+                <EnvoiFichiers type="fichier" name="documents" dossier="formations" requis />
                 <input name="titreDocument" placeholder="Titre (si un seul fichier)" className={inputClass} />
                 <label className="flex items-center gap-2 text-sm">
                   <select name="lectureObligatoire" defaultValue="on" className={`${inputClass} !py-1 !text-xs w-auto`}>

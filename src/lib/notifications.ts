@@ -10,6 +10,7 @@ import {
   nonConformites,
   pushAbonnements,
   demandesClient,
+  devis,
   formationsParticipants,
   formationsSessions,
   missionChecklistTaches,
@@ -60,6 +61,7 @@ export async function getNotifications(): Promise<Notification[]> {
     formationsReponses,
     techniciens,
     pointsNok,
+    devisSuivi,
   ] = await Promise.all([
     db
       .select({ id: appareils.id, numeroInterne: appareils.numeroInterne })
@@ -180,7 +182,27 @@ export async function getNotifications(): Promise<Notification[]> {
       .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
       .where(and(eq(missionChecklistTaches.resultat, "nok"), isNull(missionChecklistTaches.traiteLe)))
       .limit(50),
+    db
+      .select({ id: devis.id, numero: devis.numero, statut: devis.statut, travauxPlanifiesLe: devis.travauxPlanifiesLe, decideParNom: devis.decideParNom, appareil: appareils.numeroInterne })
+      .from(devis)
+      .leftJoin(appareils, eq(devis.appareilId, appareils.id))
+      .where(
+        sql`(${devis.statut} = 'a_preparer')
+          or (${devis.statut} = 'accepte' and ${devis.travauxPlanifiesLe} is null)
+          or (${devis.statut} = 'refuse' and ${devis.decideLe} > now() - interval '7 days' and ${devis.decideCanal} <> 'bureau')
+          or (${devis.statut} = 'envoye' and ${devis.dateEnvoi} < now() - interval '7 days')`
+      )
+      .limit(50),
   ]);
+
+  // Phase 25b : devis — à préparer, accepté (travaux à planifier), refusé récemment, sans réponse depuis 7 jours.
+  for (const dv of devisSuivi) {
+    const qui = `${dv.numero}${dv.appareil ? ` — ${dv.appareil}` : ""}`;
+    if (dv.statut === "a_preparer") notifications.push({ id: `devis-${dv.id}`, gravite: "warn", titre: `Devis à préparer ${qui} (demandé par le technicien)`, href: `/responsable/devis/${dv.id}` });
+    else if (dv.statut === "accepte" && !dv.travauxPlanifiesLe) notifications.push({ id: `devis-${dv.id}`, gravite: "crit", titre: `Devis accepté ${qui} — travaux à planifier`, href: `/responsable/devis/${dv.id}#travaux` });
+    else if (dv.statut === "refuse") notifications.push({ id: `devis-${dv.id}`, gravite: "warn", titre: `Devis refusé ${qui}${dv.decideParNom ? ` par ${dv.decideParNom}` : ""}`, href: `/responsable/devis/${dv.id}` });
+    else if (dv.statut === "envoye") notifications.push({ id: `devis-${dv.id}`, gravite: "warn", titre: `Devis ${qui} sans réponse depuis plus de 7 jours`, href: `/responsable/devis/${dv.id}` });
+  }
 
   for (const p of pointsNok) {
     notifications.push({ id: `checklist-${p.id}`, gravite: "warn", titre: `Checklist ✗ ${p.numero} : ${p.libelle} — à traiter`, href: `/responsable/missions/${p.interventionId}#checklist` });

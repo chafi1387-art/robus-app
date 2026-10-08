@@ -8,6 +8,7 @@ import { formatDateTime } from "@/lib/format";
 import { Btn, Card, Pill } from "@/components/ui";
 import { LIEUX_FORMATION, dateFormation, fenetreEmargement } from "@/lib/formations";
 import { consulterDocument, emargerFormation, repondreFormation } from "../actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 // Phase 21 : une formation vue par le technicien — date, lieu, programme,
 // documents, sa réponse, la signature de présence le jour J, le résultat.
@@ -114,7 +115,7 @@ export default async function FormationTechnicienPage({
                 <input type="hidden" name="sessionId" value={s.id} />
                 <input type="hidden" name="reponse" value="indisponible" />
                 <textarea name="motif" required rows={2} maxLength={500} placeholder="Pourquoi ? (congé, mission urgente…)" className="rounded-xl border border-line px-3 py-2.5 text-[15px]" />
-                <button type="submit" className="w-full rounded-xl bg-red text-white font-bold py-3">Prévenir le bureau</button>
+                <BoutonEnvoi type="submit" className="w-full rounded-xl bg-red text-white font-bold py-3">Prévenir le bureau</BoutonEnvoi>
               </form>
             </details>
           )}
@@ -166,7 +167,7 @@ export default async function FormationTechnicienPage({
               ) : (
                 <form action={consulterDocument}>
                   <input type="hidden" name="documentId" value={d.id} />
-                  <button type="submit" className="text-xs font-bold text-blue border border-line rounded-lg px-2.5 py-1.5 whitespace-nowrap">J&apos;ai lu</button>
+                  <BoutonEnvoi type="submit" className="text-xs font-bold text-blue border border-line rounded-lg px-2.5 py-1.5 whitespace-nowrap">J&apos;ai lu</BoutonEnvoi>
                 </form>
               )}
             </div>

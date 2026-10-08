@@ -8,6 +8,7 @@ import { appareils, observateurAppareils, observateurs } from "@/db/schema";
 import { ROLE_HOME } from "@/lib/auth-helpers";
 import { PARAM_TELEPHONE, adressesAppareils, getParametre } from "@/lib/observateur";
 import { connexionQr, signalerPanneQr } from "./actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 // Phase 18 : page ouverte en scannant l'étiquette QR de la cabine.
 // Non connecté : n° + adresse de l'appareil, connexion (email + mot de passe)
@@ -111,7 +112,7 @@ export default async function QrPage({
                   <input type="hidden" name="code" value={code} />
                   <input name="email" type="email" required autoComplete="email" placeholder="Email" className={champ} />
                   <input name="password" type="password" required autoComplete="current-password" placeholder="Mot de passe" className={champ} />
-                  <button type="submit" className="bg-blue text-white font-display font-bold rounded-xl py-3">Se connecter</button>
+                  <BoutonEnvoi type="submit" className="bg-blue text-white font-display font-bold rounded-xl py-3">Se connecter</BoutonEnvoi>
                 </form>
                 <Link href="/mot-de-passe-oublie" className="block text-center text-sm font-semibold text-blue mt-3">Mot de passe oublié ?</Link>
               </div>
@@ -130,7 +131,7 @@ export default async function QrPage({
                   <input type="checkbox" name="personneBloquee" className="w-5 h-5" /> Une personne est bloquée
                 </label>
                 <textarea name="description" required minLength={5} maxLength={1000} rows={3} placeholder="Que se passe-t-il ?" className={champ} />
-                <button type="submit" className="bg-navy text-white font-display font-bold rounded-xl py-3">Envoyer à ROBUS</button>
+                <BoutonEnvoi type="submit" className="bg-navy text-white font-display font-bold rounded-xl py-3">Envoyer à ROBUS</BoutonEnvoi>
               </form>
             </details>
           </>

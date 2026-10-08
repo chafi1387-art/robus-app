@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 // Phase 18 : choix des appareils, des informations partagées (droits), du
 // modèle prêt à l'emploi et de la date de fin d'accès d'un observateur.
@@ -162,9 +163,9 @@ export function FormulaireObservateur({
         <span className="text-xs text-ink-soft">Vide = accès permanent (jusqu&apos;à ce que vous le retiriez).</span>
       </section>
 
-      <button type="submit" className="self-start bg-blue hover:bg-blue-light text-white font-display font-bold text-sm rounded-lg px-5 py-3">
+      <BoutonEnvoi type="submit" className="self-start bg-blue hover:bg-blue-light text-white font-display font-bold text-sm rounded-lg px-5 py-3">
         {creation ? "Créer et envoyer l'invitation" : "Enregistrer les droits"}
-      </button>
+      </BoutonEnvoi>
     </form>
   );
 }

@@ -1,6 +1,10 @@
+import { Suspense } from "react";
+import { BandeauMessages } from "@/components/bandeau-messages";
+import { TempsReel } from "@/components/temps-reel";
 import { signOut } from "@/auth";
 import { requireObservateur } from "@/lib/observateur";
 import { NavObservateur } from "@/components/nav-observateur";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 // Phase 18 : espace Observateur — lecture seule, pensé pour le téléphone.
 export default async function ObservateurLayout({ children }: { children: React.ReactNode }) {
@@ -20,12 +24,16 @@ export default async function ObservateurLayout({ children }: { children: React.
             await signOut({ redirectTo: "/connexion" });
           }}
         >
-          <button type="submit" className="text-[11px] font-semibold text-white/70 hover:text-white border border-white/20 rounded-lg px-2.5 py-1.5">
+          <BoutonEnvoi type="submit" className="text-[11px] font-semibold text-white/70 hover:text-white border border-white/20 rounded-lg px-2.5 py-1.5">
             Déconnexion
-          </button>
+          </BoutonEnvoi>
         </form>
       </header>
       <main className="flex-1 max-w-lg w-full mx-auto px-4 py-4 pb-28">{children}</main>
+      <Suspense fallback={null}>
+        <BandeauMessages espace="observateur" />
+        <TempsReel />
+      </Suspense>
       <NavObservateur tempsReel={ctx.droits.has("temps_reel")} />
     </div>
   );

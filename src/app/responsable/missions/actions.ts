@@ -5,8 +5,9 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { enregistrerPhotos, photosDuFormulaire } from "@/lib/photos";
-import { enregistrerFichiers, fichiersDuFormulaire } from "@/lib/fichiers";
+import { photosRecues } from "@/lib/photos";
+import { fichiersRecus } from "@/lib/fichiers";
+import { avecAnnulation, signerAnnulation } from "@/lib/annulation";
 import { avecMessage } from "@/lib/url";
 import { piecesNettes } from "@/lib/pieces-mission";
 import { db } from "@/db";
@@ -18,6 +19,7 @@ import { notifierObservateurs } from "@/lib/observateur";
 import { REINIT_ENVOI } from "@/lib/missions";
 import { envoyerMissionsAuTechnicien } from "@/lib/envoi-mission";
 import { controlerHabilitations, messageManques, nomUtilisateur } from "@/lib/habilitations";
+import { etatDepuisRapport } from "@/lib/etat-appareil";
 
 // Phase 18 : le bureau valide le rapport d'une mission terminée. Le rapport
 // devient visible par les observateurs (droit « rapports ») et n'est plus
@@ -136,6 +138,7 @@ export async function modifierRapportBureau(formData: FormData) {
     })
     .where(eq(rapports.interventionId, id));
   await tracer(id, user.id, "rapport_modifie", motif, avant);
+  if (parsed.data!.statutFinalAppareil) await etatDepuisRapport(id, user.id);
   redirect(avecMessage(retour, "ok", "Rapport modifié — l'ancienne version est conservée."));
 }
 
@@ -148,18 +151,17 @@ export async function ajouterPhotosBureau(formData: FormData) {
   motifExige(m.statut, motif, retour);
   const [r] = await db.select({ id: rapports.id }).from(rapports).where(eq(rapports.interventionId, id)).limit(1);
   if (!r) redirect(avecMessage(retour, "erreur", "Pas encore de rapport pour cette mission."));
-  let fichiers: File[] = [];
+  let urls: string[] = [];
   try {
-    fichiers = photosDuFormulaire(formData);
+    urls = await photosRecues(formData, r!.id, user.id);
   } catch (e) {
     redirect(avecMessage(retour, "erreur", (e as Error).message));
   }
-  if (!fichiers.length) redirect(avecMessage(retour, "erreur", "Choisissez au moins une photo."));
+  if (!urls.length) redirect(avecMessage(retour, "erreur", "Choisissez au moins une photo."));
   const avant = await instantane(id);
-  const urls = await enregistrerPhotos(fichiers, r!.id);
   await db.insert(rapportPhotos).values(urls.map((url) => ({ rapportId: r!.id, url })));
   await tracer(id, user.id, "photos_ajoutees", motif, avant);
-  redirect(avecMessage(retour, "ok", `${urls.length} photo(s) ajoutée(s).`));
+  redirect(avecMessage(retour, "ok", `${urls.length} photo(s) ajoutée(s) ✓`));
 }
 
 export async function retirerOuRemplacerPhotoBureau(formData: FormData) {
@@ -172,22 +174,22 @@ export async function retirerOuRemplacerPhotoBureau(formData: FormData) {
   motifExige(m.statut, motif, retour);
   const [ph] = z.string().uuid().safeParse(photoId).success
     ? await db
-        .select({ id: rapportPhotos.id, rapportId: rapportPhotos.rapportId })
+        .select({ id: rapportPhotos.id, rapportId: rapportPhotos.rapportId, url: rapportPhotos.url })
         .from(rapportPhotos)
         .innerJoin(rapports, eq(rapportPhotos.rapportId, rapports.id))
         .where(and(eq(rapportPhotos.id, photoId), eq(rapports.interventionId, id)))
         .limit(1)
     : [];
-  if (!ph) redirect(avecMessage(retour, "erreur", "Photo introuvable."));
-  let remplacement: File[] = [];
+  if (!ph) redirect(avecMessage(retour, "erreur", "Photo déjà retirée."));
+  let remplacement: string[] = [];
   try {
-    remplacement = photosDuFormulaire(formData, "remplacement");
+    remplacement = await photosRecues(formData, ph!.rapportId, user.id, "remplacement", 1);
   } catch (e) {
     redirect(avecMessage(retour, "erreur", (e as Error).message));
   }
   const avant = await instantane(id);
   if (remplacement.length) {
-    const [url] = await enregistrerPhotos(remplacement.slice(0, 1), ph!.rapportId);
+    const [url] = remplacement;
     await db.update(rapportPhotos).set({ url }).where(eq(rapportPhotos.id, ph!.id));
     await tracer(id, user.id, "photo_remplacee", motif, avant);
     redirect(avecMessage(retour, "ok", "Photo remplacée (l'originale reste archivée sur le serveur)."));
@@ -196,7 +198,8 @@ export async function retirerOuRemplacerPhotoBureau(formData: FormData) {
   if (n <= 1) redirect(avecMessage(retour, "erreur", "Le rapport doit garder au moins une photo — utilisez « Remplacer »."));
   await db.delete(rapportPhotos).where(eq(rapportPhotos.id, ph!.id));
   await tracer(id, user.id, "photo_retiree", motif, avant);
-  redirect(avecMessage(retour, "ok", "Photo retirée (le fichier reste archivé)."));
+  const jeton = signerAnnulation(user.id, { k: "photo_bureau", rapportId: ph!.rapportId, url: ph!.url, interventionId: id });
+  redirect(avecAnnulation(avecMessage(retour, "ok", "Photo retirée ✓ (le fichier reste archivé)"), jeton));
 }
 
 /** Corrige la quantité nette d'une pièce sur la mission (mouvement de correction + stock). */
@@ -245,16 +248,15 @@ export async function ajouterNoteMission(formData: FormData) {
   if (!(TYPES_NOTE as readonly string[]).includes(type)) redirect(avecMessage(retour, "erreur", "Type de note invalide."));
   const titre = String(formData.get("titre") ?? "").trim().slice(0, 200);
   const texte = String(formData.get("texte") ?? "").trim().slice(0, 10000);
-  let fichiers: File[] = [];
+  let joints: { url: string; nom: string }[] = [];
   try {
-    fichiers = fichiersDuFormulaire(formData);
+    joints = await fichiersRecus(formData, "missions", `mission-${id}`, user.id);
   } catch (e) {
     redirect(avecMessage(retour, "erreur", (e as Error).message));
   }
-  if (type === "document" && !fichiers.length) redirect(avecMessage(retour, "erreur", "Joignez au moins un fichier."));
+  if (type === "document" && !joints.length) redirect(avecMessage(retour, "erreur", "Joignez au moins un fichier."));
   if (type === "rapport_bureau" && (!titre || !texte)) redirect(avecMessage(retour, "erreur", "Un rapport du bureau a besoin d'un titre et d'un texte."));
   if ((type === "commentaire" || type === "piece_manquante") && !texte) redirect(avecMessage(retour, "erreur", "Écrivez le texte de la note."));
-  const joints = fichiers.length ? await enregistrerFichiers(fichiers, "missions", `mission-${id}`) : [];
   await db
     .insert(missionNotes)
     .values({

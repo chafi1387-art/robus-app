@@ -6,6 +6,8 @@ import { requireUser } from "@/lib/auth-helpers";
 import { formatDateTime } from "@/lib/format";
 import { TYPES_SIGNALEMENT } from "@/lib/signalements-types";
 import { envoyerSignalement } from "../signalements/actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
+import { EnvoiFichiers } from "@/components/envoi-fichiers";
 
 // Phase 21 : « Signaler » — 1) le type (grandes tuiles), 2) un petit rapport
 // avec photos / document, lié automatiquement à la mission si on vient d'une
@@ -149,30 +151,12 @@ export default async function SignalerPage({
           <input name="lieu" maxLength={200} placeholder="Adresse, route, étage…" className="rounded-xl border border-line px-3 py-3 text-[15px] bg-surface" />
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Photos (facultatif)</span>
-          <input
-            type="file"
-            name="photos"
-            multiple
-            accept="image/jpeg,image/png,image/webp"
-            className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue file:text-white file:font-bold file:px-3 file:py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Document (constat, PV, devis… facultatif)</span>
-          <input
-            type="file"
-            name="fichiers"
-            multiple
-            accept="application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-[#e9eef4] file:text-ink file:font-bold file:px-3 file:py-2"
-          />
-        </label>
+        <EnvoiFichiers type="photo" libelle="Photos (facultatif)" />
+        <EnvoiFichiers type="fichier" name="fichiers" dossier="signalements" max={5} libelle="Document (constat, PV, devis… facultatif)" />
 
-        <button type="submit" className="bg-red text-white font-display font-extrabold text-[16px] rounded-xl py-3.5 mt-1">
+        <BoutonEnvoi type="submit" className="bg-red text-white font-display font-extrabold text-[16px] rounded-xl py-3.5 mt-1" enCours="Envoi au bureau…">
           Envoyer au bureau
-        </button>
+        </BoutonEnvoi>
         <p className="text-xs text-ink-soft text-center -mt-1">Le bureau reçoit une notification et un email immédiatement.</p>
       </form>
     </div>

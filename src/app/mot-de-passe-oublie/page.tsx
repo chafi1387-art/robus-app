@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { demanderReinitialisation } from "./actions";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 export default async function MotDePasseOubliePage({ searchParams }: { searchParams: Promise<{ envoye?: string }> }) {
   const { envoye } = await searchParams;
@@ -20,7 +21,7 @@ export default async function MotDePasseOubliePage({ searchParams }: { searchPar
             <p className="text-sm text-ink-soft">Indiquez l&apos;email de votre compte ROBUS : vous recevrez un lien pour choisir un nouveau mot de passe.</p>
             <form action={demanderReinitialisation} className="flex flex-col gap-3">
               <input name="email" type="email" required autoComplete="email" placeholder="prenom.nom@…" className="w-full rounded-lg border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-accent" />
-              <button type="submit" className="bg-blue hover:bg-blue-light text-white font-display font-bold text-sm rounded-lg py-2.5">Envoyer le lien</button>
+              <BoutonEnvoi type="submit" className="bg-blue hover:bg-blue-light text-white font-display font-bold text-sm rounded-lg py-2.5">Envoyer le lien</BoutonEnvoi>
             </form>
             <Link href="/connexion" className="text-sm font-semibold text-blue">← Retour à la connexion</Link>
           </>

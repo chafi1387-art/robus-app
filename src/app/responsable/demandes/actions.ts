@@ -11,7 +11,7 @@ import { demandesClient, interventions, users } from "@/db/schema";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { avecMessage } from "@/lib/url";
-import { enregistrerFichiers, fichiersDuFormulaire } from "@/lib/fichiers";
+import { fichiersRecus } from "@/lib/fichiers";
 import { ajouterMessage, changerStatutDemande, notifierClient } from "@/lib/demandes";
 import { controlerHabilitations, messageManques } from "@/lib/habilitations";
 import { envoyerMissionsAuTechnicien } from "@/lib/envoi-mission";
@@ -45,8 +45,7 @@ export async function repondreDemande(formData: FormData) {
   const texte = String(formData.get("texte") ?? "").trim().slice(0, 5000);
   let joints: { url: string; nom: string }[] = [];
   try {
-    const f = fichiersDuFormulaire(formData, "fichiers", 5);
-    joints = f.length ? await enregistrerFichiers(f, "missions", `demande-${id}`) : [];
+    joints = await fichiersRecus(formData, "missions", `demande-${id}`, user.id, "fichiers", 5);
   } catch (e) {
     redirect(avecMessage(page(id, "#fil"), "erreur", (e as Error).message));
   }

@@ -25,13 +25,18 @@ import { notifierBureau } from "@/lib/push";
 import { peutModifierHeureReelle } from "@/lib/rapport-rules";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 import { after } from "next/server";
-import { enregistrerPhotos, photosDuFormulaire } from "@/lib/photos";
+import { photosRecues } from "@/lib/photos";
+import { avecMessage } from "@/lib/url";
+import { lireReference } from "@/lib/televersement";
+import { avecAnnulation, signerAnnulation } from "@/lib/annulation";
 import { peutModifierRapport } from "@/lib/rapport-rules";
 import { notifierObservateurs } from "@/lib/observateur";
 import { marquerPassageRealise } from "@/lib/garantie-passages";
 import { demandesMissionTerminee } from "@/lib/demandes";
+import { etatDepuisRapport } from "@/lib/etat-appareil";
+import { devisMissionTerminee, signalerBesoinDevis } from "@/lib/devis";
 
 async function assertOwnIntervention(interventionId: string, userId: string, role: string) {
   const [row] = await db
@@ -226,15 +231,23 @@ export async function terminerIntervention(formData: FormData) {
   }
 
   // Phase 18 : les photos envoyées pendant la mission (fil) comptent.
-  const fichiers = photosDuFormulaire(formData);
+  // Phase 25 : photos déjà envoyées une par une (références) ou jointes.
+  let nouvellesPhotos: string[] = [];
+  try {
+    nouvellesPhotos = await photosRecues(formData, `rap-${parsed.data.interventionId}`, user.id);
+  } catch (e) {
+    redirect(avecMessage(`/technicien/interventions/${parsed.data.interventionId}#rapport`, "erreur", (e as Error).message));
+  }
+  // Phase 25 : seulement les photos du passage en cours (une mission peut repartir après un devis).
+  const [debutPassage] = await db.select({ d: interventions.dateDebut }).from(interventions).where(eq(interventions.id, parsed.data.interventionId)).limit(1);
   const fil = await db
     .select({ photos: missionJournal.photos })
     .from(missionJournal)
-    .where(eq(missionJournal.interventionId, parsed.data.interventionId))
+    .where(and(eq(missionJournal.interventionId, parsed.data.interventionId), debutPassage?.d ? gte(missionJournal.createdAt, new Date(debutPassage.d.getTime() - 60000)) : undefined))
     .orderBy(asc(missionJournal.createdAt));
   const photosFil = fil.flatMap((f) => f.photos);
-  if (fichiers.length === 0 && photosFil.length === 0) {
-    throw new Error("Merci d'ajouter au moins une photo pour clôturer la mission.");
+  if (nouvellesPhotos.length === 0 && photosFil.length === 0) {
+    redirect(avecMessage(`/technicien/interventions/${parsed.data.interventionId}#rapport`, "erreur", "Merci d'ajouter au moins une photo pour clôturer la mission."));
   }
 
   const [rapport] = await db
@@ -273,13 +286,21 @@ export async function terminerIntervention(formData: FormData) {
     );
   }
 
-  const urls = [...photosFil, ...(await enregistrerPhotos(fichiers, rapport.id))];
+  const urls = [...photosFil, ...nouvellesPhotos];
   if (urls.length) await db.insert(rapportPhotos).values(urls.map((url) => ({ rapportId: rapport.id, url })));
 
   await db
     .update(interventions)
     .set({ statut: "terminee", dateFin: new Date() })
     .where(eq(interventions.id, parsed.data.interventionId));
+  // Phase 25 : l'état de l'ascenseur suit le rapport (vu tout de suite par le client).
+  await etatDepuisRapport(parsed.data.interventionId, user.id);
+  // Phase 25b : devis demandé par le technicien / travaux du devis terminés.
+  await devisMissionTerminee(parsed.data.interventionId);
+  const besoinDevis = String(formData.get("besoinDevis") ?? "").trim().slice(0, 4000);
+  if (formData.get("devisNecessaire") === "on") {
+    await signalerBesoinDevis(parsed.data.interventionId, besoinDevis || "Devis demandé par le technicien (voir le rapport).", user.id);
+  }
   // Phase 19 : passage de garantie lié -> réalisé (le compteur baisse maintenant).
   await marquerPassageRealise(parsed.data.interventionId);
   // Phase 20 : demande client liée (panne…) -> résolue, client prévenu.
@@ -303,7 +324,7 @@ export async function terminerIntervention(formData: FormData) {
 
   revalidatePath("/technicien");
   revalidatePath(`/technicien/interventions/${parsed.data.interventionId}`);
-  redirect(`/technicien`);
+  redirect(avecMessage("/technicien", "ok", "Rapport envoyé au bureau ✓"));
 }
 
 // Phase 10 : correction de l'heure réelle sur un rapport déjà envoyé —
@@ -558,11 +579,37 @@ export async function ajouterAuFil(formData: FormData) {
   const m = await lireMission(interventionId);
   if (m.statut !== "en_cours") throw new Error("Commencez la mission avant d'envoyer des photos.");
   const texte = String(formData.get("texte") ?? "").trim().slice(0, 1000);
-  const fichiers = photosDuFormulaire(formData);
-  if (!texte && fichiers.length === 0) throw new Error("Ajoutez une photo ou une note.");
-  const photos = await enregistrerPhotos(fichiers, `fil-${interventionId}`);
+  const retour = `/technicien/interventions/${interventionId}#direct`;
+  let photos: string[] = [];
+  try {
+    photos = await photosRecues(formData, `fil-${interventionId}`, user.id);
+  } catch (e) {
+    redirect(avecMessage(retour, "erreur", (e as Error).message));
+  }
+  if (!texte && photos.length === 0) redirect(avecMessage(retour, "erreur", "Écrivez une note avant d'envoyer."));
   await db.insert(missionJournal).values({ interventionId, auteurId: user.id, texte: texte || null, photos });
   revalidatePath(`/technicien/interventions/${interventionId}`);
+  redirect(avecMessage(retour, "ok", photos.length ? "Envoyé au bureau ✓" : "Note envoyée au bureau ✓"));
+}
+
+/**
+ * Phase 25 : une photo du fil « en direct », envoyée dès qu'elle est
+ * téléversée (le technicien voit ✓ photo par photo, le bureau la voit tout de suite).
+ */
+export async function ajouterPhotoAuFil(interventionId: string, ref: string): Promise<{ erreur?: string }> {
+  const user = await requireUser(ROLES_TECHNICIEN);
+  if (!z.string().uuid().safeParse(interventionId).success) return { erreur: "Mission introuvable." };
+  try {
+    await assertOwnIntervention(interventionId, user.id, user.role);
+    const m = await lireMission(interventionId);
+    if (m.statut !== "en_cours") return { erreur: "Commencez la mission avant d'envoyer des photos." };
+    const { url } = await lireReference(ref, user.id, ["rapports"]);
+    await db.insert(missionJournal).values({ interventionId, auteurId: user.id, texte: null, photos: [url] });
+  } catch (e) {
+    return { erreur: (e as Error).message };
+  }
+  revalidatePath(`/technicien/interventions/${interventionId}`);
+  return {};
 }
 
 const modifierRapportSchema = z.object({
@@ -633,9 +680,14 @@ export async function ajouterPhotosRapport(formData: FormData) {
   const interventionId = String(formData.get("interventionId") ?? "");
   if (!z.string().uuid().safeParse(interventionId).success) throw new Error("Mission introuvable.");
   const rapport = await controlerModification(interventionId, user);
-  const fichiers = photosDuFormulaire(formData);
-  if (!fichiers.length) throw new Error("Choisissez au moins une photo.");
-  const urls = await enregistrerPhotos(fichiers, rapport.id);
+  const retour = `/technicien/interventions/${interventionId}#rapport-photos`;
+  let urls: string[] = [];
+  try {
+    urls = await photosRecues(formData, rapport.id, user.id);
+  } catch (e) {
+    redirect(avecMessage(retour, "erreur", (e as Error).message));
+  }
+  if (!urls.length) redirect(avecMessage(retour, "erreur", "Choisissez au moins une photo."));
   await db.insert(rapportPhotos).values(urls.map((url) => ({ rapportId: rapport.id, url })));
   await db
     .update(rapports)
@@ -649,6 +701,7 @@ export async function ajouterPhotosRapport(formData: FormData) {
     details: `${urls.length} photo(s) ajoutée(s)`,
   });
   revalidatePath(`/technicien/interventions/${interventionId}`);
+  redirect(avecMessage(retour, "ok", `${urls.length} photo(s) ajoutée(s) au rapport ✓`));
 }
 
 export async function retirerPhotoRapport(formData: FormData) {
@@ -659,9 +712,11 @@ export async function retirerPhotoRapport(formData: FormData) {
     throw new Error("Photo introuvable.");
   }
   const rapport = await controlerModification(interventionId, user);
-  const photos = await db.select({ id: rapportPhotos.id }).from(rapportPhotos).where(eq(rapportPhotos.rapportId, rapport.id));
-  if (!photos.some((p) => p.id === photoId)) throw new Error("Photo introuvable.");
-  if (photos.length <= 1) throw new Error("Le rapport doit garder au moins une photo.");
+  const retour = `/technicien/interventions/${interventionId}#rapport-photos`;
+  const photos = await db.select({ id: rapportPhotos.id, url: rapportPhotos.url }).from(rapportPhotos).where(eq(rapportPhotos.rapportId, rapport.id));
+  const photo = photos.find((p) => p.id === photoId);
+  if (!photo) redirect(avecMessage(retour, "erreur", "Photo déjà retirée."));
+  if (photos.length <= 1) redirect(avecMessage(retour, "erreur", "Le rapport doit garder au moins une photo."));
   // Le fichier reste sur le serveur (traçabilité ISO) : seule la liaison au rapport est retirée.
   await db.delete(rapportPhotos).where(and(eq(rapportPhotos.id, photoId), eq(rapportPhotos.rapportId, rapport.id)));
   await db
@@ -675,4 +730,6 @@ export async function retirerPhotoRapport(formData: FormData) {
     utilisateurId: user.id,
   });
   revalidatePath(`/technicien/interventions/${interventionId}`);
+  const jeton = signerAnnulation(user.id, { k: "photo_rapport", rapportId: rapport.id, url: photo!.url, interventionId });
+  redirect(avecAnnulation(avecMessage(retour, "ok", "Photo retirée ✓"), jeton));
 }

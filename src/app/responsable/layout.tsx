@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { BandeauMessages } from "@/components/bandeau-messages";
+import { TempsReel } from "@/components/temps-reel";
 import Link from "next/link";
 import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { db } from "@/db";
@@ -10,6 +11,7 @@ import { getNotifications } from "@/lib/notifications";
 import { NavBureau } from "@/components/nav-bureau";
 import { MenuMobile } from "@/components/menu-mobile";
 import { Bell, FileText } from "lucide-react";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 async function getBadgeCounts() {
   const [[{ n: retard }], [{ n: nonAffectees }], [{ n: demandes }], [{ n: sig }]] = await Promise.all([
@@ -130,18 +132,19 @@ export default async function ResponsableLayout({ children }: { children: React.
                       : "Commercial"}
                 </div>
               </div>
-              <button
+              <BoutonEnvoi
                 type="submit"
                 className="text-xs font-semibold text-ink-soft hover:text-red-ink border border-line rounded-lg px-2 sm:px-2.5 py-1.5 sm:ml-2"
               >
                 Déconnexion
-              </button>
+              </BoutonEnvoi>
             </div>
           </form>
         </header>
         <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-8 max-w-[1360px] w-full mx-auto min-w-0">
           <Suspense fallback={null}>
             <BandeauMessages />
+            <TempsReel />
           </Suspense>
           {children}
         </main>

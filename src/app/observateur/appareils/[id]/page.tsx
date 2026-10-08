@@ -6,12 +6,17 @@ import { db } from "@/db";
 import { appareils, documentsClient, garantieFormules, garanties, prestationAppareils, prestations, projetAppareils, projets, users } from "@/db/schema";
 import { Card, StatutAppareilPill } from "@/components/ui";
 import { EtapesSuivi } from "@/components/etapes-suivi";
+import { RafraichissementAuto } from "@/components/rafraichissement-auto";
+import { devisDeLObservateur } from "@/lib/devis";
+import { ListeDevisObservateur } from "@/components/liste-devis-observateur";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { ETAPES, adressesAppareils, etapeObservateur, exigerAppareil, requireObservateur } from "@/lib/observateur";
 import { interventionsEnCours, interventionsTerminees, prenom, prochainesVisites } from "@/lib/observateur-donnees";
 import { creerDemandeObservateur } from "../../actions";
 import { TYPES_DOCUMENT_CLIENT } from "@/lib/documents-client";
 import { passagesDAppareils } from "@/lib/garantie-passages";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
+import { EnvoiFichiers } from "@/components/envoi-fichiers";
 
 const TYPE: Record<string, string> = { preventive: "Maintenance préventive", corrective: "Dépannage", systematique: "Contrôle systématique" };
 
@@ -71,6 +76,7 @@ export default async function AppareilObservateurPage({
         .orderBy(desc(prestations.dateDebut))
     : [];
   const passages = d.has("contrat") && (garantiesRows.length || contrats.length) ? await passagesDAppareils([id]) : [];
+  const mesDevis = await devisDeLObservateur(ctx.userId, id);
   const adresse = adresses.get(id);
   const rapportsVisibles = d.has("rapports");
 
@@ -83,7 +89,10 @@ export default async function AppareilObservateurPage({
           {d.has("fiche") && <StatutAppareilPill statut={a.statut} />}
         </div>
         {adresse && <p className="text-sm text-ink-soft flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {adresse}</p>}
+        <div className="mt-1"><RafraichissementAuto /></div>
       </div>
+
+      <ListeDevisObservateur devis={mesDevis} />
 
       {sp.panne === "1" && (
         <div className="text-sm bg-green-fill text-green-ink rounded-lg px-3 py-2">Panne signalée. ROBUS a été prévenu et va organiser l&apos;intervention.</div>
@@ -129,11 +138,8 @@ export default async function AppareilObservateurPage({
                 <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Téléphone pour vous rappeler</span>
                 <input name="telephone" defaultValue={moi?.telephone ?? ""} inputMode="tel" className="rounded-lg border border-line px-3 py-2.5 text-[15px]" />
               </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Photo (facultatif)</span>
-                <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple className="text-sm" />
-              </label>
-              <button type="submit" className="bg-red-ink text-white font-display font-bold rounded-xl py-3">Envoyer à ROBUS</button>
+              <EnvoiFichiers type="photo" max={5} libelle="Photos (facultatif)" />
+              <BoutonEnvoi type="submit" className="bg-red-ink text-white font-display font-bold rounded-xl py-3" enCours="Envoi à ROBUS…">Envoyer à ROBUS</BoutonEnvoi>
             </form>
             <Link href={`/observateur/demandes/nouvelle?appareil=${id}`} className="block text-center text-sm font-semibold text-blue mt-3">Autre demande (intervention, question, document)…</Link>
           </details>

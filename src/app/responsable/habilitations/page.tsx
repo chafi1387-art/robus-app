@@ -9,6 +9,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { CATEGORIES_HABILITATION, EXIGENCES_MISSION, STATUT_HAB, habilitationsCourantes } from "@/lib/habilitations";
 import { creerSession, deciderCertificat, enregistrerCatalogue } from "./actions";
 import { ACCEPT_FICHIERS_JOINTS } from "@/lib/fichiers";
+import { EnvoiFichiers } from "@/components/envoi-fichiers";
 
 // Phase 19 : Habilitations & formations — matrice des compétences, catalogue,
 // sessions de formation, certificats déposés par les techniciens à valider.
@@ -363,9 +364,7 @@ async function Sessions({
                 </div>
               </div>
               <div className="md:col-span-2">
-                <Field label="Documents de la formation (support, programme… facultatif)">
-                  <input type="file" name="documents" multiple accept={ACCEPT_FICHIERS_JOINTS} className="text-sm" />
-                </Field>
+                <EnvoiFichiers type="fichier" name="documents" dossier="formations" libelle="Documents de la formation (support, programme… facultatif)" />
                 <p className="text-xs text-ink-soft mt-1">Rangés aussi dans la Bibliothèque (catégorie « Formations internes ») et sur la fiche de chaque participant.</p>
               </div>
               <div className="md:col-span-2">

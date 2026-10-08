@@ -93,10 +93,15 @@ export const typeMouvementStockEnum = pgEnum("type_mouvement_stock", ["entree", 
 export const typeAuditEnum = pgEnum("type_audit", ["interne", "externe"]);
 export const statutAuditEnum = pgEnum("statut_audit", ["planifie", "en_cours", "termine"]);
 export const statutDevisEnum = pgEnum("statut_devis", [
+  // Phase 25 : « a_preparer » = demandé par le technicien, à faire par le bureau.
+  "a_preparer",
   "brouillon",
   "envoye",
   "accepte",
   "refuse",
+  // Phase 25 : travaux réalisés (mission terminée après acceptation) / annulé par le bureau.
+  "realise",
+  "annule",
 ]);
 export const typeRisqueEnum = pgEnum("type_risque", ["risque", "opportunite"]);
 export const statutRisqueEnum = pgEnum("statut_risque", [
@@ -261,6 +266,8 @@ export const interventions = pgTable("interventions", {
   valideeLe: timestamp("validee_le"),
   valideeParId: uuid("validee_par_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Phase 25 : numéro du passage en cours (2 = travaux après devis…).
+  passage: integer("passage").notNull().default(1),
 });
 
 // ---------- Rapports (structure simple — Phase 1) ----------
@@ -574,6 +581,87 @@ export const devis = pgTable("devis", {
   description: text("description"),
   dateEnvoi: timestamp("date_envoi"),
   dateReponse: timestamp("date_reponse"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  // ---------- Phase 25 : devis dans la mission ----------
+  interventionId: uuid("intervention_id").references(() => interventions.id, { onDelete: "set null" }),
+  appareilId: uuid("appareil_id").references(() => appareils.id, { onDelete: "set null" }),
+  projetId: uuid("projet_id").references(() => projets.id, { onDelete: "set null" }),
+  titre: varchar("titre", { length: 200 }),
+  /** lignes = saisi dans ROBUS ; document = devis déjà prêt (PDF scanné) joint. */
+  mode: varchar("mode", { length: 20 }).notNull().default("lignes"),
+  documentUrl: text("document_url"),
+  documentNom: varchar("document_nom", { length: 200 }),
+  message: text("message"),
+  /** Besoin décrit par le technicien (travaux / pièces à prévoir). */
+  besoinTechnicien: text("besoin_technicien"),
+  demandeParId: uuid("demande_par_id").references(() => users.id, { onDelete: "set null" }),
+  creeParId: uuid("cree_par_id").references(() => users.id, { onDelete: "set null" }),
+  envoyeParId: uuid("envoye_par_id").references(() => users.id, { onDelete: "set null" }),
+  validiteJours: integer("validite_jours").notNull().default(30),
+  decideLe: timestamp("decide_le"),
+  decideParNom: varchar("decide_par_nom", { length: 150 }),
+  decideParId: uuid("decide_par_id").references(() => users.id, { onDelete: "set null" }),
+  /** espace | email | bureau (accord reçu par téléphone, saisi par le bureau) */
+  decideCanal: varchar("decide_canal", { length: 20 }),
+  motifRefus: text("motif_refus"),
+  relanceLe: timestamp("relance_le"),
+  travauxPlanifiesLe: timestamp("travaux_planifies_le"),
+  realiseLe: timestamp("realise_le"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const devisLignes = pgTable("devis_lignes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  devisId: uuid("devis_id")
+    .notNull()
+    .references(() => devis.id, { onDelete: "cascade" }),
+  ordre: integer("ordre").notNull().default(0),
+  designation: text("designation").notNull(),
+  quantite: numeric("quantite").notNull().default("1"),
+  prixUnitaireHt: numeric("prix_unitaire_ht"),
+  pieceId: uuid("piece_id").references(() => pieces.id, { onDelete: "set null" }),
+});
+
+/** Phase 25 : à qui le devis est envoyé — espace observateur ou email — et ce que chacun peut faire. */
+export const devisDestinataires = pgTable("devis_destinataires", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  devisId: uuid("devis_id")
+    .notNull()
+    .references(() => devis.id, { onDelete: "cascade" }),
+  canal: varchar("canal", { length: 20 }).notNull(), // observateur | email
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 200 }),
+  nom: varchar("nom", { length: 150 }),
+  prixVisible: integer("prix_visible").notNull().default(1),
+  peutDecider: integer("peut_decider").notNull().default(1),
+  /** SHA-256 du lien personnel envoyé par email (le lien lui-même n'est jamais stocké). */
+  jetonHash: varchar("jeton_hash", { length: 64 }),
+  envoyeLe: timestamp("envoye_le"),
+  envoiEmail: varchar("envoi_email", { length: 20 }),
+  vuLe: timestamp("vu_le"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+/**
+ * Phase 25 : passages successifs d'une même mission (ex. 1 = diagnostic,
+ * 2 = travaux après acceptation du devis). Quand la mission repart, le
+ * rapport du passage précédent est archivé ici, tel quel.
+ */
+export const missionPassages = pgTable("mission_passages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  interventionId: uuid("intervention_id")
+    .notNull()
+    .references(() => interventions.id, { onDelete: "cascade" }),
+  numero: integer("numero").notNull(),
+  technicienId: uuid("technicien_id").references(() => users.id, { onDelete: "set null" }),
+  dateProgrammee: timestamp("date_programmee"),
+  dateDebut: timestamp("date_debut"),
+  dateFin: timestamp("date_fin"),
+  valideeLe: timestamp("validee_le"),
+  valideeParId: uuid("validee_par_id").references(() => users.id, { onDelete: "set null" }),
+  rapport: jsonb("rapport"),
+  photos: text("photos").array().notNull().default(sql`'{}'::text[]`),
+  motif: text("motif"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -10,7 +10,7 @@ import { documentsFormations, formationsParticipants, formationsSessions, habili
 import { LIEUX_FORMATION, avertirTechniciens, conflitsMissions, dateFormation } from "@/lib/formations";
 import { requireUser } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
-import { enregistrerFichiers, fichiersDuFormulaire } from "@/lib/fichiers";
+import { enregistrerFichiers, fichiersDuFormulaire, fichiersRecus } from "@/lib/fichiers";
 import { CATEGORIES_HABILITATION, EXIGENCES_MISSION, calculerExpiration } from "@/lib/habilitations";
 import { notifierUtilisateurs } from "@/lib/push";
 import { avecMessage } from "@/lib/url";
@@ -210,6 +210,7 @@ export async function creerSession(formData: FormData) {
   if (!techIds.length) redirect(avecMessage(retour, "erreur", "Inscrivez au moins un technicien."));
   try {
     fichiersDuFormulaire(formData, "documents", 10);
+    if (formData.getAll("documents").filter((v) => typeof v === "string" && v.startsWith("ref:")).length > 10) throw new Error("10 fichiers maximum.");
   } catch (e) {
     redirect(avecMessage(retour, "erreur", (e as Error).message));
   }
@@ -228,7 +229,7 @@ export async function creerSession(formData: FormData) {
     .returning({ id: formationsSessions.id });
   await db.insert(formationsParticipants).values(valides.map((t) => ({ sessionId: s.id, technicienId: t.id })));
   // Phase 21 : documents de la formation (support, programme…) dès la création.
-  const nbDocs = await enregistrerDocumentsSession(formData, s.id, parsed.data.titre);
+  const nbDocs = await enregistrerDocumentsSession(formData, s.id, parsed.data.titre, user.id);
   await journaliser({ entite: "formation_session", entiteId: s.id, action: "planifiee", utilisateurId: user.id, details: `${parsed.data.titre} — ${valides.length} participant(s)` });
   avertirTechniciens(
     valides.map((t) => t.id),
@@ -245,15 +246,14 @@ export async function creerSession(formData: FormData) {
 }
 
 /** Enregistre les fichiers « documents » d'un formulaire comme documents de la formation (bibliothèque, catégorie Formations internes). */
-async function enregistrerDocumentsSession(formData: FormData, sessionId: string, titreSession: string) {
-  let fichiers: File[] = [];
+async function enregistrerDocumentsSession(formData: FormData, sessionId: string, titreSession: string, userId: string) {
+  let enregistres: { url: string; nom: string }[] = [];
   try {
-    fichiers = fichiersDuFormulaire(formData, "documents", 10);
+    enregistres = await fichiersRecus(formData, "formations", `form-${sessionId.slice(0, 8)}`, userId, "documents", 10);
   } catch (e) {
     redirect(avecMessage(`/responsable/habilitations/sessions/${sessionId}`, "erreur", (e as Error).message));
   }
-  if (!fichiers.length) return 0;
-  const enregistres = await enregistrerFichiers(fichiers, "formations", `form-${sessionId.slice(0, 8)}`);
+  if (!enregistres.length) return 0;
   const titreSaisi = String(formData.get("titreDocument") ?? "").trim().slice(0, 200);
   await db.insert(documentsFormations).values(
     enregistres.map((f, i) => ({
@@ -285,7 +285,7 @@ export async function ajouterDocumentsSession(formData: FormData) {
   const user = await requireUser([...GESTION]);
   const s = await chargerSession(String(formData.get("sessionId") ?? ""));
   const page = `/responsable/habilitations/sessions/${s.id}`;
-  const n = await enregistrerDocumentsSession(formData, s.id, s.titre);
+  const n = await enregistrerDocumentsSession(formData, s.id, s.titre, user.id);
   if (!n) redirect(avecMessage(page, "erreur", "Choisissez au moins un fichier."));
   await journaliser({ entite: "formation_session", entiteId: s.id, action: "documents_ajoutes", utilisateurId: user.id, details: `${n} document(s)` });
   if (s.statut === "planifiee" && formData.get("prevenir") === "on") {

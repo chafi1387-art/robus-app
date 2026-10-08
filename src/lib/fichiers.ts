@@ -1,6 +1,7 @@
 import "server-only";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { estReference, lireReference } from "@/lib/televersement";
 
 // Phase 19 : pièces jointes (certificats, documents de mission, rapports du
 // bureau). Fichiers rangés sous public/uploads/<dossier>/ — servis par nginx
@@ -30,7 +31,7 @@ export function fichiersDuFormulaire(formData: FormData, champ = "fichiers", max
   return fichiers;
 }
 
-export async function enregistrerFichiers(fichiers: File[], dossier: "missions" | "habilitations" | "signalements" | "formations", prefixe: string) {
+export async function enregistrerFichiers(fichiers: File[], dossier: "missions" | "habilitations" | "signalements" | "formations" | "devis", prefixe: string) {
   const rep = path.join(process.cwd(), "public", "uploads", dossier);
   await mkdir(rep, { recursive: true });
   const res: { url: string; nom: string }[] = [];
@@ -40,4 +41,24 @@ export async function enregistrerFichiers(fichiers: File[], dossier: "missions" 
     res.push({ url: `/uploads/${dossier}/${nom}`, nom: f.name.slice(0, 160) });
   }
   return res;
+}
+
+/**
+ * Phase 25 : pièces jointes d'un formulaire — références déjà envoyées une par
+ * une (/api/televersement) et, en secours, fichiers joints directement.
+ */
+export async function fichiersRecus(
+  formData: FormData,
+  dossier: "missions" | "habilitations" | "signalements" | "formations" | "devis",
+  prefixe: string,
+  userId: string,
+  champ = "fichiers",
+  max = 10
+) {
+  const refs = formData.getAll(champ).filter(estReference);
+  if (refs.length > max) throw new Error(`${max} fichiers maximum.`);
+  const res: { url: string; nom: string }[] = [];
+  for (const r of refs) res.push(await lireReference(r, userId, [dossier]));
+  const fichiers = fichiersDuFormulaire(formData, champ, Math.max(0, max - refs.length));
+  return [...res, ...(await enregistrerFichiers(fichiers, dossier, prefixe))];
 }

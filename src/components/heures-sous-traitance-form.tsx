@@ -1,5 +1,6 @@
 import { Field, inputClass } from "@/components/ui";
 import { PAUSES_MINUTES } from "@/lib/sous-traitance";
+import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 type Props = {
   action: (formData: FormData) => Promise<void>;
@@ -72,12 +73,12 @@ export function HeuresSousTraitanceForm({ action, clients, retour, dateMin, date
           className={inputClass}
         />
       </Field>
-      <button
+      <BoutonEnvoi
         type="submit"
         className="bg-blue hover:bg-blue-light text-white font-display font-bold text-sm rounded-lg py-2.5"
       >
         {submitLabel}
-      </button>
+      </BoutonEnvoi>
     </form>
   );
 }
