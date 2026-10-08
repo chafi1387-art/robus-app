@@ -199,6 +199,34 @@ export async function updateAppareil(formData: FormData) {
   revalidatePath(`/responsable/appareils/${parsed.data.appareilId}`);
   revalidatePath("/responsable/appareils");
   if (existing.siteId) revalidatePath(`/responsable/sites/${existing.siteId}`);
+  redirect(avecMessage(`/responsable/appareils/${parsed.data.appareilId}?tab=modifier`, "ok", "Fiche enregistrée ✓"));
+}
+
+const ETATS_APPAREIL = ["en_service", "sous_surveillance", "en_panne", "hors_service", "en_travaux", "installation"] as const;
+const LIBELLE_ETAT: Record<string, string> = {
+  en_service: "En service",
+  sous_surveillance: "Sous surveillance",
+  en_panne: "En panne",
+  hors_service: "Hors service",
+  en_travaux: "En travaux",
+  installation: "Installation",
+};
+
+/** Phase 26 : changer l'état d'un appareil en un clic (fiche appareil). L'heure du changement est gardée par la base. */
+export async function changerEtatAppareilBureau(formData: FormData) {
+  const user = await requireUser(ROLES_BUREAU);
+  const id = String(formData.get("appareilId") ?? "");
+  const statut = String(formData.get("statut") ?? "");
+  if (!z.string().uuid().safeParse(id).success) redirect("/responsable/appareils");
+  const retour = `/responsable/appareils/${id}`;
+  if (!(ETATS_APPAREIL as readonly string[]).includes(statut)) redirect(avecMessage(retour, "erreur", "État inconnu."));
+  const [a] = await db.select({ statut: appareils.statut }).from(appareils).where(eq(appareils.id, id)).limit(1);
+  if (!a) redirect("/responsable/appareils");
+  if (a!.statut === statut) redirect(retour);
+  await db.update(appareils).set({ statut: statut as (typeof ETATS_APPAREIL)[number] }).where(eq(appareils.id, id));
+  await journaliser({ entite: "appareil", entiteId: id, action: "etat_modifie", utilisateurId: user.id, details: `${a!.statut} → ${statut} (bureau)` });
+  revalidatePath(retour);
+  redirect(avecMessage(retour, "ok", `État : ${LIBELLE_ETAT[statut]} ✓`));
 }
 
 const PHOTO_TYPES: Record<string, string> = {

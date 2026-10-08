@@ -64,7 +64,9 @@ const NAV_GROUPS: { title: string; items: Item[] }[] = [
   },
 ];
 
-export function NavBureau({ role, badges }: { role: string; badges: { panne: number; nonAffectees: number; demandes?: number; signalements?: number } }) {
+type Badges = { panne: number; nonAffectees: number; demandes?: number; signalements?: number; enPanne?: number; horsService?: number };
+
+export function NavBureau({ role, badges }: { role: string; badges: Badges }) {
   const pathname = usePathname();
   const actif = (href: string) => (href === "/responsable" ? pathname === href : pathname === href || pathname.startsWith(href + "/"));
   return (
@@ -79,9 +81,14 @@ export function NavBureau({ role, badges }: { role: string; badges: { panne: num
               const on = actif(item.href);
               const Icon = item.icon;
               const n = item.badge ? badges[item.badge] ?? 0 : 0;
+              // Phase 26 : appareils à l'arrêt (en panne + hors service), détail sous le lien.
+              const detailArret =
+                item.badge === "panne" && n > 0
+                  ? [badges.enPanne ? `${badges.enPanne} en panne` : null, badges.horsService ? `${badges.horsService} hors service` : null].filter(Boolean).join(" · ")
+                  : "";
               return (
+                <div key={item.href}>
                 <Link
-                  key={item.href}
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-[7px] rounded-lg text-[13.5px] transition-colors ${
                     on ? "bg-blue text-white font-semibold shadow-sm" : "text-[#d6e6f5] hover:bg-white/10 hover:text-white"
@@ -91,14 +98,18 @@ export function NavBureau({ role, badges }: { role: string; badges: { panne: num
                   <span className="flex-1 truncate">{item.label}</span>
                   {n > 0 && (
                     <span
+                      title={detailArret || undefined}
+                      aria-label={detailArret ? `${n} appareils à l'arrêt : ${detailArret}` : undefined}
                       className={`min-w-5 h-5 px-1.5 rounded-full text-white text-[11px] font-bold flex items-center justify-center ${
                         item.badge === "panne" || item.badge === "demandes" || item.badge === "signalements" ? "bg-red" : "bg-orange"
-                      }`}
+                      } ${item.badge === "panne" ? "ring-[3px] ring-red/30" : ""}`}
                     >
                       {n}
                     </span>
                   )}
                 </Link>
+                {detailArret && <div className="pl-[42px] pr-3 -mt-0.5 mb-0.5 text-[11px] text-[#f3b4ac]">{detailArret}</div>}
+                </div>
               );
             })}
           </div>

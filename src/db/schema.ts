@@ -225,9 +225,24 @@ export const appareils = pgTable(
     // Phase 18 : code de l'étiquette QR (aléatoire, impossible à deviner).
     qrCode: varchar("qr_code", { length: 32 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    // Phase 26 : depuis quand l'appareil est dans son état actuel (tenu à jour par la base).
+    statutDepuis: timestamp("statut_depuis").defaultNow(),
   },
   (t) => [uniqueIndex("appareils_numero_interne_idx").on(t.numeroInterne), uniqueIndex("appareils_qr_code_idx").on(t.qrCode)]
 );
+
+/** Phase 26 : historique des états d'un appareil (rempli par un déclencheur de la base). */
+export const appareilEtats = pgTable("appareil_etats", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  appareilId: uuid("appareil_id")
+    .notNull()
+    .references(() => appareils.id, { onDelete: "cascade" }),
+  statut: statutAppareilEnum("statut").notNull(),
+  debut: timestamp("debut").notNull().defaultNow(),
+  fin: timestamp("fin"),
+  /** 1 = date de début reconstituée lors de la mise en place (approximative). */
+  estime: integer("estime").notNull().default(0),
+});
 
 // ---------- Interventions ----------
 // Règle d'intégrité 3 : impossible de créer une Intervention sans Appareil existant -> appareilId NOT NULL + RESTRICT

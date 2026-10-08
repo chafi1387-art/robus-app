@@ -224,6 +224,10 @@ export async function terminerIntervention(formData: FormData) {
 
   await assertOwnIntervention(parsed.data.interventionId, user.id, user.role);
 
+  // Phase 26 : rapport envoyé deux fois (double clic, réseau lent) → pas d'erreur, on confirme.
+  const [dejaEnvoye] = await db.select({ id: rapports.id }).from(rapports).where(eq(rapports.interventionId, parsed.data.interventionId)).limit(1);
+  if (dejaEnvoye) redirect(avecMessage("/technicien", "ok", "Rapport déjà envoyé au bureau ✓"));
+
   // Phase 23 : toutes les tâches obligatoires de la checklist doivent être remplies.
   const manquantes = await tachesObligatoiresManquantes(parsed.data.interventionId);
   if (manquantes > 0) {

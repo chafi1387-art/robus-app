@@ -1,154 +1,265 @@
-import { Card, Btn, Field, inputClass, StatutAppareilPill } from "@/components/ui";
-import { db } from "@/db";
-import { appareils, clients, projetAppareils, projets } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import Link from "next/link";
+import { Download, Plus, Search } from "lucide-react";
+import { Card, Btn, Field, inputClass } from "@/components/ui";
+import { RafraichissementAuto } from "@/components/rafraichissement-auto";
+import { ArretDepuis, BadgePriorite, CarteAppareil, LignePriorite, PastilleEtat } from "@/components/parc";
+import { chargerParc, estArret, indicateursParc, jourCourt, type LigneParc } from "@/lib/parc";
 import { createAppareil } from "../actions";
 
-const STATUTS = [
-  "en_service",
-  "sous_surveillance",
-  "en_panne",
-  "hors_service",
-  "en_travaux",
-  "installation",
-] as const;
+// Phase 26 : le parc d'appareils en tableau de bord (maquette validée le 08/10/2026).
 
-const STATUT_LABEL: Record<(typeof STATUTS)[number], string> = {
-  en_service: "En service",
-  sous_surveillance: "Sous surveillance",
-  en_panne: "En panne",
-  hors_service: "Hors service",
-  en_travaux: "En travaux",
-  installation: "Installation",
+const FILTRES: Record<string, { label: string; test: (l: LigneParc, maintenant: number) => boolean }> = {
+  arret: { label: "Hors service / panne", test: (l) => estArret(l.statut) },
+  surveillance: { label: "Surveillance", test: (l) => l.statut === "sous_surveillance" },
+  encours: { label: "Mission en cours", test: (l) => l.missions.some((m) => m.statut === "en_cours") },
+  affecter: { label: "À affecter", test: (l) => l.missions.some((m) => !m.technicienId) },
+  visites: { label: "Visite ≤ 7 j", test: (l, n) => !!l.prochaineVisite && l.prochaineVisite.getTime() <= n + 7 * 86400000 },
+  priorites: { label: "À traiter", test: (l) => l.priorite <= 3 },
+  sanscontrat: { label: "Sans contrat", test: (l, n) => !l.couvertureFin || l.couvertureFin.getTime() < n },
+  service: { label: "En service", test: (l) => l.statut === "en_service" },
 };
 
-export default async function AppareilsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ statut?: string }>;
-}) {
-  const { statut } = await searchParams;
-  const activeStatut = statut && STATUTS.includes(statut as (typeof STATUTS)[number]) ? statut : undefined;
+function normaliser(t: string) {
+  return t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
 
-  const [allRows, projetsParAppareilRows] = await Promise.all([
-    db
-      .select({
-        id: appareils.id,
-        numeroInterne: appareils.numeroInterne,
-        marque: appareils.marque,
-        modele: appareils.modele,
-        statut: appareils.statut,
-      })
-      .from(appareils)
-      .orderBy(appareils.numeroInterne),
-    // Phase 6 : un appareil se rattache à un Client via un ou plusieurs
-    // Projets (many-to-many) — plus de Site/Client legacy directs à afficher.
-    db
-      .select({
-        appareilId: projetAppareils.appareilId,
-        reference: projets.reference,
-        titre: projets.titre,
-        clientNom: clients.raisonSociale,
-      })
-      .from(projetAppareils)
-      .innerJoin(projets, eq(projetAppareils.projetId, projets.id))
-      .innerJoin(clients, eq(projets.clientId, clients.id)),
-  ]);
+function instant() {
+  return Date.now();
+}
 
-  const projetsParAppareil = new Map<string, { reference: string; titre: string; clientNom: string }[]>();
-  for (const p of projetsParAppareilRows) {
-    const liste = projetsParAppareil.get(p.appareilId) ?? [];
-    liste.push({ reference: p.reference, titre: p.titre, clientNom: p.clientNom });
-    projetsParAppareil.set(p.appareilId, liste);
-  }
+export default async function AppareilsPage({ searchParams }: { searchParams: Promise<{ f?: string; q?: string; vue?: string; nouveau?: string }> }) {
+  const sp = await searchParams;
+  const parc = await chargerParc();
+  const k = indicateursParc(parc);
+  const maintenant = instant();
+  const filtre = sp.f && FILTRES[sp.f] ? sp.f : null;
+  const q = (sp.q ?? "").trim();
+  const vue = sp.vue === "tableau" ? "tableau" : "cartes";
+  const recherche = q ? normaliser(q) : "";
+  const liste = parc.filter(
+    (l) =>
+      (!filtre || FILTRES[filtre].test(l, maintenant)) &&
+      (!recherche || normaliser([l.numero, l.client, l.adresse, l.marque, l.modele].filter(Boolean).join(" ")).includes(recherche))
+  );
+  const priorites = parc.filter((l) => l.priorite <= 3);
+  const lien = (p: Record<string, string | null>) => {
+    const u = new URLSearchParams();
+    const v = { f: filtre, q: q || null, vue: vue === "tableau" ? "tableau" : null, ...p };
+    for (const [c, x] of Object.entries(v)) if (x) u.set(c, x);
+    const s = u.toString();
+    return `/responsable/appareils${s ? `?${s}` : ""}`;
+  };
+  const pct = (n: number) => (k.total ? Math.round((n / k.total) * 100) : 0);
+  const arretTotal = k.horsService + k.enPanne;
 
-  const rows = activeStatut ? allRows.filter((a) => a.statut === activeStatut) : allRows;
+  const compteurs: { cle: string; titre: string; valeur: number; sous: string; style: string; couleur: string }[] = [
+    { cle: "arret", titre: "Hors service / en panne", valeur: arretTotal, sous: `${k.horsService} hors service · ${k.enPanne} en panne`, style: arretTotal ? "bg-red text-white border-red" : "bg-surface border-line", couleur: arretTotal ? "text-white" : "text-green-ink" },
+    { cle: "surveillance", titre: "Sous surveillance", valeur: k.surveillance, sous: k.repetees ? `dont ${k.repetees} pannes répétées` : "à suivre", style: "bg-surface border-[#F0C9A5]", couleur: "text-orange-ink" },
+    { cle: "encours", titre: "Missions en cours", valeur: k.missionsEnCours, sous: k.techniciensSurPlace ? `${k.techniciensSurPlace} technicien(s) sur place` : "personne sur place", style: "bg-surface border-line", couleur: "text-blue" },
+    { cle: "affecter", titre: "Missions à affecter", valeur: k.aAffecter, sous: "sans technicien", style: "bg-surface border-line", couleur: k.aAffecter ? "text-orange-ink" : "text-navy" },
+    { cle: "visites", titre: "Visites ≤ 7 jours", valeur: k.visites7, sous: "préventives & passages", style: "bg-surface border-line", couleur: "text-navy" },
+    { cle: "service", titre: "En service", valeur: k.enService, sous: `${pct(k.enService)} % du parc`, style: "bg-surface border-[#C9E8D4]", couleur: "text-green-ink" },
+  ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="flex flex-col gap-5 max-w-[1240px]">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-extrabold font-display">Appareils</h1>
-          <p className="text-sm text-ink-soft">{rows.length} appareil(s) enregistré(s)</p>
+          <h1 className="font-display font-extrabold text-[28px] text-navy leading-tight">Parc d&apos;appareils</h1>
+          <div className="text-sm text-ink-soft flex items-center gap-3 flex-wrap">
+            <span>
+              {k.total} ascenseur{k.total > 1 ? "s" : ""} suivi{k.total > 1 ? "s" : ""}
+            </span>
+            <RafraichissementAuto />
+          </div>
         </div>
-        <Btn href="/api/export/appareils" variant="ghost">
-          Exporter CSV
-        </Btn>
+        <div className="flex gap-2 flex-wrap">
+          <form action="/responsable/appareils" className="flex items-center gap-2 bg-surface border border-line rounded-[10px] px-3 h-[42px] w-full sm:w-[300px]">
+            {filtre && <input type="hidden" name="f" value={filtre} />}
+            {vue === "tableau" && <input type="hidden" name="vue" value="tableau" />}
+            <Search className="w-4 h-4 text-ink-soft shrink-0" />
+            <input name="q" defaultValue={q} placeholder="N°, client, adresse, marque…" aria-label="Rechercher un appareil" className="flex-1 min-w-0 bg-transparent outline-none text-sm" />
+          </form>
+          <Link href={lien({ nouveau: "1" }) + "#nouvel-appareil"} className="inline-flex items-center gap-1.5 h-[42px] px-4 rounded-[10px] bg-blue text-white font-display font-bold text-sm hover:bg-blue-light">
+            <Plus className="w-4 h-4" /> Nouvel appareil
+          </Link>
+          <Link href="/api/export/appareils" className="inline-flex items-center gap-1.5 h-[42px] px-3 rounded-[10px] border border-line bg-surface text-sm font-semibold hover:bg-blue-pale" title="Exporter en CSV">
+            <Download className="w-4 h-4" /> <span className="hidden sm:inline">CSV</span>
+          </Link>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="p-5 lg:col-span-2">
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <Link
-              href="/responsable/appareils"
-              className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-                !activeStatut ? "bg-blue text-white" : "bg-blue-pale text-blue"
-              }`}
-            >
-              Tous
+      {/* Compteurs */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+        {compteurs.map((c) => (
+          <Link
+            key={c.cle}
+            href={lien({ f: filtre === c.cle ? null : c.cle })}
+            aria-pressed={filtre === c.cle}
+            className={`rounded-2xl border p-4 flex flex-col gap-1.5 transition-shadow hover:shadow-md ${c.style} ${filtre === c.cle ? "ring-2 ring-navy ring-offset-2" : ""}`}
+          >
+            <span className={`text-xs font-semibold ${c.cle === "arret" && c.valeur ? "text-white/90" : "text-ink-soft"}`}>{c.titre}</span>
+            <span className={`font-display font-extrabold text-[34px] leading-none ${c.couleur}`}>{c.valeur}</span>
+            <span className={`text-xs ${c.cle === "arret" && c.valeur ? "text-white/90" : "text-ink-soft"}`}>{c.sous}</span>
+          </Link>
+        ))}
+      </div>
+
+      {/* Barre d'état du parc */}
+      {k.total > 0 && (
+        <Card className="px-5 py-4 flex flex-col gap-2.5">
+          <div className="flex justify-between text-[13px] text-ink-soft">
+            <span className="font-bold text-ink">État du parc</span>
+            <span>{k.total} appareils</span>
+          </div>
+          <div
+            className="flex h-3.5 rounded-full overflow-hidden gap-0.5"
+            role="img"
+            aria-label={`${k.horsService} hors service, ${k.enPanne} en panne, ${k.surveillance + k.enTravaux} à surveiller, ${k.enService} en service`}
+          >
+            {k.horsService > 0 && <span style={{ flex: k.horsService }} className="bg-[#7B1F17]" />}
+            {k.enPanne > 0 && <span style={{ flex: k.enPanne }} className="bg-red" />}
+            {k.surveillance + k.enTravaux > 0 && <span style={{ flex: k.surveillance + k.enTravaux }} className="bg-orange" />}
+            {k.installation > 0 && <span style={{ flex: k.installation }} className="bg-blue-accent" />}
+            {k.enService > 0 && <span style={{ flex: k.enService }} className="bg-green" />}
+          </div>
+          <div className="flex gap-x-5 gap-y-1 flex-wrap text-xs text-ink-soft">
+            <Legende couleur="bg-[#7B1F17]" texte={`Hors service ${k.horsService}`} />
+            <Legende couleur="bg-red" texte={`En panne ${k.enPanne}`} />
+            <Legende couleur="bg-orange" texte={`Surveillance / travaux ${k.surveillance + k.enTravaux}`} />
+            {k.installation > 0 && <Legende couleur="bg-blue-accent" texte={`Installation ${k.installation}`} />}
+            <Legende couleur="bg-green" texte={`En service ${k.enService}`} />
+          </div>
+        </Card>
+      )}
+
+      {/* À traiter en priorité */}
+      {!filtre && !q && (
+        <section className="bg-surface border border-line rounded-2xl overflow-hidden" id="priorites">
+          <div className="flex items-center justify-between gap-3 flex-wrap px-5 py-4 border-b border-line">
+            <h2 className="font-display font-extrabold text-[17px] text-navy">À traiter en priorité</h2>
+            <div className="flex gap-1.5 flex-wrap">
+              <BadgePriorite p={1} compte={k.p1} />
+              <BadgePriorite p={2} compte={k.p2} />
+              <BadgePriorite p={3} compte={k.p3} />
+            </div>
+          </div>
+          {priorites.length === 0 ? (
+            <p className="px-5 py-6 text-sm text-green-ink font-semibold">✓ Rien d&apos;urgent : tous les appareils sont en service, sans mission en retard.</p>
+          ) : (
+            <>
+              {priorites.slice(0, 8).map((l) => (
+                <LignePriorite key={l.id} l={l} />
+              ))}
+              {priorites.length > 8 && (
+                <div className="px-5 py-3 text-[13px] text-ink-soft flex justify-between gap-2 flex-wrap">
+                  <span>+ {priorites.length - 8} autre(s) appareil(s) à traiter</span>
+                  <Link href={lien({ f: "priorites" })} className="font-bold text-blue">
+                    Voir tout
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {/* Tous les appareils */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="font-display font-extrabold text-[17px] text-navy">
+            {filtre ? FILTRES[filtre].label : "Tous les appareils"}
+            {q ? ` — « ${q} »` : ""} <span className="text-ink-soft font-semibold text-sm">({liste.length})</span>
+          </h2>
+          <div className="flex gap-1.5 flex-wrap items-center">
+            <Link href={lien({ f: null })} className={`h-[34px] px-3 rounded-full text-[13px] font-semibold flex items-center ${!filtre ? "bg-navy text-white" : "bg-surface border border-line"}`}>
+              Tous {k.total}
             </Link>
-            {STATUTS.map((s) => (
+            {(["arret", "surveillance", "encours", "sanscontrat"] as const).map((f) => (
               <Link
-                key={s}
-                href={`/responsable/appareils?statut=${s}`}
-                className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-                  activeStatut === s ? "bg-blue text-white" : "bg-blue-pale text-blue"
+                key={f}
+                href={lien({ f: filtre === f ? null : f })}
+                className={`h-[34px] px-3 rounded-full text-[13px] font-semibold flex items-center ${filtre === f ? "bg-navy text-white" : "bg-surface border border-line"} ${
+                  filtre !== f && f === "arret" ? "text-red-ink" : filtre !== f && f === "surveillance" ? "text-orange-ink" : filtre !== f && f === "encours" ? "text-blue" : ""
                 }`}
               >
-                {STATUT_LABEL[s]}
+                {FILTRES[f].label} {parc.filter((l) => FILTRES[f].test(l, maintenant)).length}
               </Link>
             ))}
+            <span className="w-px h-6 bg-line mx-1" aria-hidden="true" />
+            <Link href={lien({ vue: null })} aria-pressed={vue === "cartes"} className={`h-[34px] px-3 rounded-lg text-[13px] font-semibold flex items-center ${vue === "cartes" ? "bg-blue-pale text-blue" : "text-ink-soft"}`}>
+              Cartes
+            </Link>
+            <Link href={lien({ vue: "tableau" })} aria-pressed={vue === "tableau"} className={`h-[34px] px-3 rounded-lg text-[13px] font-semibold flex items-center ${vue === "tableau" ? "bg-blue-pale text-blue" : "text-ink-soft"}`}>
+              Tableau
+            </Link>
           </div>
+        </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        {liste.length === 0 ? (
+          <Card className="p-6 text-sm text-ink-soft">Aucun appareil {filtre || q ? "pour ce filtre" : "pour l'instant"}.</Card>
+        ) : vue === "cartes" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {liste.map((l) => (
+              <CarteAppareil key={l.id} l={l} />
+            ))}
+          </div>
+        ) : (
+          <Card className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[860px]">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-ink-soft border-b border-line">
-                  <th className="pb-2 pr-3">N° interne</th>
-                  <th className="pb-2 pr-3">Marque / Modèle</th>
-                  <th className="pb-2 pr-3">Statut</th>
+                  <th className="px-4 py-3">Priorité</th>
+                  <th className="px-3 py-3">Appareil</th>
+                  <th className="px-3 py-3">Client</th>
+                  <th className="px-3 py-3">État</th>
+                  <th className="px-3 py-3">Situation</th>
+                  <th className="px-3 py-3 text-right">Pannes 90 j</th>
+                  <th className="px-3 py-3">Prochaine visite</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((a) => {
-                  const projetsAppareil = projetsParAppareil.get(a.id) ?? [];
-                  return (
-                    <tr key={a.id} className="border-b border-line last:border-0">
-                      <td className="py-2.5 pr-3">
-                        <Link href={`/responsable/appareils/${a.id}`} className="font-semibold text-blue">
-                          {a.numeroInterne}
-                        </Link>
-                        <div className="text-xs text-ink-soft mt-0.5">
-                          {projetsAppareil.length > 0
-                            ? projetsAppareil
-                                .map((p) => `${p.reference} — ${p.titre} (${p.clientNom})`)
-                                .join(", ")
-                            : "Sans projet"}
-                        </div>
-                      </td>
-                      <td className="py-2.5 pr-3">{[a.marque, a.modele].filter(Boolean).join(" ") || "—"}</td>
-                      <td className="py-2.5 pr-3">
-                        <StatutAppareilPill statut={a.statut} />
-                      </td>
-                    </tr>
-                  );
-                })}
+                {liste.map((l) => (
+                  <tr key={l.id} className="border-b border-line last:border-0 align-top hover:bg-bg/60">
+                    <td className="px-4 py-3">
+                      <BadgePriorite p={l.priorite} />
+                    </td>
+                    <td className="px-3 py-3">
+                      <Link href={`/responsable/appareils/${l.id}`} className="font-display font-extrabold text-navy hover:underline">
+                        {l.numero}
+                      </Link>
+                      <div className="text-xs text-ink-soft">{[l.marque, l.modele].filter(Boolean).join(" ") || "—"}</div>
+                    </td>
+                    <td className="px-3 py-3">{l.client ?? "—"}</td>
+                    <td className="px-3 py-3">
+                      <PastilleEtat statut={l.statut} />
+                      <div className="mt-1">
+                        <ArretDepuis statut={l.statut} depuis={l.statutDepuis} />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-[13px]">
+                      {l.raison || <span className="text-ink-soft">RAS</span>}
+                      {l.detail && <div className="text-xs text-ink-soft">{l.detail}</div>}
+                    </td>
+                    <td className={`px-3 py-3 text-right font-semibold tabular-nums ${l.pannes90 >= 3 ? "text-red-ink" : ""}`}>{l.pannes90}</td>
+                    <td className="px-3 py-3">{l.prochaineVisite ? jourCourt(l.prochaineVisite) : "—"}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
-            {rows.length === 0 && (
-              <p className="text-sm text-ink-soft py-3">Aucun appareil pour l&apos;instant.</p>
-            )}
-          </div>
-        </Card>
+          </Card>
+        )}
+        <p className="text-xs text-ink-soft">Tri : priorité, puis l&apos;arrêt le plus long en premier, puis le numéro.</p>
+      </section>
 
-        <Card className="p-5 h-fit">
-          <h2 className="font-display font-bold text-sm mb-3">Nouvel appareil</h2>
-          <p className="text-xs text-ink-soft mb-3">
-            Un appareil se crée seul, avec ses seules caractéristiques techniques — il se
-            rattache ensuite à un Client via un Projet.
-          </p>
-          <form action={createAppareil} className="flex flex-col gap-3">
+      {/* Nouvel appareil */}
+      <details id="nouvel-appareil" open={sp.nouveau === "1" || undefined} className="bg-surface border border-line rounded-2xl scroll-mt-24">
+        <summary className="px-5 py-4 cursor-pointer select-none font-display font-bold text-[15px] text-navy flex items-center gap-2">
+          <Plus className="w-4 h-4" /> Nouvel appareil
+        </summary>
+        <div className="px-5 pb-5">
+          <p className="text-xs text-ink-soft mb-3">L&apos;appareil se crée avec ses caractéristiques techniques, puis se rattache à un client via un projet.</p>
+          <form action={createAppareil} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Field label="N° unique interne Robus">
               <input name="numeroInterne" required className={inputClass} placeholder="A-1042" />
             </Field>
@@ -164,24 +275,22 @@ export default async function AppareilsPage({
             <Field label="Type d'appareil">
               <input name="typeAppareil" className={inputClass} placeholder="Traction, hydraulique..." />
             </Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Charge (kg)">
-                <input name="charge" type="number" step="0.01" className={inputClass} />
-              </Field>
-              <Field label="Vitesse (m/s)">
-                <input name="vitesse" type="number" step="0.01" className={inputClass} />
-              </Field>
-              <Field label="Niveaux">
-                <input name="niveaux" type="number" className={inputClass} />
-              </Field>
-              <Field label="Année d'installation">
-                <input name="anneeInstallation" type="number" className={inputClass} />
-              </Field>
-            </div>
+            <Field label="Charge (kg)">
+              <input name="charge" type="number" step="0.01" className={inputClass} />
+            </Field>
+            <Field label="Vitesse (m/s)">
+              <input name="vitesse" type="number" step="0.01" className={inputClass} />
+            </Field>
+            <Field label="Niveaux">
+              <input name="niveaux" type="number" className={inputClass} />
+            </Field>
+            <Field label="Année d'installation">
+              <input name="anneeInstallation" type="number" className={inputClass} />
+            </Field>
             <Field label="Type de portes">
               <input name="typePortes" className={inputClass} placeholder="Automatiques, manuelles..." />
             </Field>
-            <Field label="Statut">
+            <Field label="État">
               <select name="statut" className={inputClass} defaultValue="en_service">
                 <option value="en_service">En service</option>
                 <option value="sous_surveillance">Sous surveillance</option>
@@ -191,10 +300,21 @@ export default async function AppareilsPage({
                 <option value="installation">Installation (projet sur plan)</option>
               </select>
             </Field>
-            <Btn>Créer l&apos;appareil</Btn>
+            <div className="flex items-end">
+              <Btn enCours="Création…">Créer l&apos;appareil</Btn>
+            </div>
           </form>
-        </Card>
-      </div>
+        </div>
+      </details>
     </div>
+  );
+}
+
+function Legende({ couleur, texte }: { couleur: string; texte: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={`w-2.5 h-2.5 rounded-[3px] ${couleur}`} />
+      {texte}
+    </span>
   );
 }

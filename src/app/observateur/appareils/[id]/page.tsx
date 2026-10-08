@@ -7,6 +7,7 @@ import { appareils, documentsClient, garantieFormules, garanties, prestationAppa
 import { Card, StatutAppareilPill } from "@/components/ui";
 import { EtapesSuivi } from "@/components/etapes-suivi";
 import { RafraichissementAuto } from "@/components/rafraichissement-auto";
+import { ArretDepuis } from "@/components/parc";
 import { devisDeLObservateur } from "@/lib/devis";
 import { ListeDevisObservateur } from "@/components/liste-devis-observateur";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -88,6 +89,7 @@ export default async function AppareilObservateurPage({
           <h1 className="font-display font-extrabold text-[22px] text-navy">{a.numeroInterne}</h1>
           {d.has("fiche") && <StatutAppareilPill statut={a.statut} />}
         </div>
+        {d.has("fiche") && <ArretDepuis statut={a.statut} depuis={a.statutDepuis} />}
         {adresse && <p className="text-sm text-ink-soft flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {adresse}</p>}
         <div className="mt-1"><RafraichissementAuto /></div>
       </div>

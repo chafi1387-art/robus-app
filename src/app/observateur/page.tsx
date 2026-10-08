@@ -6,6 +6,7 @@ import { appareils } from "@/db/schema";
 import { StatutAppareilPill } from "@/components/ui";
 import { CarteApplication } from "@/components/app-installable";
 import { EtapesSuivi } from "@/components/etapes-suivi";
+import { ArretDepuis } from "@/components/parc";
 import { clePubliqueVapid } from "@/lib/push";
 import { devisDeLObservateur } from "@/lib/devis";
 import { ListeDevisObservateur } from "@/components/liste-devis-observateur";
@@ -21,7 +22,7 @@ export default async function MesAscenseursPage({ searchParams }: { searchParams
   const [liste, adresses, enCours, terminees, visites, mesDevis] = await Promise.all([
     ids.length
       ? db
-          .select({ id: appareils.id, numero: appareils.numeroInterne, marque: appareils.marque, modele: appareils.modele, statut: appareils.statut })
+          .select({ id: appareils.id, numero: appareils.numeroInterne, marque: appareils.marque, modele: appareils.modele, statut: appareils.statut, statutDepuis: appareils.statutDepuis })
           .from(appareils)
           .where(inArray(appareils.id, ids))
           .orderBy(appareils.numeroInterne)
@@ -58,6 +59,7 @@ export default async function MesAscenseursPage({ searchParams }: { searchParams
               <div className="min-w-0">
                 <div className="font-display font-extrabold text-[17px] text-navy">{a.numero}</div>
                 {d.has("fiche") && (a.marque || a.modele) && <div className="text-[13px] text-ink-soft">{[a.marque, a.modele].filter(Boolean).join(" · ")}</div>}
+                {d.has("fiche") && <ArretDepuis statut={a.statut} depuis={a.statutDepuis} />}
                 {adresses.get(a.id) && (
                   <div className="text-[13px] text-ink-soft flex items-center gap-1"><MapPin className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{adresses.get(a.id)}</span></div>
                 )}

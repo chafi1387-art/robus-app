@@ -9,16 +9,15 @@ import { and, eq, count, ne, isNull } from "drizzle-orm";
 import { signOut } from "@/auth";
 import { getNotifications } from "@/lib/notifications";
 import { NavBureau } from "@/components/nav-bureau";
+import { nbAppareilsArret } from "@/lib/parc";
 import { MenuMobile } from "@/components/menu-mobile";
 import { Bell, FileText } from "lucide-react";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
 
 async function getBadgeCounts() {
-  const [[{ n: retard }], [{ n: nonAffectees }], [{ n: demandes }], [{ n: sig }]] = await Promise.all([
-    db
-      .select({ n: count() })
-      .from(appareils)
-      .where(eq(appareils.statut, "en_panne")),
+  const [arret, [{ n: nonAffectees }], [{ n: demandes }], [{ n: sig }]] = await Promise.all([
+    // Phase 26 : appareils à l'arrêt = en panne + hors service.
+    nbAppareilsArret(),
     db
       .select({ n: count() })
       .from(interventions)
@@ -28,7 +27,7 @@ async function getBadgeCounts() {
     // Phase 21 : signalements des techniciens à prendre en charge.
     db.select({ n: count() }).from(signalements).where(eq(signalements.statut, "nouveau")),
   ]);
-  return { retard: Number(retard), nonAffectees: Number(nonAffectees), demandes: Number(demandes), signalements: Number(sig) };
+  return { retard: arret.total, enPanne: arret.enPanne, horsService: arret.horsService, nonAffectees: Number(nonAffectees), demandes: Number(demandes), signalements: Number(sig) };
 }
 
 export default async function ResponsableLayout({ children }: { children: React.ReactNode }) {
@@ -50,7 +49,7 @@ export default async function ResponsableLayout({ children }: { children: React.
           </div>
         </div>
 
-        <NavBureau role={user.role} badges={{ panne: badges.retard, nonAffectees: badges.nonAffectees, demandes: badges.demandes, signalements: badges.signalements }} />
+        <NavBureau role={user.role} badges={{ panne: badges.retard, enPanne: badges.enPanne, horsService: badges.horsService, nonAffectees: badges.nonAffectees, demandes: badges.demandes, signalements: badges.signalements }} />
 
         <div className="mt-auto px-5 py-4 border-t border-white/10 text-xs text-blue-accent/80">
           ROBUS · Pilotage ISO 9001
@@ -59,7 +58,7 @@ export default async function ResponsableLayout({ children }: { children: React.
 
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="print:hidden sticky top-0 z-20 bg-surface/95 backdrop-blur border-b border-line flex items-center gap-2 sm:gap-4 px-3 sm:px-8 h-16">
-          <MenuMobile role={user.role} badges={{ panne: badges.retard, nonAffectees: badges.nonAffectees, demandes: badges.demandes, signalements: badges.signalements }} />
+          <MenuMobile role={user.role} badges={{ panne: badges.retard, enPanne: badges.enPanne, horsService: badges.horsService, nonAffectees: badges.nonAffectees, demandes: badges.demandes, signalements: badges.signalements }} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-robus.png" alt="ROBUS" className="lg:hidden h-7 w-auto object-contain" />
           <div className="flex-1" />
