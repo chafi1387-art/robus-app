@@ -1,0 +1,66 @@
+== commit
+23a34e1 Phase 25 : photos une par une, retour visuel des boutons, temps réel, devis dans la mission
+== migrations
+0021_temps_reel.sql
+0022_devis_mission.sql
+== déclencheurs temps réel
+37
+== tables Phase 25 (accès rôle robus)
+devis_lignes 0
+devis_destinataires 0
+mission_passages 0
+== colonnes
+5
+passage
+== statuts de devis
+a_preparer,brouillon,envoye,accepte,refuse,realise,annule
+== pages
+/responsable/devis 307
+/api/temps-reel 307
+/api/televersement 307
+/devis/lien-invente 404
+== nginx
+27:        proxy_http_version 1.1;
+== flux temps réel à travers nginx (https) + envoi d'une photo test
+flux : HTTP 200 text/event-stream; charset=utf-8
+connexion établie (event: pret) : true 1825 ms
+signal reçu à travers nginx : true 105 ms
+envoi photo : HTTP 200 référence signée OK
+fichier test supprimé
+envoi sans session : HTTP 307
+== vitesse
+== Bureau (amine)
+  295 ms  200  /responsable
+   82 ms  200  /responsable/projets
+   98 ms  200  /responsable/interventions
+   58 ms  200  /responsable/techniciens
+   67 ms  200  /responsable/habilitations
+   62 ms  200  /responsable/sous-traitance
+   52 ms  200  /responsable/demandes
+   46 ms  200  /responsable/signalements
+   63 ms  200  /responsable/documents
+   63 ms  200  /responsable/techniciens/1c8c39f1-c20b-4986-9223-35fa007c96df
+   65 ms  200  /responsable/techniciens/1c8c39f1-c20b-4986-9223-35fa007c96df?tab=habilitations
+   48 ms  200  /responsable/techniciens/1c8c39f1-c20b-4986-9223-35fa007c96df?tab=missions
+   88 ms  200  /responsable/projets/b551233a-e80b-42aa-a1eb-b7070191bf0a
+   60 ms  200  /responsable/missions/502af1bf-0fac-434e-89e1-d4ba441adec5
+== Technicien (MOHAMMED EL HAJJY)
+   36 ms  200  /technicien
+   41 ms  200  /technicien?vue=semaine
+   36 ms  200  /technicien/heures
+   25 ms  200  /technicien/formations
+   53 ms  200  /technicien/profil
+   26 ms  200  /technicien/signaler
+   27 ms  200  /technicien/signalements
+   26 ms  200  /technicien/appareils
+== pm2
+robus-dashboard online instances: 1 redémarrages: 54 mémoire: 56 Mo
+== erreurs récentes
+⨯ Error: Failed query: insert into "rapports" ("id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at") values (default, $1, $2, $3, $4, $5, default, default, default, default, $6, $7, $8, default, default, default) returning "id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at"
+⨯ Error: Failed query: insert into "rapports" ("id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at") values (default, $1, $2, $3, $4, $5, default, default, default, default, $6, $7, $8, default, default, default) returning "id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at"
+⨯ Error: Failed query: insert into "rapports" ("id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at") values (default, $1, $2, $3, $4, $5, default, default, default, default, $6, $7, $8, default, default, default) returning "id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at"
+⨯ Error: Commencez la mission avant d'envoyer des photos.
+⨯ Error: Commencez la mission avant d'envoyer des photos.
+Error: aborted
+Thu Oct  8 10:02:46 UTC 2026
+(code retour 0, 2026-10-08 10:02:46)

@@ -1,26 +1,52 @@
-=== Deploiement 2026-10-06 19:38:02 : bf0255f -> ef9c746
---- migration 0020_prestations_contrat.sql
+=== Deploiement 2026-10-08 10:00:04 : ef9c746 -> 23a34e1
+--- migration 0021_temps_reel.sql
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "projets" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "projet_techniciens" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "projet_appareils" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "prestations" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "prestation_appareils" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "formations_sessions" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "formations_participants" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "habilitations_technicien" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "mouvements_stock" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "pieces" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "non_conformites" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "heures_sous_traitance" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "clients" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "sites" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "devis" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "observateurs" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "observateur_appareils" does not exist, skipping
+psql:/tmp/0021_temps_reel.sql:50: NOTICE:  trigger "robus_temps_reel" for relation "enquetes_satisfaction" does not exist, skipping
+DO
+UPDATE 0
+--- migration 0022_devis_mission.sql
 ALTER TABLE
 ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+DO
+CREATE TABLE
 CREATE INDEX
 CREATE TABLE
 CREATE INDEX
 CREATE INDEX
-ALTER TABLE
-ALTER TABLE
-DO
 CREATE INDEX
+CREATE TABLE
 CREATE INDEX
-UPDATE 0
+ALTER TABLE
+psql:/tmp/0022_devis_mission.sql:93: NOTICE:  trigger "robus_temps_reel" for relation "devis_destinataires" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/0022_devis_mission.sql:95: NOTICE:  trigger "robus_temps_reel" for relation "mission_passages" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
 --- build
+├ ƒ /responsable/sous-traitance
+├ ƒ /responsable/stock
+├ ƒ /responsable/stock/pieces/[id]
+├ ƒ /responsable/techniciens
+├ ƒ /responsable/techniciens/[id]
 ├ ƒ /responsable/techniciens/acces-appareils
 ├ ƒ /responsable/utilisateurs
 ├ ƒ /technicien
@@ -41,10 +67,5 @@ UPDATE 0
 ○  (Static)   prerendered as static content
 ƒ  (Dynamic)  server-rendered on demand
 
-npm notice
-npm notice New major version of npm available! 10.8.2 -> 12.2.0
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
-npm notice To update run: npm install -g npm@12.2.0
-npm notice
 --- curl /responsable/projets : 307
-STATUT: OK ef9c746
+STATUT: OK 23a34e1
