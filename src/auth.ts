@@ -30,6 +30,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
         if (user.role === "observateur" && !(await accesObservateurValide(user.id))) return null;
+        // Phase 28 : dernière connexion (sans bloquer la connexion en cas d'erreur).
+        await db.update(users).set({ derniereConnexion: new Date() }).where(eq(users.id, user.id)).catch(() => {});
 
         return {
           id: user.id,

@@ -159,6 +159,8 @@ export const users = pgTable(
     role: roleEnum("role").notNull(),
     telephone: varchar("telephone", { length: 40 }),
     actif: integer("actif").notNull().default(1), // 1 = actif, 0 = désactivé
+    // Phase 28 : dernière connexion réussie (tableau de bord : observateurs actifs).
+    derniereConnexion: timestamp("derniere_connexion"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)]
