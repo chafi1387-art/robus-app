@@ -1,4 +1,4 @@
-=== Deploiement 2026-10-08 10:25:02 : a954485 -> c75c948
+=== Deploiement 2026-10-08 11:18:02 : c75c948 -> d1cf81b
 --- build
 ├ ƒ /responsable/sous-traitance
 ├ ƒ /responsable/stock
@@ -26,4 +26,4 @@
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK c75c948
+STATUT: OK d1cf81b

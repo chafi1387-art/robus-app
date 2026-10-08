@@ -1,0 +1,33 @@
+== commit
+d1cf81b Phase 27 : Planning des missions en tableau de bord (semaine, jour, mois, par projet)
+== fuseau du serveur (heures programmées = heure murale)
+Thu Oct  8 11:19:18 UTC 2026
+node TZ: UTC
+pas de TZ dans pm2
+== missions ouvertes
+  statut  | count | sans_tech | non_envoyees 
+----------+-------+-----------+--------------
+ affectee |     2 |         0 |            0
+ en_cours |     1 |         0 |            0
+(2 rows)
+
+== pages
+/responsable/interventions 307
+/responsable/interventions?vue=jour 307
+== vitesse (avec session)
+  détail menu : (rien en cours) · sections : Sur le terrain maintenant, À traiter, Technicien
+  311 ms  200  /responsable/interventions
+  99 ms  200  /responsable/interventions?vue=jour
+  76 ms  200  /responsable/interventions?vue=mois
+  97 ms  200  /responsable/interventions?vue=projet
+  100 ms  200  /responsable/appareils
+  93 ms  200  /responsable
+== erreurs récentes
+⨯ Error: Failed query: insert into "rapports" ("id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at") values (default, $1, $2, $3, $4, $5, default, default, default, default, $6, $7, $8, default, default, default) returning "id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at"
+⨯ Error: Failed query: insert into "rapports" ("id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at") values (default, $1, $2, $3, $4, $5, default, default, default, default, $6, $7, $8, default, default, default) returning "id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at"
+⨯ Error: Failed query: insert into "rapports" ("id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at") values (default, $1, $2, $3, $4, $5, default, default, default, default, $6, $7, $8, default, default, default) returning "id", "intervention_id", "checklist_modele_id", "travaux_realises", "observations", "temps_passe_minutes", "modifie_le", "nb_modifications", "corrige_bureau_le", "corrige_bureau_par_id", "statut_final_appareil", "date_envoi", "heure_reelle", "valide_par_id", "date_validation", "created_at"
+Error: aborted
+⨯ Error: Failed query: select "id" from "devis" where ("devis"."statut" = $1 and "devis"."relance_le" is null and "devis"."date_envoi" < $2)
+  [cause]: TypeError: The "string" argument must be of type string or an instance of Buffer or ArrayBuffer. Received an instance of Date
+Thu Oct  8 11:19:22 UTC 2026
+(code retour 0, 2026-10-08 11:19:22)
