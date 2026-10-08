@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { after } from "next/server";
-import { and, asc, desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, like, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   appareils,
@@ -465,7 +465,7 @@ export async function relancerDevisSansReponse() {
   const aRelancer = await db
     .select({ id: devis.id })
     .from(devis)
-    .where(and(eq(devis.statut, "envoye"), isNull(devis.relanceLe), sql`${devis.dateEnvoi} < ${limite}`));
+    .where(and(eq(devis.statut, "envoye"), isNull(devis.relanceLe), lt(devis.dateEnvoi, limite)));
   let n = 0;
   for (const { id } of aRelancer) {
     const dv = await lireDevis(id);
