@@ -9,6 +9,7 @@ import { rappelerFormations } from "@/lib/formations";
 import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
 import { and, eq, inArray, isNotNull, isNull, lt, notInArray } from "drizzle-orm";
 import { timingSafeEqual } from "node:crypto";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // Phase 16 : appelée par le cron du serveur (en-tête X-Cron-Secret = CRON_SECRET
 // du .env). Notifie UNE fois chaque mission en retard : le technicien + le bureau.
@@ -29,11 +30,11 @@ export async function POST(req: Request) {
       id: interventions.id,
       technicienId: interventions.technicienId,
       dateProgrammee: interventions.dateProgrammee,
-      numero: appareils.numeroInterne,
+      numero: CIBLE_MISSION,
       projetRef: projets.reference,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .where(
       and(
@@ -74,11 +75,11 @@ export async function POST(req: Request) {
       id: interventions.id,
       technicienId: interventions.technicienId,
       dateProgrammee: interventions.dateProgrammee,
-      numero: appareils.numeroInterne,
+      numero: CIBLE_MISSION,
       technicien: users.nom,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .innerJoin(users, eq(interventions.technicienId, users.id))
     .where(
       and(

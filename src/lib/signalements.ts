@@ -8,6 +8,7 @@ import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
 import { envoyerAlerteDemande } from "@/lib/mail";
 import { destinatairesAlertes } from "@/lib/demandes";
 import { GRAVITES_SIGNALEMENT, TYPES_SIGNALEMENT, graviteSignalement } from "@/lib/signalements-types";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // Phase 21 : signalements du technicien (accident, véhicule, météo…).
 // Création, numérotation SG-AAAA-NNNN, alertes au bureau (notification +
@@ -49,9 +50,9 @@ export async function creerSignalement(p: NouveauSignalement) {
   let contexte: { numero: string | null; projetRef: string | null; client: string | null } = { numero: null, projetRef: null, client: null };
   if (p.interventionId) {
     const [m] = await db
-      .select({ technicienId: interventions.technicienId, projetId: interventions.projetId, appareilId: interventions.appareilId, numero: appareils.numeroInterne, projetRef: projets.reference, projetTitre: projets.titre })
+      .select({ technicienId: interventions.technicienId, projetId: interventions.projetId, appareilId: interventions.appareilId, numero: CIBLE_MISSION, projetRef: projets.reference, projetTitre: projets.titre })
       .from(interventions)
-      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
       .leftJoin(projets, eq(interventions.projetId, projets.id))
       .where(eq(interventions.id, p.interventionId))
       .limit(1);

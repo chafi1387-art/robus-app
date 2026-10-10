@@ -10,6 +10,8 @@ import {
   contactsClient,
   demandesAide,
   interventions,
+  prestations,
+  prestationsCatalogue,
   projets,
   sites,
   users,
@@ -18,7 +20,7 @@ import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { envoyerEtJournaliserOrdreMission } from "./projets/actions";
@@ -281,8 +283,12 @@ export async function uploadAppareilPhoto(formData: FormData) {
   revalidatePath(`/responsable/appareils/${appareilId}`);
 }
 
+// Phase 29 : nom affiché d'une prestation (description, sinon nom du catalogue).
+const NOM_PRESTATION_PAR_ID = sql<string>`coalesce(nullif(${prestations.description}, ''), ${prestationsCatalogue.nom}, 'Prestation')`;
+
 const interventionSchema = z.object({
-  appareilId: z.string().uuid(),
+  // Phase 29 : appareil OU prestation (mission « à la carte »).
+  appareilId: z.string().uuid().optional(),
   // Phase 5 : le Projet devient obligatoire pour toute nouvelle intervention
   // (les interventions déjà en base, créées avant, restent avec projetId
   // null et continuent de fonctionner comme avant — voir schema.ts).
@@ -297,30 +303,76 @@ const interventionSchema = z.object({
 export async function createIntervention(formData: FormData) {
   const user = await requireUser(ROLES_BUREAU);
   const technicienId = formData.get("technicienId");
+  // Phase 29 : « Mission pour : un appareil | une prestation ».
+  const cible = formData.get("cible") === "prestation" ? "prestation" : "appareil";
+  const retourForm = String(formData.get("retour") ?? "");
   const parsed = interventionSchema.safeParse({
-    appareilId: formData.get("appareilId"),
+    appareilId: cible === "appareil" ? formData.get("appareilId") || undefined : undefined,
     projetId: formData.get("projetId"),
-    type: formData.get("type"),
+    // Mission « à la carte » : pas de type à choisir (enregistrée comme « systématique »).
+    type: cible === "prestation" ? "systematique" : formData.get("type"),
     priorite: formData.get("priorite"),
     description: formData.get("description") || undefined,
     technicienId: technicienId && technicienId !== "" ? technicienId : undefined,
     dateProgrammee: formData.get("dateProgrammee") || undefined,
   });
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
-
-  const [appareilExists] = await db
-    .select({ id: appareils.id, numero: appareils.numeroInterne, marque: appareils.marque })
-    .from(appareils)
-    .where(eq(appareils.id, parsed.data.appareilId))
-    .limit(1);
-  if (!appareilExists) throw new Error("Appareil introuvable — impossible de créer l'intervention.");
+  const retourProjet = `/responsable/projets/${parsed.data.projetId}?tab=missions`;
+  const retourErreur = retourForm.startsWith("/responsable/") ? retourForm : retourProjet;
 
   const [projetExists] = await db
-    .select({ id: projets.id, typeProjet: projets.typeProjet })
+    .select({ id: projets.id, typeProjet: projets.typeProjet, reference: projets.reference })
     .from(projets)
     .where(eq(projets.id, parsed.data.projetId))
     .limit(1);
   if (!projetExists) throw new Error("Projet introuvable — impossible de créer l'intervention.");
+
+  // Cible : un appareil existant, ou une prestation ponctuelle de CE projet
+  // (existante, ou créée ici depuis le catalogue / avec un nom libre).
+  let appareilExists: { id: string; numero: string; marque: string | null } | null = null;
+  let prestationCible: { id: string; nom: string } | null = null;
+  let nouvellePrestation: { catalogueId: string | null; description: string; prix: string | null } | null = null;
+  if (cible === "appareil") {
+    if (!parsed.data.appareilId) redirect(avecMessage(retourErreur, "erreur", "Choisissez l'appareil de la mission."));
+    const [a] = await db
+      .select({ id: appareils.id, numero: appareils.numeroInterne, marque: appareils.marque })
+      .from(appareils)
+      .where(eq(appareils.id, parsed.data.appareilId!))
+      .limit(1);
+    if (!a) throw new Error("Appareil introuvable — impossible de créer l'intervention.");
+    appareilExists = a;
+  } else {
+    const prestationId = String(formData.get("prestationId") ?? "");
+    if (prestationId === "nouvelle") {
+      const catalogueId = String(formData.get("nouveauCatalogueId") ?? "");
+      const nom = String(formData.get("nouvellePrestationNom") ?? "").trim().slice(0, 200);
+      if (catalogueId === "libre" || catalogueId === "") {
+        if (!nom) redirect(avecMessage(retourErreur, "erreur", "Indiquez le nom de la prestation (ex. Nettoyage, Démolition…)."));
+        nouvellePrestation = { catalogueId: null, description: nom, prix: null };
+      } else {
+        if (!z.string().uuid().safeParse(catalogueId).success) redirect(avecMessage(retourErreur, "erreur", "Prestation du catalogue invalide."));
+        const [c] = await db.select().from(prestationsCatalogue).where(eq(prestationsCatalogue.id, catalogueId)).limit(1);
+        if (!c || !c.actif) redirect(avecMessage(retourErreur, "erreur", "Prestation du catalogue introuvable."));
+        if (c!.mode === "contrat" || c!.categorie === "vente_piece") {
+          redirect(avecMessage(retourErreur, "erreur", "Un contrat ou une vente de pièce ne peut pas être une mission à la carte."));
+        }
+        nouvellePrestation = { catalogueId: c!.id, description: nom || c!.nom, prix: c!.prixIndicatif };
+      }
+      prestationCible = { id: "", nom: nouvellePrestation!.description };
+    } else {
+      if (!z.string().uuid().safeParse(prestationId).success) redirect(avecMessage(retourErreur, "erreur", "Choisissez la prestation de la mission."));
+      const [p] = await db
+        .select({ id: prestations.id, projetId: prestations.projetId, mode: prestations.mode, nom: NOM_PRESTATION_PAR_ID })
+        .from(prestations)
+        .leftJoin(prestationsCatalogue, eq(prestations.catalogueId, prestationsCatalogue.id))
+        .where(eq(prestations.id, prestationId))
+        .limit(1);
+      if (!p || p.projetId !== parsed.data.projetId) redirect(avecMessage(retourErreur, "erreur", "Cette prestation n'appartient pas au projet."));
+      if (p!.mode === "contrat") redirect(avecMessage(retourErreur, "erreur", "Un contrat à passages se planifie par appareil, pas en mission à la carte."));
+      prestationCible = { id: p!.id, nom: p!.nom };
+    }
+  }
+
   // Phase 17 : une mission envoyée a toujours un technicien ET une date.
   if (parsed.data.technicienId && !parsed.data.dateProgrammee) {
     throw new Error("Choisissez la date et l'heure de la mission avant de l'envoyer au technicien.");
@@ -328,17 +380,47 @@ export async function createIntervention(formData: FormData) {
   // Phase 19 : contrôle de sécurité — habilitations obligatoires en règle.
   if (parsed.data.technicienId) {
     const manques = await controlerHabilitationsSpecs(parsed.data.technicienId, [
-      { type: parsed.data.type, numero: appareilExists.numero, marque: appareilExists.marque, typeProjet: projetExists.typeProjet ?? null },
+      {
+        type: parsed.data.type,
+        numero: appareilExists?.numero ?? prestationCible!.nom,
+        marque: appareilExists?.marque ?? null,
+        typeProjet: projetExists.typeProjet ?? null,
+      },
     ]);
     if (manques.length) {
-      const retourErr = String(formData.get("retour") ?? "");
-      const base = retourErr.startsWith("/responsable/") ? retourErr : `/responsable/appareils/${parsed.data.appareilId}`;
+      const base = retourForm.startsWith("/responsable/")
+        ? retourForm
+        : appareilExists
+          ? `/responsable/appareils/${appareilExists.id}`
+          : retourProjet;
       redirect(avecMessage(base, "erreur", messageManques(await nomUtilisateur(parsed.data.technicienId), manques)));
     }
   }
 
+  // Phase 29 : prestation créée depuis le formulaire de mission.
+  if (nouvellePrestation) {
+    const [p] = await db
+      .insert(prestations)
+      .values({
+        projetId: parsed.data.projetId,
+        catalogueId: nouvellePrestation.catalogueId,
+        description: nouvellePrestation.description,
+        prixEstime: nouvellePrestation.prix,
+      })
+      .returning({ id: prestations.id });
+    prestationCible = { id: p.id, nom: nouvellePrestation.description };
+    await journaliser({
+      entite: "prestation",
+      entiteId: p.id,
+      action: "prestation_ajoutee",
+      utilisateurId: user.id,
+      details: `${projetExists.reference} — ${nouvellePrestation.description} (depuis une nouvelle mission)`,
+    });
+  }
+
   const [creee] = await db.insert(interventions).values({
-    appareilId: parsed.data.appareilId,
+    appareilId: appareilExists?.id ?? null,
+    prestationId: appareilExists ? null : prestationCible!.id,
     projetId: parsed.data.projetId,
     type: parsed.data.type,
     priorite: parsed.data.priorite,
@@ -349,10 +431,11 @@ export async function createIntervention(formData: FormData) {
   }).returning({ id: interventions.id });
 
   // Phase 23 : checklists choisies (ou la plus adaptée si aucune case cochée).
+  // Phase 29 : mission à la carte -> seulement les checklists cochées.
   if (formData.get("sansChecklist") !== "on") {
     const choisies = formData.getAll("checklistIds").map(String).filter((x) => z.string().uuid().safeParse(x).success);
     if (choisies.length) await attribuerChecklists(creee.id, choisies, user.id);
-    else await attribuerParDefaut(creee.id);
+    else if (appareilExists) await attribuerParDefaut(creee.id);
   }
 
   // Phase 10 : même règle que assignerIntervention — si un technicien est
@@ -366,13 +449,12 @@ export async function createIntervention(formData: FormData) {
     });
   }
 
-  revalidatePath(`/responsable/appareils/${parsed.data.appareilId}`);
+  if (appareilExists) revalidatePath(`/responsable/appareils/${appareilExists.id}`);
   revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
   revalidatePath("/responsable/interventions");
   // Phase 13 : création depuis l'onglet Missions d'un Projet -> on y revient.
-  const retour = String(formData.get("retour") ?? "");
-  if (retour.startsWith(`/responsable/projets/${parsed.data.projetId}`)) redirect(retour);
-  redirect(`/responsable/appareils/${parsed.data.appareilId}`);
+  if (retourForm.startsWith(`/responsable/projets/${parsed.data.projetId}`)) redirect(retourForm);
+  redirect(appareilExists ? `/responsable/appareils/${appareilExists.id}` : retourProjet);
 }
 
 // Statuts d'intervention à partir desquels on considère le travail engagé :

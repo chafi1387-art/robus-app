@@ -11,6 +11,7 @@ import {
   getReclamations,
   updateReclamationStatut,
 } from "./actions";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 const STATUT_RECLAMATION_LABEL: Record<string, string> = {
   ouverte: "Ouverte",
@@ -53,11 +54,11 @@ async function getInterventionsOptions() {
       id: interventions.id,
       type: interventions.type,
       dateProgrammee: interventions.dateProgrammee,
-      numeroInterne: appareils.numeroInterne,
+      numeroInterne: CIBLE_MISSION,
       raisonSociale: clients.raisonSociale,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id))
     .orderBy(desc(interventions.dateProgrammee));

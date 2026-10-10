@@ -18,6 +18,7 @@ import { and, count, desc, eq, sql } from "drizzle-orm";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { CarteApplication } from "@/components/app-installable";
 import { clePubliqueVapid } from "@/lib/push";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 const CATEGORIE_LABEL: Record<string, string> = {
   securite: "Sécurité",
@@ -74,10 +75,10 @@ export default async function ProfilPage({ searchParams }: { searchParams: Promi
         type: interventions.type,
         statut: interventions.statut,
         dateProgrammee: interventions.dateProgrammee,
-        numeroInterne: appareils.numeroInterne,
+        numeroInterne: CIBLE_MISSION,
       })
       .from(interventions)
-      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
       .where(eq(interventions.technicienId, user.id))
       .orderBy(desc(interventions.dateProgrammee))
       .limit(10),

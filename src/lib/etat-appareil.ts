@@ -37,14 +37,16 @@ export async function etatDepuisRapport(interventionId: string, utilisateurId: s
     .innerJoin(rapports, eq(rapports.interventionId, interventions.id))
     .where(eq(interventions.id, interventionId))
     .limit(1);
-  if (!m?.statut) return;
+  // Phase 29 : mission « à la carte » (prestation) -> aucun appareil à mettre à jour.
+  if (!m?.statut || !m.appareilId) return;
+  const appareilId = m.appareilId;
   const [derniere] = await db
     .select({ id: interventions.id })
     .from(interventions)
     .innerJoin(rapports, eq(rapports.interventionId, interventions.id))
-    .where(and(eq(interventions.appareilId, m.appareilId), inArray(interventions.statut, ["terminee", "validee", "cloturee"]), isNotNull(rapports.statutFinalAppareil)))
+    .where(and(eq(interventions.appareilId, appareilId), inArray(interventions.statut, ["terminee", "validee", "cloturee"]), isNotNull(rapports.statutFinalAppareil)))
     .orderBy(desc(interventions.dateFin))
     .limit(1);
   if (derniere && derniere.id !== interventionId) return;
-  await changerEtatAppareil(m.appareilId, m.statut, "rapport d'intervention", utilisateurId);
+  await changerEtatAppareil(appareilId, m.statut, "rapport d'intervention", utilisateurId);
 }

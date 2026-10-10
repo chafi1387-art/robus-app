@@ -8,6 +8,7 @@ import { TYPES_SIGNALEMENT } from "@/lib/signalements-types";
 import { envoyerSignalement } from "../signalements/actions";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
 import { EnvoiFichiers } from "@/components/envoi-fichiers";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // Phase 21 : « Signaler » — 1) le type (grandes tuiles), 2) un petit rapport
 // avec photos / document, lié automatiquement à la mission si on vient d'une
@@ -63,11 +64,11 @@ export default async function SignalerPage({
       id: interventions.id,
       statut: interventions.statut,
       dateProgrammee: interventions.dateProgrammee,
-      numero: appareils.numeroInterne,
+      numero: CIBLE_MISSION,
       client: clients.raisonSociale,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id))
     .where(

@@ -18,6 +18,7 @@ import { notifierBureau, notifierUtilisateurs } from "@/lib/push";
 import { journaliser } from "@/lib/journal";
 import { notifierObservateurs } from "@/lib/observateur";
 import { demandesMissionPlanifiee } from "@/lib/demandes";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // Phase 17 : envoi d'une (ou plusieurs) mission(s) au technicien — logique
 // unique utilisée partout (création, affectation, ajout à un projet,
@@ -99,14 +100,15 @@ export async function envoyerMissionsAuTechnicien(params: {
             id: interventions.id,
             type: interventions.type,
             dateProgrammee: interventions.dateProgrammee,
-            numero: appareils.numeroInterne,
+            // Phase 29 : appareil, sinon prestation (mission à la carte).
+            numero: CIBLE_MISSION,
             appareilId: interventions.appareilId,
           })
           .from(interventions)
-          .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+          .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
           .where(filtreMissions)
           .orderBy(interventions.dateProgrammee)
-      : Promise.resolve([] as { id: string; type: string; dateProgrammee: Date | null; numero: string; appareilId: string }[]),
+      : Promise.resolve([] as { id: string; type: string; dateProgrammee: Date | null; numero: string; appareilId: string | null }[]),
   ]);
 
   const documentsIdsDemandes = [...new Set((params.documentsIds ?? []).filter(Boolean))];
@@ -158,7 +160,7 @@ export async function envoyerMissionsAuTechnicien(params: {
           dateDebutPrevue: premiere?.dateProgrammee ?? contexte.dateDebutPrevue,
           message: params.message,
           documents: documentsResolus.map((d) => ({ titre: d.titre, url: d.urlFichier })),
-          missions: missions.map((m) => ({ date: m.dateProgrammee, appareil: m.numero, type: TYPE_LABEL[m.type] ?? m.type })),
+          missions: missions.map((m) => ({ date: m.dateProgrammee, appareil: m.numero, type: m.appareilId ? TYPE_LABEL[m.type] ?? m.type : "Prestation" })),
         }),
         notifierUtilisateurs([params.technicienId], {
           titre: missions.length > 1 ? `📋 ${missions.length} nouvelles missions` : `📋 Nouvelle mission — ${contexte.reference}`,
@@ -188,6 +190,7 @@ export async function envoyerMissionsAuTechnicien(params: {
       await demandesMissionPlanifiee(missionIds);
       // Phase 18 : l'observateur du client est prévenu de la date prévue.
       for (const m of missions) {
+        if (!m.appareilId) continue; // mission à la carte : pas d'observateur d'appareil
         await notifierObservateurs(
           m.appareilId,
           "temps_reel",

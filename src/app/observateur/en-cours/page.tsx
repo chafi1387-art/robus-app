@@ -4,14 +4,19 @@ import { EtapesSuivi } from "@/components/etapes-suivi";
 import { RafraichissementAuto } from "@/components/rafraichissement-auto";
 import { formatDateTime } from "@/lib/format";
 import { ETAPES, etapeObservateur, requireObservateur } from "@/lib/observateur";
-import { interventionsEnCours, prenom } from "@/lib/observateur-donnees";
+import { interventionsEnCours, prenom, STATUTS_FINIS, travauxDuClient } from "@/lib/observateur-donnees";
 
 const TYPE: Record<string, string> = { preventive: "Maintenance préventive", corrective: "Dépannage", systematique: "Contrôle systématique" };
 
 export default async function EnCoursPage() {
   const ctx = await requireObservateur();
   if (!ctx.droits.has("temps_reel")) redirect("/observateur");
-  const liste = await interventionsEnCours(ctx.appareilIds);
+  const [surAppareils, travaux] = await Promise.all([interventionsEnCours(ctx.appareilIds), travauxDuClient(ctx)]);
+  // Phase 29 : missions à la carte (prestation) du client, en cours.
+  const liste = [
+    ...surAppareils,
+    ...travaux.filter((t) => !(STATUTS_FINIS as readonly string[]).includes(t.statut)),
+  ];
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
@@ -21,13 +26,13 @@ export default async function EnCoursPage() {
       {liste.map((i) => {
         const etape = etapeObservateur(i);
         return (
-          <Link key={i.id} href={`/observateur/appareils/${i.appareilId}`} className="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-3">
+          <Link key={i.id} href={i.appareilId ? `/observateur/appareils/${i.appareilId}` : `/observateur/interventions/${i.id}`} className="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
               <span className="font-display font-extrabold text-[17px] text-navy">{i.numero}</span>
               <span className="text-xs font-bold text-blue">{ETAPES[etape]}</span>
             </div>
             <div className="text-[13px] text-ink-soft">
-              {TYPE[i.type] ?? i.type}
+              {i.appareilId ? TYPE[i.type] ?? i.type : "Travaux"}
               {i.dateProgrammee && etape >= 1 ? ` · ${formatDateTime(i.dateProgrammee)}` : ""}
               {etape >= 1 && prenom(i.technicien) ? ` · Technicien : ${prenom(i.technicien)}` : ""}
             </div>

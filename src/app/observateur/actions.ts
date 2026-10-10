@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { demandesClient, enquetesSatisfaction, interventions, observateurs, reclamationsClient } from "@/db/schema";
 import { journaliser } from "@/lib/journal";
 import { requireObservateur } from "@/lib/observateur";
+import { observateurPeutVoirMission } from "@/lib/observateur-donnees";
 import { after } from "next/server";
 import { creerDemande, ajouterMessage, tropDeDemandes } from "@/lib/demandes";
 import { photosRecues } from "@/lib/photos";
@@ -145,11 +146,12 @@ export async function noterIntervention(formData: FormData) {
   if (!ctx.droits.has("satisfaction") || !z.string().uuid().safeParse(id).success) redirect("/observateur");
   if (!Number.isInteger(note) || note < 1 || note > 5) redirect(`/observateur/interventions/${id}?erreur=note`);
   const [m] = await db
-    .select({ appareilId: interventions.appareilId, statut: interventions.statut })
+    .select({ appareilId: interventions.appareilId, projetId: interventions.projetId, statut: interventions.statut })
     .from(interventions)
     .where(eq(interventions.id, id))
     .limit(1);
-  if (!m || !ctx.appareilIds.includes(m.appareilId) || !["terminee", "validee", "cloturee"].includes(m.statut)) redirect("/observateur?acces=refuse");
+  // Phase 29 : mission à la carte -> autorisée si le projet est celui du client.
+  if (!m || !(await observateurPeutVoirMission(ctx, m)) || !["terminee", "validee", "cloturee"].includes(m.statut)) redirect("/observateur?acces=refuse");
   const [deja] = await db
     .select({ id: enquetesSatisfaction.id })
     .from(enquetesSatisfaction)

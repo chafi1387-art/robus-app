@@ -37,6 +37,7 @@ import { marquerPassageRealise } from "@/lib/garantie-passages";
 import { demandesMissionTerminee } from "@/lib/demandes";
 import { etatDepuisRapport } from "@/lib/etat-appareil";
 import { devisMissionTerminee, signalerBesoinDevis } from "@/lib/devis";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 async function assertOwnIntervention(interventionId: string, userId: string, role: string) {
   const [row] = await db
@@ -83,12 +84,13 @@ export async function commencerIntervention(formData: FormData) {
     .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
     .where(eq(interventions.id, interventionId))
     .limit(1);
-  if (m) {
+  const appareilCommence = m?.appareilId;
+  if (m && appareilCommence) {
     after(() =>
-      notifierObservateurs(m.appareilId, "temps_reel", {
+      notifierObservateurs(appareilCommence, "temps_reel", {
         titre: "🔧 Technicien sur place",
         corps: `L'intervention sur l'ascenseur ${m.numero} a commencé.`,
-        url: `/observateur/appareils/${m.appareilId}`,
+        url: `/observateur/appareils/${appareilCommence}`,
       })
     );
   }
@@ -156,11 +158,11 @@ export async function refuserMission(formData: FormData) {
       accepteeLe: interventions.accepteeLe,
       refuseeLe: interventions.refuseeLe,
       dateProgrammee: interventions.dateProgrammee,
-      numero: appareils.numeroInterne,
+      numero: CIBLE_MISSION,
       projetId: interventions.projetId,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .where(eq(interventions.id, interventionId))
     .limit(1);
   if (!m || !["creee", "planifiee", "affectee"].includes(m.statut)) retourErreur("Cette mission ne peut plus être refusée.");
@@ -201,7 +203,7 @@ const rapportSchema = z.object({
     "en_panne",
     "hors_service",
     "en_travaux",
-  ]),
+  ]).optional(), // Phase 29 : absent pour une mission à la carte (prestation, sans appareil)
   checklistModeleId: z.string().uuid().optional(),
   // Phase 10 : heure réelle de l'intervention (peut différer de l'heure
   // programmée) — optionnelle à la clôture, modifiable ensuite pendant 24h.
@@ -215,7 +217,7 @@ export async function terminerIntervention(formData: FormData) {
     travauxRealises: formData.get("travauxRealises"),
     observations: formData.get("observations") || undefined,
     tempsPasseMinutes: formData.get("tempsPasseMinutes") || undefined,
-    statutFinalAppareil: formData.get("statutFinalAppareil"),
+    statutFinalAppareil: formData.get("statutFinalAppareil") || undefined,
     checklistModeleId: formData.get("checklistModeleId") || undefined,
     heureReelle: formData.get("heureReelle") || undefined,
   };
@@ -243,7 +245,9 @@ export async function terminerIntervention(formData: FormData) {
     redirect(avecMessage(`/technicien/interventions/${parsed.data.interventionId}#rapport`, "erreur", (e as Error).message));
   }
   // Phase 25 : seulement les photos du passage en cours (une mission peut repartir après un devis).
-  const [debutPassage] = await db.select({ d: interventions.dateDebut }).from(interventions).where(eq(interventions.id, parsed.data.interventionId)).limit(1);
+  const [debutPassage] = await db.select({ d: interventions.dateDebut, appareilId: interventions.appareilId }).from(interventions).where(eq(interventions.id, parsed.data.interventionId)).limit(1);
+  // L'état final de l'appareil est demandé seulement s'il y a un appareil.
+  const statutFinal = debutPassage?.appareilId ? parsed.data.statutFinalAppareil ?? "en_service" : null;
   const fil = await db
     .select({ photos: missionJournal.photos })
     .from(missionJournal)
@@ -262,7 +266,7 @@ export async function terminerIntervention(formData: FormData) {
       travauxRealises: parsed.data.travauxRealises,
       observations: parsed.data.observations ?? null,
       tempsPasseMinutes: parsed.data.tempsPasseMinutes ?? null,
-      statutFinalAppareil: parsed.data.statutFinalAppareil,
+      statutFinalAppareil: statutFinal,
       dateEnvoi: new Date(),
       heureReelle: parsed.data.heureReelle ? new Date(parsed.data.heureReelle) : null,
     })
@@ -316,12 +320,13 @@ export async function terminerIntervention(formData: FormData) {
     .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
     .where(eq(interventions.id, parsed.data.interventionId))
     .limit(1);
-  if (fin) {
+  const appareilFini = fin?.appareilId;
+  if (fin && appareilFini) {
     after(() =>
-      notifierObservateurs(fin.appareilId, "temps_reel", {
+      notifierObservateurs(appareilFini, "temps_reel", {
         titre: "✅ Intervention terminée",
         corps: `L'intervention sur l'ascenseur ${fin.numero} est terminée. Le rapport sera disponible après validation par ROBUS.`,
-        url: `/observateur/appareils/${fin.appareilId}`,
+        url: `/observateur/appareils/${appareilFini}`,
       })
     );
   }

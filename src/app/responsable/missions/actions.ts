@@ -20,6 +20,7 @@ import { REINIT_ENVOI } from "@/lib/missions";
 import { envoyerMissionsAuTechnicien } from "@/lib/envoi-mission";
 import { controlerHabilitations, messageManques, nomUtilisateur } from "@/lib/habilitations";
 import { etatDepuisRapport } from "@/lib/etat-appareil";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // Phase 18 : le bureau valide le rapport d'une mission terminée. Le rapport
 // devient visible par les observateurs (droit « rapports ») et n'est plus
@@ -35,10 +36,14 @@ export async function validerRapport(formData: FormData) {
     .returning({ appareilId: interventions.appareilId });
   if (maj.length) {
     await journaliser({ entite: "intervention", entiteId: id, action: "rapport_valide", utilisateurId: user.id });
-    const [a] = await db.select({ numero: appareils.numeroInterne }).from(appareils).where(eq(appareils.id, maj[0].appareilId)).limit(1);
+  }
+  // Phase 29 : mission « à la carte » (prestation) -> pas d'observateur d'appareil à prévenir.
+  const appareilValide = maj[0]?.appareilId;
+  if (appareilValide) {
+    const [a] = await db.select({ numero: appareils.numeroInterne }).from(appareils).where(eq(appareils.id, appareilValide)).limit(1);
     after(() =>
       notifierObservateurs(
-        maj[0].appareilId,
+        appareilValide,
         "rapports",
         {
           titre: "📄 Rapport d'intervention disponible",
@@ -390,11 +395,11 @@ export async function traiterTacheNonConforme(formData: FormData) {
   const decision = String(formData.get("decision") ?? "");
   if (!z.string().uuid().safeParse(tacheId).success) redirect("/responsable/interventions");
   const [t] = await db
-    .select({ tache: missionChecklistTaches, interventionId: missionChecklists.interventionId, appareilId: interventions.appareilId, numero: appareils.numeroInterne, technicienId: interventions.technicienId })
+    .select({ tache: missionChecklistTaches, interventionId: missionChecklists.interventionId, appareilId: interventions.appareilId, numero: CIBLE_MISSION, technicienId: interventions.technicienId })
     .from(missionChecklistTaches)
     .innerJoin(missionChecklists, eq(missionChecklistTaches.missionChecklistId, missionChecklists.id))
     .innerJoin(interventions, eq(missionChecklists.interventionId, interventions.id))
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .where(eq(missionChecklistTaches.id, tacheId))
     .limit(1);
   if (!t || t.tache.resultat !== "nok") redirect("/responsable/interventions");

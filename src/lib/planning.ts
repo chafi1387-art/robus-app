@@ -13,6 +13,7 @@ import {
   users,
 } from "@/db/schema";
 import { progressionMissions } from "@/lib/checklists";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // ==========================================================================
 // Phase 27 — Planning des missions (maquette validée le 08/10/2026).
@@ -148,9 +149,11 @@ export type MissionPlanning = {
   valideeLe: Date | null;
   technicienId: string | null;
   technicien: string | null;
-  appareilId: string;
+  /** Phase 29 : null = mission « à la carte » liée à une prestation. */
+  appareilId: string | null;
+  /** N° interne de l'appareil, sinon nom de la prestation. */
   numero: string;
-  appareilStatut: string;
+  appareilStatut: string | null;
   appareilDepuis: Date | null;
   client: string | null;
   projetId: string | null;
@@ -182,7 +185,7 @@ const COLONNES = {
   technicienId: interventions.technicienId,
   technicien: users.nom,
   appareilId: interventions.appareilId,
-  numero: appareils.numeroInterne,
+  numero: CIBLE_MISSION,
   appareilStatut: appareils.statut,
   appareilDepuis: appareils.statutDepuis,
   client: clients.raisonSociale,
@@ -195,7 +198,7 @@ function requeteMissions() {
   return db
     .select(COLONNES)
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id))
     .leftJoin(users, eq(interventions.technicienId, users.id));
@@ -402,7 +405,7 @@ export function lignesATraiter(ouvertes: MissionPlanning[], maintenant: number):
   for (const m of ouvertes) {
     if (!estNonCommencee(m.statut)) continue;
     const etat = etatVisuel(m);
-    const arret = ARRET.has(m.appareilStatut);
+    const arret = !!m.appareilStatut && ARRET.has(m.appareilStatut);
     const retard = estEnRetard(m, maintenant);
     const proche = !!m.dateProgrammee && m.dateProgrammee.getTime() < mur(maintenant) + 48 * HEURE;
     if (etat === "refusee") {

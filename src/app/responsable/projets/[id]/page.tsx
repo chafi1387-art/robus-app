@@ -61,6 +61,8 @@ import { FICHIER_MAX_BYTES, FICHIER_TYPES } from "@/lib/document-file-rules";
 import { signalementsDe } from "@/lib/signalements";
 import { modelesActifs, progressionMissions } from "@/lib/checklists";
 import { ChoixChecklists } from "@/components/choix-checklists";
+import { ChoixCibleMission } from "@/components/choix-cible-mission";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 import { ListeSignalements } from "@/components/liste-signalements";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
 
@@ -242,7 +244,8 @@ export default async function ProjetDetailPage({
         type: interventions.type,
         statut: interventions.statut,
         dateProgrammee: interventions.dateProgrammee,
-        numeroInterne: appareils.numeroInterne,
+        numeroInterne: CIBLE_MISSION,
+        appareilId: interventions.appareilId,
         technicien: users.nom,
         technicienId: interventions.technicienId,
         envoyeeLe: interventions.envoyeeLe,
@@ -257,7 +260,7 @@ export default async function ProjetDetailPage({
         tempsPasseMinutes: rapports.tempsPasseMinutes,
       })
       .from(interventions)
-      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
       .leftJoin(users, eq(interventions.technicienId, users.id))
       .leftJoin(rapports, eq(rapports.interventionId, interventions.id))
       .where(eq(interventions.projetId, id))
@@ -579,28 +582,21 @@ export default async function ProjetDetailPage({
                 <span className="font-display font-bold text-[15px] flex items-center gap-2"><Plus className="w-4 h-4" /> Nouvelle mission</span>
                 <span className="text-xs text-ink-soft">Client, adresse et contact repris du projet</span>
               </summary>
-              {appareilsAttaches.length === 0 ? (
-                <p className="text-sm text-ink-soft mt-3">
-                  Ajoutez d&apos;abord un appareil au projet (onglet <Link className="text-blue font-semibold" href={ongletHref("appareils")}>Appareils</Link>).
-                </p>
-              ) : (
+              {(
                 <form action={createIntervention} className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   <input type="hidden" name="projetId" value={projet.id} />
                   <input type="hidden" name="retour" value={`/responsable/projets/${projet.id}?tab=missions`} />
-                  <Field label="Appareil">
-                    <select name="appareilId" required className={inputClass}>
-                      {appareilsAttaches.map((a) => (
-                        <option key={a.id} value={a.id}>{a.numeroInterne}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Type de mission">
-                    <select name="type" className={inputClass} defaultValue="preventive">
-                      <option value="preventive">Maintenance préventive</option>
-                      <option value="corrective">Dépannage / corrective</option>
-                      <option value="systematique">Systématique / contrôle</option>
-                    </select>
-                  </Field>
+                  {/* Phase 29 : mission pour un appareil OU une prestation (à la carte). */}
+                  <ChoixCibleMission
+                    className="md:col-span-2 xl:col-span-3"
+                    appareils={appareilsAttaches.map((a) => ({ id: a.id, libelle: a.numeroInterne }))}
+                    prestations={prestationsListe
+                      .filter((p) => p.prestation.mode !== "contrat")
+                      .map((p) => ({ id: p.prestation.id, libelle: p.prestation.description || p.catalogueNom || "Prestation" }))}
+                    catalogue={catalogueOptions
+                      .filter((c) => c.mode !== "contrat" && c.categorie !== "vente_piece")
+                      .map((c) => ({ id: c.id, libelle: c.nom }))}
+                  />
                   <Field label="Priorité">
                     <select name="priorite" className={inputClass} defaultValue="normale">
                       <option value="basse">Basse</option>
@@ -660,7 +656,7 @@ export default async function ProjetDetailPage({
                 <div className="flex items-center gap-3 flex-wrap">
                   <TypeInterventionPill type={i.type} />
                   <Link href={`/responsable/missions/${i.id}`} className="flex-1 min-w-0 text-sm hover:text-blue">
-                    <span className="font-semibold">{i.numeroInterne}</span> · {formatDateTime(i.dateProgrammee)} · {i.technicien ?? "Non affecté"}
+                    <span className="font-semibold">{i.numeroInterne}</span>{!i.appareilId && <span className="ml-1.5 text-[10.5px] font-extrabold uppercase text-ink-soft">Prestation</span>} · {formatDateTime(i.dateProgrammee)} · {i.technicien ?? "Non affecté"}
                   </Link>
                   {i.statut === "en_cours" && (
                     <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wide text-white bg-red-ink rounded-full px-2 py-0.5">

@@ -1,4 +1,4 @@
-import { TypeInterventionPill, StatutInterventionPill } from "@/components/ui";
+import { Pill, TypeInterventionPill, StatutInterventionPill } from "@/components/ui";
 import { db } from "@/db";
 import { appareils, clients, interventions, projets } from "@/db/schema";
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
@@ -10,6 +10,7 @@ import { CarteApplication } from "@/components/app-installable";
 import { clePubliqueVapid } from "@/lib/push";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // Phase 6 : l'Appareil n'est plus rattaché à un Site — l'adresse et le
 // client d'une intervention se dérivent désormais du Projet. On passe donc
@@ -25,13 +26,14 @@ function baseQuery() {
       vueLe: interventions.vueLe,
       accepteeLe: interventions.accepteeLe,
       refuseeLe: interventions.refuseeLe,
-      numeroInterne: appareils.numeroInterne,
+      numeroInterne: CIBLE_MISSION,
+      appareilId: interventions.appareilId,
       projetReference: projets.reference,
       adresse: projets.adresse,
       raisonSociale: clients.raisonSociale,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id));
 }
@@ -503,7 +505,7 @@ function InterventionCard({ i, retard = false, nouvelle = false }: { i: Row; ret
         )}
       </div>
       <div className="flex items-center gap-2">
-        <TypeInterventionPill type={i.type} />
+        {i.appareilId ? <TypeInterventionPill type={i.type} /> : <Pill tone="neutral">Prestation</Pill>}
         <span className="font-display font-bold text-[15px]">{i.numeroInterne}</span>
       </div>
       <div className="text-[13px] text-ink-soft">
@@ -555,14 +557,14 @@ async function HistoriqueTechnicien({ userId, q, limite }: { userId: string; q: 
       statut: interventions.statut,
       dateProgrammee: interventions.dateProgrammee,
       dateFin: interventions.dateFin,
-      numeroInterne: appareils.numeroInterne,
+      numeroInterne: CIBLE_MISSION,
       raisonSociale: clients.raisonSociale,
       adresse: projets.adresse,
       photos: nbPhotos.n,
       modifieLe: rapports.modifieLe,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id))
     .leftJoin(rapports, eq(rapports.interventionId, interventions.id))
@@ -573,7 +575,7 @@ async function HistoriqueTechnicien({ userId, q, limite }: { userId: string; q: 
         inArray(interventions.statut, ["terminee", "validee", "cloturee"]),
         recherche
           ? or(
-              ilike(appareils.numeroInterne, `%${recherche}%`),
+              ilike(CIBLE_MISSION, `%${recherche}%`),
               ilike(clients.raisonSociale, `%${recherche}%`),
               ilike(projets.adresse, `%${recherche}%`)
             )

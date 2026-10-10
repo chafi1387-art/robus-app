@@ -12,7 +12,7 @@ import { devisDeLObservateur } from "@/lib/devis";
 import { ListeDevisObservateur } from "@/components/liste-devis-observateur";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { ETAPES, adressesAppareils, etapeObservateur, requireObservateur } from "@/lib/observateur";
-import { interventionsEnCours, interventionsTerminees, prochainesVisites } from "@/lib/observateur-donnees";
+import { interventionsEnCours, interventionsTerminees, prenom, prochainesVisites, STATUTS_FINIS, travauxDuClient } from "@/lib/observateur-donnees";
 
 export default async function MesAscenseursPage({ searchParams }: { searchParams: Promise<{ acces?: string }> }) {
   const ctx = await requireObservateur();
@@ -33,6 +33,8 @@ export default async function MesAscenseursPage({ searchParams }: { searchParams
     d.has("prochaines_visites") ? prochainesVisites(ids) : Promise.resolve([]),
     devisDeLObservateur(ctx.userId),
   ]);
+  // Phase 29 : travaux à la carte (nettoyage, démolition…) des projets du client.
+  const travaux = await travauxDuClient(ctx, 10);
   // Phase 25b : en premier les devis qui attendent une réponse, puis les 3 derniers.
   const devisAffiches = [...mesDevis.filter((x) => x.statut === "envoye"), ...mesDevis.filter((x) => x.statut !== "envoye").slice(0, 3)];
 
@@ -98,6 +100,28 @@ export default async function MesAscenseursPage({ searchParams }: { searchParams
         );
       })}
       {liste.length === 0 && <p className="text-sm text-ink-soft">Aucun appareil ne vous est attribué pour l&apos;instant.</p>}
+
+      {travaux.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h2 className="font-display font-bold text-[15px] mt-2">Autres travaux</h2>
+          {travaux.map((t) => {
+            const fini = (STATUTS_FINIS as readonly string[]).includes(t.statut);
+            const etapeT = etapeObservateur(t);
+            return (
+              <Link key={t.id} href={`/observateur/interventions/${t.id}`} className="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-2 active:bg-blue-pale">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-display font-extrabold text-[16px] text-navy truncate">{t.numero}</span>
+                  <span className="text-xs font-bold text-blue whitespace-nowrap">{fini ? "Terminé" : ETAPES[etapeT]}</span>
+                </div>
+                <div className="text-[13px] text-ink-soft">
+                  {[t.projetRef, formatDate(t.dateFin ?? t.dateProgrammee), prenom(t.technicien)].filter(Boolean).join(" · ")}
+                </div>
+                {!fini && <EtapesSuivi etape={etapeT} />}
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

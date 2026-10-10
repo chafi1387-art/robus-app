@@ -4,6 +4,7 @@ import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { csvResponse, toCsv } from "@/lib/csv";
 import { formatDateTime } from "@/lib/format";
 import { desc, eq } from "drizzle-orm";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 export async function GET() {
   await requireUser(ROLES_BUREAU);
@@ -15,12 +16,13 @@ export async function GET() {
     .select({
       intervention: interventions,
       appareil: appareils,
+      cible: CIBLE_MISSION,
       projet: projets,
       client: clients,
       technicien: users.nom,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id))
     .leftJoin(users, eq(interventions.technicienId, users.id))
@@ -40,10 +42,10 @@ export async function GET() {
       "Date fin",
       "Description",
     ],
-    lignes.map(({ intervention, appareil, projet, client, technicien }) => [
+    lignes.map(({ intervention, cible, projet, client, technicien }) => [
       client?.raisonSociale ?? "",
       projet?.adresse ?? "",
-      appareil.numeroInterne,
+      cible,
       intervention.type,
       intervention.statut,
       intervention.priorite,

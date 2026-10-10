@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   date,
   index,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -247,13 +248,15 @@ export const appareilEtats = pgTable("appareil_etats", {
 });
 
 // ---------- Interventions ----------
-// Règle d'intégrité 3 : impossible de créer une Intervention sans Appareil existant -> appareilId NOT NULL + RESTRICT
+// Règle d'intégrité 3 : une Intervention vise un Appareil existant (RESTRICT)…
+// Phase 29 : … OU une Prestation ponctuelle d'un Projet (mission « à la carte » :
+// nettoyage, démolition, câblage…). Contrainte SQL : au moins l'un des deux.
 // Règle d'intégrité 4 : liée à Client + Site + Appareil (+ Technicien) -> dérivée via l'Appareil, jamais dupliquée.
 export const interventions = pgTable("interventions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  appareilId: uuid("appareil_id")
-    .notNull()
-    .references(() => appareils.id, { onDelete: "restrict" }),
+  appareilId: uuid("appareil_id").references(() => appareils.id, { onDelete: "restrict" }),
+  // Phase 29 : prestation visée quand la mission n'a pas d'appareil.
+  prestationId: uuid("prestation_id").references((): AnyPgColumn => prestations.id, { onDelete: "restrict" }),
   technicienId: uuid("technicien_id").references(() => users.id, { onDelete: "set null" }),
   // Phase 5 : rattachement au Projet central. Nullable pour ne pas casser les
   // interventions déjà en base (créées avant l'introduction du Projet) —

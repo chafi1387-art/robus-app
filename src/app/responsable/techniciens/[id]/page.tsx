@@ -36,6 +36,7 @@ import { StatutInterventionPill } from "@/components/ui";
 import { updateTechnicienFiche, uploadTechnicienDocument, uploadTechnicienPhoto } from "../actions";
 import { getSitesForSelect } from "../../actions";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 const STATUT_RH_LABEL: Record<string, string> = {
   actif: "Actif",
@@ -140,7 +141,7 @@ export default async function TechnicienDetailPage({
             statut: interventions.statut,
             type: interventions.type,
             dateProgrammee: interventions.dateProgrammee,
-            appareil: appareils.numeroInterne,
+            appareil: CIBLE_MISSION,
             projetId: projets.id,
             projetRef: projets.reference,
             projetTitre: projets.titre,
@@ -148,7 +149,7 @@ export default async function TechnicienDetailPage({
             refusMotif: interventions.refusMotif,
           })
           .from(interventions)
-          .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+          .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
           .leftJoin(projets, eq(interventions.projetId, projets.id))
           .where(eq(interventions.technicienId, id))
           .orderBy(desc(interventions.dateProgrammee))
@@ -227,9 +228,9 @@ export default async function TechnicienDetailPage({
     tab === "signalements" ? signalementsDe({ technicienId: id }, 200) : tab === "apercu" ? signalementsDe({ technicienId: id }, 20) : Promise.resolve([]),
     tab === "apercu"
       ? db
-          .select({ id: interventions.id, numero: appareils.numeroInterne, dateProgrammee: interventions.dateProgrammee, refuseeLe: interventions.refuseeLe, refusMotif: interventions.refusMotif, envoyeeLe: interventions.envoyeeLe, vueLe: interventions.vueLe, accepteeLe: interventions.accepteeLe })
+          .select({ id: interventions.id, numero: CIBLE_MISSION, dateProgrammee: interventions.dateProgrammee, refuseeLe: interventions.refuseeLe, refusMotif: interventions.refusMotif, envoyeeLe: interventions.envoyeeLe, vueLe: interventions.vueLe, accepteeLe: interventions.accepteeLe })
           .from(interventions)
-          .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+          .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
           .where(and(eq(interventions.technicienId, id), inArray(interventions.statut, ["creee", "planifiee", "affectee"]), isNotNull(interventions.envoyeeLe), isNull(interventions.accepteeLe)))
       : Promise.resolve([]),
     db

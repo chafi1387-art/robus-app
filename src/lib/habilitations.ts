@@ -10,6 +10,7 @@ import {
   users,
 } from "@/db/schema";
 import { and, asc, eq, inArray, notInArray } from "drizzle-orm";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // ==========================================================================
 // Phase 19 — Habilitations : statuts, exigences par mission, contrôle à
@@ -134,9 +135,9 @@ export type Manque = { mission: string; habilitation: string; raison: string };
 export async function controlerHabilitations(technicienId: string, interventionIds: string[]): Promise<Manque[]> {
   if (!interventionIds.length) return [];
   const missions = await db
-    .select({ type: interventions.type, numero: appareils.numeroInterne, marque: appareils.marque, typeProjet: projets.typeProjet })
+    .select({ type: interventions.type, numero: CIBLE_MISSION, marque: appareils.marque, typeProjet: projets.typeProjet })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .where(inArray(interventions.id, interventionIds));
   return controlerHabilitationsSpecs(technicienId, missions);

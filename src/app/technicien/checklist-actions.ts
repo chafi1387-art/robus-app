@@ -9,6 +9,7 @@ import { appareils, interventions, missionChecklistTaches, missionChecklists } f
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { notifierBureau } from "@/lib/push";
 import { evaluerMesure } from "@/lib/checklists-regles";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // Phase 23 : le technicien remplit une tâche de checklist — enregistrée tout
 // de suite (rien n'est perdu s'il quitte l'écran). ✓ = conforme ; ✗ = non
@@ -33,12 +34,12 @@ export async function repondreTache(entree: { tacheId: string; resultat?: "ok" |
       interventionId: missionChecklists.interventionId,
       technicienId: interventions.technicienId,
       statut: interventions.statut,
-      numero: appareils.numeroInterne,
+      numero: CIBLE_MISSION,
     })
     .from(missionChecklistTaches)
     .innerJoin(missionChecklists, eq(missionChecklistTaches.missionChecklistId, missionChecklists.id))
     .innerJoin(interventions, eq(missionChecklists.interventionId, interventions.id))
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .where(eq(missionChecklistTaches.id, p.data.tacheId))
     .limit(1);
   if (!t) return { ok: false, erreur: "Tâche introuvable." };

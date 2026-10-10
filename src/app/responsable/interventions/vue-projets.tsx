@@ -6,6 +6,7 @@ import { BadgeEnCours } from "@/components/kit-tableau";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
 import { db } from "@/db";
 import { appareils, clients, interventions, projets, users } from "@/db/schema";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 import { formatDateTime } from "@/lib/format";
 import { assignerIntervention } from "../actions";
 
@@ -28,7 +29,7 @@ export async function VueProjets({ technicienId, type, techniciens }: { technici
       priorite: interventions.priorite,
       dateProgrammee: interventions.dateProgrammee,
       appareilId: appareils.id,
-      numeroInterne: appareils.numeroInterne,
+      numeroInterne: CIBLE_MISSION,
       raisonSociale: clients.raisonSociale,
       technicien: users.nom,
       technicienId: interventions.technicienId,
@@ -45,7 +46,7 @@ export async function VueProjets({ technicienId, type, techniciens }: { technici
       projetCreatedAt: projets.createdAt,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id))
     .leftJoin(users, eq(interventions.technicienId, users.id))
@@ -125,9 +126,15 @@ export async function VueProjets({ technicienId, type, techniciens }: { technici
                         )}
                       </td>
                       <td className="py-2.5 pr-3">
-                        <Link href={`/responsable/appareils/${i.appareilId}`} className="font-semibold text-blue">
-                          {i.numeroInterne}
-                        </Link>
+                        {i.appareilId ? (
+                          <Link href={`/responsable/appareils/${i.appareilId}`} className="font-semibold text-blue">
+                            {i.numeroInterne}
+                          </Link>
+                        ) : (
+                          <Link href={`/responsable/missions/${i.id}`} className="font-semibold text-blue">
+                            {i.numeroInterne} <span className="text-[10.5px] font-extrabold uppercase text-ink-soft">· Prestation</span>
+                          </Link>
+                        )}
                       </td>
                       <td className="py-2.5 pr-3">
                         <TypeInterventionPill type={i.type} />

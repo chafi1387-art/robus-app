@@ -35,6 +35,7 @@ import { journaliser } from "@/lib/journal";
 import { BLOCS_ISO, calculerScoreGlobal } from "@/lib/score-iso";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 function periodeLabel(debut?: Date, fin?: Date) {
   if (!debut && !fin) return "Toute la période";
@@ -70,9 +71,9 @@ export async function GET(req: NextRequest) {
       // nécessairement rattaché à un Site) — LEFT JOIN pour ne jamais faire
       // disparaître une intervention sans Projet du rapport.
       const rows = await db
-        .select({ i: interventions, appareil: appareils, client: clients, technicien: users.nom })
+        .select({ i: interventions, appareil: appareils, client: clients, technicien: users.nom, cible: CIBLE_MISSION })
         .from(interventions)
-        .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+        .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
         .leftJoin(projets, eq(interventions.projetId, projets.id))
         .leftJoin(clients, eq(projets.clientId, clients.id))
         .leftJoin(users, eq(interventions.technicienId, users.id))
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
         ],
         rows.map((r) => [
           formatDate(r.i.dateProgrammee),
-          r.appareil.numeroInterne,
+          r.cible,
           r.client?.raisonSociale ?? "—",
           r.i.type,
           r.i.statut,
@@ -210,9 +211,9 @@ export async function GET(req: NextRequest) {
         ...bornesIntervention,
       ].filter(Boolean);
       const rows = await db
-        .select({ i: interventions, appareil: appareils, client: clients, rapport: rapports })
+        .select({ i: interventions, appareil: appareils, client: clients, rapport: rapports, cible: CIBLE_MISSION })
         .from(interventions)
-        .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+        .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
         .leftJoin(projets, eq(interventions.projetId, projets.id))
         .leftJoin(clients, eq(projets.clientId, clients.id))
         .leftJoin(rapports, eq(rapports.interventionId, interventions.id))
@@ -232,7 +233,7 @@ export async function GET(req: NextRequest) {
         ],
         rows.map((r) => [
           formatDate(r.i.dateProgrammee),
-          r.appareil.numeroInterne,
+          r.cible,
           r.client?.raisonSociale ?? "—",
           r.i.statut,
           r.rapport?.tempsPasseMinutes ? String(r.rapport.tempsPasseMinutes) : "—",

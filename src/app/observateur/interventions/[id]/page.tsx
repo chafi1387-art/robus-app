@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { PassagesPrecedents } from "@/components/carte-devis-mission";
 import { passagesDeMission } from "@/lib/devis";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { Star } from "lucide-react";
 import { db } from "@/db";
-import { appareils, enquetesSatisfaction, interventions, missionNotes, rapportPhotos, rapports, users } from "@/db/schema";
+import { appareils, enquetesSatisfaction, interventions, missionNotes, projets, rapportPhotos, rapports, users } from "@/db/schema";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 import { Card } from "@/components/ui";
 import { EtapesSuivi } from "@/components/etapes-suivi";
 import { GaleriePhotos } from "@/components/galerie-photos";
 import { formatDateTime } from "@/lib/format";
 import { DROIT_HISTO_12_MOIS, etapeObservateur, exigerAppareil, requireObservateur } from "@/lib/observateur";
-import { prenom } from "@/lib/observateur-donnees";
+import { observateurPeutVoirMission, prenom } from "@/lib/observateur-donnees";
 import { piecesNettes } from "@/lib/pieces-mission";
 import { noterIntervention } from "../../actions";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
@@ -40,14 +41,18 @@ export default async function InterventionObservateurPage({
   const sp = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const [row] = await db
-    .select({ m: interventions, numero: appareils.numeroInterne, technicien: users.nom })
+    .select({ m: interventions, numero: CIBLE_MISSION, projetRef: projets.reference, technicien: users.nom })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(users, eq(interventions.technicienId, users.id))
     .where(eq(interventions.id, id))
     .limit(1);
   if (!row) notFound();
-  exigerAppareil(ctx, row.m.appareilId);
+  // Phase 29 : mission à la carte (prestation) -> visible par les observateurs du client du projet.
+  if (row.m.appareilId) exigerAppareil(ctx, row.m.appareilId);
+  else if (!(await observateurPeutVoirMission(ctx, row.m))) redirect("/observateur?acces=refuse");
+  const surAppareil = !!row.m.appareilId;
   const d = ctx.droits;
   const m = row.m;
   const finie = ["terminee", "validee", "cloturee"].includes(m.statut);
@@ -83,11 +88,15 @@ export default async function InterventionObservateurPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <Link href={`/observateur/appareils/${m.appareilId}`} className="text-xs text-blue font-semibold">&larr; Ascenseur {row.numero}</Link>
+      {surAppareil ? (
+        <Link href={`/observateur/appareils/${m.appareilId}`} className="text-xs text-blue font-semibold">&larr; Ascenseur {row.numero}</Link>
+      ) : (
+        <Link href="/observateur" className="text-xs text-blue font-semibold">&larr; Accueil</Link>
+      )}
       <div>
-        <h1 className="font-display font-extrabold text-[21px] text-navy">{TYPE[m.type] ?? "Intervention"}</h1>
+        <h1 className="font-display font-extrabold text-[21px] text-navy">{surAppareil ? TYPE[m.type] ?? "Intervention" : row.numero}</h1>
         <p className="text-sm text-ink-soft">
-          Ascenseur {row.numero} · {formatDateTime(m.dateFin ?? m.dateProgrammee)}
+          {surAppareil ? `Ascenseur ${row.numero}` : `Travaux${row.projetRef ? ` · ${row.projetRef}` : ""}`} · {formatDateTime(m.dateFin ?? m.dateProgrammee)}
           {prenom(row.technicien) ? ` · ${prenom(row.technicien)}` : ""}
         </p>
       </div>

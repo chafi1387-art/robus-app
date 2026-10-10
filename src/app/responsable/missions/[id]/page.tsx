@@ -54,6 +54,7 @@ import {
   validerRapport,
 } from "../actions";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 const ACCEPT_FICHIERS = "application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -100,7 +101,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
   const [row] = await db
     .select({
       m: interventions,
-      numero: appareils.numeroInterne,
+      numero: CIBLE_MISSION,
       appareilId: appareils.id,
       projetRef: projets.reference,
       projetTitre: projets.titre,
@@ -109,7 +110,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
       technicien: users.nom,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id))
     .leftJoin(users, eq(interventions.technicienId, users.id))
@@ -226,7 +227,12 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display font-extrabold text-2xl text-navy">{row.numero}</h1>
+              <h1 className="font-display font-extrabold text-2xl text-navy">
+                {row.appareilId ? <Link href={`/responsable/appareils/${row.appareilId}`} className="hover:underline">{row.numero}</Link> : row.numero}
+              </h1>
+              {!row.appareilId && (
+                <span className="text-[11px] font-extrabold uppercase tracking-wide text-navy bg-blue-pale rounded-full px-2.5 py-1">Prestation</span>
+              )}
               {enDirect && (
                 <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-white bg-red-ink rounded-full px-2.5 py-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> En direct
@@ -538,7 +544,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                 )}
                 <div className="flex justify-between"><dt className="text-ink-soft">Temps passé</dt><dd>{rapport.tempsPasseMinutes != null ? `${rapport.tempsPasseMinutes} min` : "—"}</dd></div>
                 <div className="flex justify-between"><dt className="text-ink-soft">Heure réelle</dt><dd>{formatDateTime(rapport.heureReelle)}</dd></div>
-                <div className="flex justify-between"><dt className="text-ink-soft">État de l&apos;appareil</dt><dd>{STATUT_APPAREIL[rapport.statutFinalAppareil ?? ""] ?? "—"}</dd></div>
+                {row.appareilId && <div className="flex justify-between"><dt className="text-ink-soft">État de l&apos;appareil</dt><dd>{STATUT_APPAREIL[rapport.statutFinalAppareil ?? ""] ?? "—"}</dd></div>}
                 <div className="flex justify-between"><dt className="text-ink-soft">Envoyé le</dt><dd>{formatDateTime(rapport.dateEnvoi)}</dd></div>
                 {rapport.modifieLe && (
                   <div className="flex justify-between"><dt className="text-ink-soft">Corrigé par le technicien</dt><dd>{formatDateTime(rapport.modifieLe)}</dd></div>
@@ -567,6 +573,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                       <input name="heureReelle" type="datetime-local" defaultValue={toDatetimeLocalValue(rapport.heureReelle ?? m.dateProgrammee)} className={inputClass} />
                     </Field>
                   </div>
+                  {row.appareilId && (
                   <Field label="État de l'appareil après l'intervention">
                     <select name="statutFinalAppareil" defaultValue={rapport.statutFinalAppareil ?? "en_service"} className={inputClass}>
                       {Object.entries(STATUT_APPAREIL).map(([k, v]) => (
@@ -574,6 +581,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
                       ))}
                     </select>
                   </Field>
+                  )}
                   <Field label={valide ? "Motif de la modification (obligatoire : rapport validé)" : "Motif (facultatif)"}>
                     <input name="motif" required={valide} className={inputClass} />
                   </Field>

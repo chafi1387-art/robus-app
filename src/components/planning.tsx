@@ -146,6 +146,10 @@ function BadgeEtat({ m }: { m: MissionPlanning }) {
 }
 
 function BadgeArret({ m, maintenant }: { m: MissionPlanning; maintenant: number }) {
+  // Phase 29 : mission « à la carte » liée à une prestation (pas d'appareil).
+  if (!m.appareilId) {
+    return <span className="inline-flex text-[10.5px] font-extrabold uppercase rounded-md px-1.5 py-0.5 bg-blue-pale text-navy whitespace-nowrap">Prestation</span>;
+  }
   if (m.appareilStatut !== "en_panne" && m.appareilStatut !== "hors_service") return null;
   return (
     <span className={`inline-flex text-[10.5px] font-extrabold uppercase rounded-md px-1.5 py-0.5 text-white whitespace-nowrap ${m.appareilStatut === "hors_service" ? "bg-[#7B1F17]" : "bg-red"}`}>

@@ -26,6 +26,7 @@ import { destinatairesAlertes } from "@/lib/demandes";
 import { REINIT_ENVOI } from "@/lib/missions";
 import { envoyerMissionsAuTechnicien } from "@/lib/envoi-mission";
 import { controlerHabilitations, messageManques, nomUtilisateur } from "@/lib/habilitations";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // ==========================================================================
 // Phase 25b — Devis dans la mission (5 étapes, la mission continue).
@@ -120,9 +121,9 @@ async function insererAvecNumero(valeurs: Omit<typeof devis.$inferInsert, "numer
 
 async function contexteMission(interventionId: string) {
   const [m] = await db
-    .select({ id: interventions.id, appareilId: interventions.appareilId, projetId: interventions.projetId, clientId: projets.clientId, numero: appareils.numeroInterne, siteId: appareils.siteId })
+    .select({ id: interventions.id, appareilId: interventions.appareilId, projetId: interventions.projetId, clientId: projets.clientId, numero: CIBLE_MISSION, siteId: appareils.siteId })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .where(eq(interventions.id, interventionId))
     .limit(1);

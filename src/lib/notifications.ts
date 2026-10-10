@@ -22,6 +22,7 @@ import { TYPES_SIGNALEMENT } from "@/lib/signalements-types";
 import { libelleRefus } from "@/lib/missions";
 import { and, eq, gt, inArray, isNotNull, isNull, lt, ne, notExists, sql } from "drizzle-orm";
 import { habilitationsCourantes } from "@/lib/habilitations";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 export type Notification = {
   id: string;
@@ -96,10 +97,10 @@ export async function getNotifications(): Promise<Notification[]> {
     habilitationsCourantes(),
     // Phase 17 : mission envoyée depuis plus de 30 min et pas encore ouverte.
     db
-      .select({ id: interventions.id, projetId: interventions.projetId, technicien: users.nom, numero: appareils.numeroInterne })
+      .select({ id: interventions.id, projetId: interventions.projetId, technicien: users.nom, numero: CIBLE_MISSION })
       .from(interventions)
       .innerJoin(users, eq(interventions.technicienId, users.id))
-      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
       .where(
         and(
           inArray(interventions.statut, [...NON_COMMENCES]),
@@ -147,10 +148,10 @@ export async function getNotifications(): Promise<Notification[]> {
       .where(eq(signalements.statut, "nouveau")),
     // Phase 21 : missions refusées par le technicien — décision du bureau attendue.
     db
-      .select({ id: interventions.id, technicien: users.nom, numero: appareils.numeroInterne, motif: interventions.refusMotif })
+      .select({ id: interventions.id, technicien: users.nom, numero: CIBLE_MISSION, motif: interventions.refusMotif })
       .from(interventions)
       .innerJoin(users, eq(interventions.technicienId, users.id))
-      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
       .where(and(isNotNull(interventions.refuseeLe), inArray(interventions.statut, [...NON_COMMENCES]))),
     // Phase 21 : formations à venir — technicien indisponible, ou sans réponse à 3 jours.
     db
@@ -175,11 +176,11 @@ export async function getNotifications(): Promise<Notification[]> {
     db.select({ id: users.id, nom: users.nom }).from(users).where(eq(users.role, "technicien")),
     // Phase 23 : points de checklist non conformes pas encore traités par le bureau.
     db
-      .select({ id: missionChecklistTaches.id, libelle: missionChecklistTaches.libelle, interventionId: missionChecklists.interventionId, numero: appareils.numeroInterne })
+      .select({ id: missionChecklistTaches.id, libelle: missionChecklistTaches.libelle, interventionId: missionChecklists.interventionId, numero: CIBLE_MISSION })
       .from(missionChecklistTaches)
       .innerJoin(missionChecklists, eq(missionChecklistTaches.missionChecklistId, missionChecklists.id))
       .innerJoin(interventions, eq(missionChecklists.interventionId, interventions.id))
-      .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+      .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
       .where(and(eq(missionChecklistTaches.resultat, "nok"), isNull(missionChecklistTaches.traiteLe)))
       .limit(50),
     db

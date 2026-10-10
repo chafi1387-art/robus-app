@@ -54,6 +54,7 @@ import {
   terminerIntervention,
 } from "../../actions";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 const CATEGORIE_DOC_LABEL: Record<string, string> = {
   securite: "Sécurité",
@@ -83,15 +84,16 @@ export default async function InterventionDetailPage({
   // Projet (LEFT JOIN : une intervention sans Projet reste affichée, avec un
   // message "Projet non renseigné" plutôt qu'un plantage).
   const [row] = await db
-    .select({ intervention: interventions, appareil: appareils, projet: projets, client: clients })
+    .select({ intervention: interventions, appareil: appareils, projet: projets, client: clients, cible: CIBLE_MISSION })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    // Phase 29 : mission « à la carte » liée à une prestation -> pas d'appareil.
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id))
     .where(eq(interventions.id, id))
     .limit(1);
   if (!row) notFound();
-  const { intervention, appareil, projet, client } = row;
+  const { intervention, appareil, projet, client, cible } = row;
 
   if (user.role !== "administrateur" && intervention.technicienId !== user.id) {
     notFound();
@@ -140,7 +142,9 @@ export default async function InterventionDetailPage({
     checklistsMission(id),
     // Documentation (Phase 6) : union dédupliquée des documents rattachés à
     // l'Appareil OU au Projet de cette intervention.
-    db.select().from(documentsFormations).where(eq(documentsFormations.appareilId, appareil.id)),
+    appareil
+      ? db.select().from(documentsFormations).where(eq(documentsFormations.appareilId, appareil.id))
+      : Promise.resolve([] as (typeof documentsFormations.$inferSelect)[]),
     projet
       ? db.select().from(documentsFormations).where(eq(documentsFormations.projetId, projet.id))
       : Promise.resolve([]),
@@ -178,7 +182,8 @@ export default async function InterventionDetailPage({
           <PrioritePill priorite={intervention.priorite} />
           <StatutInterventionPill statut={intervention.statut} />
         </div>
-        <h1 className="text-xl font-extrabold font-display mt-2">{appareil.numeroInterne}</h1>
+        <h1 className="text-xl font-extrabold font-display mt-2">{appareil ? appareil.numeroInterne : cible}</h1>
+        {!appareil && <p className="text-xs font-bold uppercase text-blue tracking-wide">Prestation{projet ? ` · ${projet.reference}` : ""}</p>}
         {client && projet ? (
           <p className="text-sm text-ink-soft">
             {client.raisonSociale}
@@ -293,7 +298,8 @@ export default async function InterventionDetailPage({
         </dl>
       </Card>
 
-      {/* Fiche technique complète de l'appareil (Phase 6) */}
+      {/* Fiche technique complète de l'appareil (Phase 6) — absente pour une mission à la carte */}
+      {appareil && (
       <Card className="p-4">
         <h2 className="font-display font-bold text-sm mb-2">Appareil</h2>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
@@ -312,6 +318,7 @@ export default async function InterventionDetailPage({
           <DetailRow label="Type de portes" value={appareil.typePortes} />
         </dl>
       </Card>
+      )}
 
       {/* Détails Projet (Phase 6) */}
       {projet && (
@@ -502,6 +509,7 @@ export default async function InterventionDetailPage({
             <p className="text-xs text-ink-soft -mt-2">
               Vous pourrez corriger le rapport pendant 24 h après l&apos;avoir envoyé.
             </p>
+            {appareil && (
             <Field label="Statut final de l'appareil">
               <select name="statutFinalAppareil" className={inputClass} defaultValue="en_service">
                 <option value="en_service">En service</option>
@@ -511,6 +519,7 @@ export default async function InterventionDetailPage({
                 <option value="en_travaux">En travaux</option>
               </select>
             </Field>
+            )}
             <div className="group rounded-xl border border-line px-3 py-2.5 has-[input[name=devisNecessaire]:checked]:border-orange has-[input[name=devisNecessaire]:checked]:bg-orange-fill/40">
               <label className="flex items-center gap-2 text-sm font-bold text-navy cursor-pointer select-none">
                 <input type="checkbox" name="devisNecessaire" className="w-5 h-5" />
@@ -584,7 +593,7 @@ export default async function InterventionDetailPage({
           </details>
           <details className="border-t border-line pt-2 mt-2">
             <summary className="font-semibold text-sm cursor-pointer select-none py-1.5">
-              🚫 Non-conformité sur l&apos;appareil
+              🚫 Non-conformité{appareil ? " sur l'appareil" : ""}
             </summary>
             <form action={declarerNonConformite} className="flex flex-col gap-3 mt-2">
               <input type="hidden" name="interventionId" value={intervention.id} />

@@ -24,6 +24,7 @@ import {
 } from "@/lib/pdf";
 import { journaliser } from "@/lib/journal";
 import { eq } from "drizzle-orm";
+import { CIBLE_MISSION } from "@/lib/cible-mission";
 
 // Phase 7 : PDF illustré d'une intervention (fiche appareil + projet +
 // compte-rendu + checklist + photos) — utilisé depuis le bloc "Interventions
@@ -39,13 +40,14 @@ export async function GET(
     .select({
       intervention: interventions,
       appareil: appareils,
+      cible: CIBLE_MISSION,
       projet: projets,
       client: clients,
       technicien: users,
       rapport: rapports,
     })
     .from(interventions)
-    .innerJoin(appareils, eq(interventions.appareilId, appareils.id))
+    .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
     .leftJoin(projets, eq(interventions.projetId, projets.id))
     .leftJoin(clients, eq(projets.clientId, clients.id))
     .leftJoin(users, eq(interventions.technicienId, users.id))
@@ -57,13 +59,18 @@ export async function GET(
     return new Response("Intervention introuvable", { status: 404 });
   }
 
-  const { intervention, appareil, projet, client, technicien, rapport } = row;
+  const { intervention, appareil, cible, projet, client, technicien, rapport } = row;
 
   const doc = creerDocumentRapport(
     "Rapport d'intervention",
-    `${appareil.numeroInterne} — ${formatDateTime(intervention.dateProgrammee)}`
+    `${cible} — ${formatDateTime(intervention.dateProgrammee)}`
   );
 
+  // Phase 29 : mission « à la carte » -> prestation à la place de la fiche appareil.
+  if (!appareil) {
+    sectionTitre(doc, "Prestation");
+    ligneCle(doc, "Prestation", cible);
+  } else {
   sectionTitre(doc, "Appareil");
   ligneCle(doc, "N° interne", appareil.numeroInterne);
   ligneCle(doc, "N° de série", appareil.numeroSerie ?? "");
@@ -75,6 +82,7 @@ export async function GET(
   ligneCle(doc, "Vitesse", appareil.vitesse ? `${appareil.vitesse} m/s` : "");
   ligneCle(doc, "Niveaux", appareil.niveaux?.toString() ?? "");
   ligneCle(doc, "Type de portes", appareil.typePortes ?? "");
+  }
 
   if (projet) {
     sectionTitre(doc, "Projet");
@@ -86,7 +94,7 @@ export async function GET(
 
   sectionTitre(doc, "Intervention");
   ligneCle(doc, "Technicien", technicien?.nom ?? "Non affecté");
-  ligneCle(doc, "Type", intervention.type);
+  ligneCle(doc, "Type", appareil ? intervention.type : "Prestation");
   ligneCle(doc, "Date programmée", formatDateTime(intervention.dateProgrammee));
   ligneCle(doc, "Statut", intervention.statut);
 
@@ -99,7 +107,7 @@ export async function GET(
       "Temps passé",
       rapport.tempsPasseMinutes != null ? `${rapport.tempsPasseMinutes} min` : ""
     );
-    ligneCle(doc, "Statut final de l'appareil", rapport.statutFinalAppareil ?? "");
+    if (appareil) ligneCle(doc, "Statut final de l'appareil", rapport.statutFinalAppareil ?? "");
     if (rapport.modifieLe) ligneCle(doc, "Corrigé par le technicien", formatDateTime(rapport.modifieLe));
     // Phase 19 : mention de la correction par le bureau (versions dans l'application).
     if (rapport.corrigeBureauLe) ligneCle(doc, "Corrigé par le bureau", formatDateTime(rapport.corrigeBureauLe));
