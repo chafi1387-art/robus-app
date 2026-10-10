@@ -1,0 +1,44 @@
+== occurrences
+3
+== contexte (cause PostgreSQL)
+2511:⨯ Error: Failed query: update "appareils" set "numero_interne" = $1, "numero_serie" = $2, "marque" = $3, "modele" = $4, "type_appareil" = $5, "annee_installation" = $6, "charge_kg" = $7, "vitesse_ms" = $8, "niveaux" = $9, "type_portes" = $10, "statut" = $11 where "appareils"."id" = $12
+2512-params: [n°],,Armoire BR100,,MR sans porte cabine,,,0.63,,manuel,en_service,a15e921d-ed85-4318-b41f-ed9cc3591bbf
+2516-  params: [
+2531-  [cause]: i: value too long for type character varying(40)
+2535-    severity_local: 'ERROR',
+2536-    severity: 'ERROR',
+2543:⨯ Error: Failed query: update "appareils" set "numero_interne" = $1, "numero_serie" = $2, "marque" = $3, "modele" = $4, "type_appareil" = $5, "annee_installation" = $6, "charge_kg" = $7, "vitesse_ms" = $8, "niveaux" = $9, "type_portes" = $10, "statut" = $11 where "appareils"."id" = $12
+2544-params: [n°],,Armoire BR100,,MR sans porte cabine,,,0.63,,manuel,en_service,a15e921d-ed85-4318-b41f-ed9cc3591bbf
+2548-  params: [
+2563-  [cause]: i: value too long for type character varying(40)
+2567-    severity_local: 'ERROR',
+2568-    severity: 'ERROR',
+2575:⨯ Error: Failed query: update "appareils" set "numero_interne" = $1, "numero_serie" = $2, "marque" = $3, "modele" = $4, "type_appareil" = $5, "annee_installation" = $6, "charge_kg" = $7, "vitesse_ms" = $8, "niveaux" = $9, "type_portes" = $10, "statut" = $11 where "appareils"."id" = $12
+2576-params: [n°],,Armoire BR100,,MR sans porte cabine,,,0.63,,manuel,en_service,a15e921d-ed85-4318-b41f-ed9cc3591bbf
+2580-  params: [
+2595-  [cause]: i: value too long for type character varying(40)
+2599-    severity_local: 'ERROR',
+2600-    severity: 'ERROR',
+== horodatage approximatif (journal pm2 avec dates ?)
+-rw-r--r-- 1 root root 224443 2026-10-10 20:17:31.364152506 +0000 /root/.pm2/logs/robus-dashboard-error.log
+== modifications de fiche réussies récentes
+         created_at         |              entite_id               
+----------------------------+--------------------------------------
+ 2026-10-10 19:52:15.994844 | a15e921d-ed85-4318-b41f-ed9cc3591bbf
+ 2026-10-10 19:50:48.8364   | a15e921d-ed85-4318-b41f-ed9cc3591bbf
+ 2026-10-10 19:49:57.660431 | a15e921d-ed85-4318-b41f-ed9cc3591bbf
+ 2026-10-07 19:15:47.668484 | d8420af4-69b8-4f08-9c60-d29fe02c0bea
+ 2026-10-07 19:08:20.227961 | d8420af4-69b8-4f08-9c60-d29fe02c0bea
+(5 rows)
+
+== types numériques
+    column_name     | data_type | numeric_precision | numeric_scale 
+--------------------+-----------+-------------------+---------------
+ annee_installation | integer   |                32 |             0
+ charge_kg          | numeric   |                   |              
+ vitesse_ms         | numeric   |                   |              
+ niveaux            | integer   |                32 |             0
+(4 rows)
+
+Sat Oct 10 20:19:02 UTC 2026
+(code retour 0, 2026-10-10 20:19:02)
