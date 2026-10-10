@@ -730,7 +730,7 @@ export default async function AppareilDetailPage({ params, searchParams }: { par
               <input type="hidden" name="appareilId" value={appareil.id} />
               <div className="grid grid-cols-2 gap-2">
                 <Field label="N° unique interne Robus">
-                  <input
+                  <input maxLength={80}
                     name="numeroInterne"
                     required
                     defaultValue={appareil.numeroInterne}
@@ -747,20 +747,20 @@ export default async function AppareilDetailPage({ params, searchParams }: { par
                   </select>
                 </Field>
                 <Field label="Marque">
-                  <input name="marque" defaultValue={appareil.marque ?? ""} className={inputClass} />
+                  <input maxLength={80} name="marque" defaultValue={appareil.marque ?? ""} className={inputClass} />
                 </Field>
                 <Field label="Modèle">
-                  <input name="modele" defaultValue={appareil.modele ?? ""} className={inputClass} />
+                  <input maxLength={80} name="modele" defaultValue={appareil.modele ?? ""} className={inputClass} />
                 </Field>
                 <Field label="N° de série constructeur">
-                  <input
+                  <input maxLength={80}
                     name="numeroSerie"
                     defaultValue={appareil.numeroSerie ?? ""}
                     className={inputClass}
                   />
                 </Field>
                 <Field label="Type d'appareil">
-                  <input
+                  <input maxLength={80}
                     name="typeAppareil"
                     defaultValue={appareil.typeAppareil ?? ""}
                     className={inputClass}
@@ -801,7 +801,7 @@ export default async function AppareilDetailPage({ params, searchParams }: { par
                   />
                 </Field>
                 <Field label="Type de portes">
-                  <input
+                  <input maxLength={80}
                     name="typePortes"
                     defaultValue={appareil.typePortes ?? ""}
                     className={inputClass}

@@ -61,20 +61,21 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           <h2 className="font-display font-bold text-sm mb-3">Nouvel appareil</h2>
           <form action={createAppareil} className="flex flex-col gap-3">
             <input type="hidden" name="siteId" value={site.id} />
+            <input type="hidden" name="retour" value={`/responsable/sites/${site.id}`} />
             <Field label="N° unique interne Robus">
-              <input name="numeroInterne" required className={inputClass} placeholder="A-1042" />
+              <input maxLength={80} name="numeroInterne" required className={inputClass} placeholder="A-1042" />
             </Field>
             <Field label="Marque">
-              <input name="marque" className={inputClass} placeholder="OTIS, Schindler, Kone..." />
+              <input maxLength={80} name="marque" className={inputClass} placeholder="OTIS, Schindler, Kone..." />
             </Field>
             <Field label="Modèle">
-              <input name="modele" className={inputClass} />
+              <input maxLength={80} name="modele" className={inputClass} />
             </Field>
             <Field label="N° de série constructeur">
-              <input name="numeroSerie" className={inputClass} />
+              <input maxLength={80} name="numeroSerie" className={inputClass} />
             </Field>
             <Field label="Type d'appareil">
-              <input name="typeAppareil" className={inputClass} placeholder="Traction, hydraulique..." />
+              <input maxLength={80} name="typeAppareil" className={inputClass} placeholder="Traction, hydraulique..." />
             </Field>
             <div className="grid grid-cols-2 gap-2">
               <Field label="Charge (kg)">
@@ -91,7 +92,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
               </Field>
             </div>
             <Field label="Type de portes">
-              <input name="typePortes" className={inputClass} placeholder="Automatiques, manuelles..." />
+              <input maxLength={80} name="typePortes" className={inputClass} placeholder="Automatiques, manuelles..." />
             </Field>
             <Field label="Statut">
               <select name="statut" className={inputClass} defaultValue="en_service">

@@ -490,16 +490,16 @@ export function AssistantProjet({ donnees }: { donnees: DonneesAssistant }) {
                   <div className="rounded-xl border border-blue/40 bg-[#f7fbfe] p-4 flex flex-col gap-3">
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                       <Champ label="N° interne *">
-                        <input className={input} value={nouvelApp.numero} onChange={(e) => setNouvelApp({ ...nouvelApp, numero: e.target.value })} placeholder="ASC-012" autoFocus />
+                        <input maxLength={80} className={input} value={nouvelApp.numero} onChange={(e) => setNouvelApp({ ...nouvelApp, numero: e.target.value })} placeholder="ASC-012" autoFocus />
                       </Champ>
                       <Champ label="Marque">
-                        <input className={input} value={nouvelApp.marque} onChange={(e) => setNouvelApp({ ...nouvelApp, marque: e.target.value })} />
+                        <input maxLength={80} className={input} value={nouvelApp.marque} onChange={(e) => setNouvelApp({ ...nouvelApp, marque: e.target.value })} />
                       </Champ>
                       <Champ label="Modèle">
-                        <input className={input} value={nouvelApp.modele} onChange={(e) => setNouvelApp({ ...nouvelApp, modele: e.target.value })} />
+                        <input maxLength={80} className={input} value={nouvelApp.modele} onChange={(e) => setNouvelApp({ ...nouvelApp, modele: e.target.value })} />
                       </Champ>
                       <Champ label="Type">
-                        <input className={input} value={nouvelApp.type} onChange={(e) => setNouvelApp({ ...nouvelApp, type: e.target.value })} placeholder="Électrique, hydraulique…" />
+                        <input maxLength={80} className={input} value={nouvelApp.type} onChange={(e) => setNouvelApp({ ...nouvelApp, type: e.target.value })} placeholder="Électrique, hydraulique…" />
                       </Champ>
                     </div>
                     <div className="flex gap-2">

@@ -213,7 +213,7 @@ export const appareils = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     siteId: uuid("site_id").references(() => sites.id, { onDelete: "set null" }),
-    numeroInterne: varchar("numero_interne", { length: 40 }).notNull(),
+    numeroInterne: varchar("numero_interne", { length: 80 }).notNull(), // Phase 30 : 40 -> 80
     numeroSerie: varchar("numero_serie", { length: 80 }),
     marque: varchar("marque", { length: 80 }),
     modele: varchar("modele", { length: 80 }),

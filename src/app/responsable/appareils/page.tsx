@@ -254,19 +254,19 @@ export default async function AppareilsPage({ searchParams }: { searchParams: Pr
           <p className="text-xs text-ink-soft mb-3">L&apos;appareil se crée avec ses caractéristiques techniques, puis se rattache à un client via un projet.</p>
           <form action={createAppareil} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Field label="N° unique interne Robus">
-              <input name="numeroInterne" required className={inputClass} placeholder="A-1042" />
+              <input maxLength={80} name="numeroInterne" required className={inputClass} placeholder="A-1042" />
             </Field>
             <Field label="Marque">
-              <input name="marque" className={inputClass} placeholder="OTIS, Schindler, Kone..." />
+              <input maxLength={80} name="marque" className={inputClass} placeholder="OTIS, Schindler, Kone..." />
             </Field>
             <Field label="Modèle">
-              <input name="modele" className={inputClass} />
+              <input maxLength={80} name="modele" className={inputClass} />
             </Field>
             <Field label="N° de série constructeur">
-              <input name="numeroSerie" className={inputClass} />
+              <input maxLength={80} name="numeroSerie" className={inputClass} />
             </Field>
             <Field label="Type d'appareil">
-              <input name="typeAppareil" className={inputClass} placeholder="Traction, hydraulique..." />
+              <input maxLength={80} name="typeAppareil" className={inputClass} placeholder="Traction, hydraulique..." />
             </Field>
             <Field label="Charge (kg)">
               <input name="charge" type="number" step="0.01" className={inputClass} />
@@ -281,7 +281,7 @@ export default async function AppareilsPage({ searchParams }: { searchParams: Pr
               <input name="anneeInstallation" type="number" className={inputClass} />
             </Field>
             <Field label="Type de portes">
-              <input name="typePortes" className={inputClass} placeholder="Automatiques, manuelles..." />
+              <input maxLength={80} name="typePortes" className={inputClass} placeholder="Automatiques, manuelles..." />
             </Field>
             <Field label="État">
               <select name="statut" className={inputClass} defaultValue="en_service">

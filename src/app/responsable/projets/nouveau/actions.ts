@@ -185,10 +185,10 @@ export async function creerClientRapide(input: unknown) {
 }
 
 const appareilRapideSchema = z.object({
-  numeroInterne: z.string().trim().min(1, "Numéro interne requis.").max(40),
-  marque: z.string().trim().max(80).optional(),
-  modele: z.string().trim().max(80).optional(),
-  typeAppareil: z.string().trim().max(80).optional(),
+  numeroInterne: z.string().trim().min(1, "Numéro interne requis.").max(80, "Le n° interne ne doit pas dépasser 80 caractères."),
+  marque: z.string().trim().max(80, "Marque : 80 caractères maximum.").optional(),
+  modele: z.string().trim().max(80, "Modèle : 80 caractères maximum.").optional(),
+  typeAppareil: z.string().trim().max(80, "Type d'appareil : 80 caractères maximum.").optional(),
 });
 
 export async function creerAppareilRapide(input: unknown) {

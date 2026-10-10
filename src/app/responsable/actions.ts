@@ -20,7 +20,7 @@ import { requireUser, ROLES_BUREAU } from "@/lib/auth-helpers";
 import { journaliser } from "@/lib/journal";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { envoyerEtJournaliserOrdreMission } from "./projets/actions";
@@ -103,19 +103,32 @@ const STATUTS_APPAREIL = [
   "installation",
 ] as const;
 
+// Phase 30 : longueurs alignées sur la base (80 caractères) + messages clairs
+// (avant : un n° interne trop long faisait planter l'enregistrement).
+const texteCourt = (champ: string) => z.string().trim().max(80, `${champ} : 80 caractères maximum.`).optional();
 const appareilSchema = z.object({
-  numeroInterne: z.string().min(1, "Numéro interne requis"),
-  numeroSerie: z.string().optional(),
-  marque: z.string().optional(),
-  modele: z.string().optional(),
-  typeAppareil: z.string().optional(),
-  anneeInstallation: z.coerce.number().int().optional(),
-  charge: z.coerce.number().optional(),
-  vitesse: z.coerce.number().optional(),
-  niveaux: z.coerce.number().int().optional(),
-  typePortes: z.string().optional(),
+  numeroInterne: z.string().trim().min(1, "Numéro interne requis.").max(80, "Le n° interne ne doit pas dépasser 80 caractères."),
+  numeroSerie: texteCourt("N° de série"),
+  marque: texteCourt("Marque"),
+  modele: texteCourt("Modèle"),
+  typeAppareil: texteCourt("Type d'appareil"),
+  anneeInstallation: z.coerce.number({ message: "Année d'installation invalide." }).int("Année d'installation invalide.").min(1900, "Année d'installation invalide.").max(2100, "Année d'installation invalide.").optional(),
+  charge: z.coerce.number({ message: "Charge invalide (nombre en kg)." }).min(0, "Charge invalide.").max(100000, "Charge invalide.").optional(),
+  vitesse: z.coerce.number({ message: "Vitesse invalide (nombre en m/s)." }).min(0, "Vitesse invalide.").max(100, "Vitesse invalide.").optional(),
+  niveaux: z.coerce.number({ message: "Nombre de niveaux invalide." }).int("Nombre de niveaux invalide.").min(0, "Nombre de niveaux invalide.").max(500, "Nombre de niveaux invalide.").optional(),
+  typePortes: texteCourt("Type de portes"),
   statut: z.enum(STATUTS_APPAREIL),
 });
+
+/** Phase 30 : un n° interne déjà pris par un autre appareil ? */
+async function numeroDejaPris(numero: string, saufId?: string) {
+  const [a] = await db
+    .select({ id: appareils.id })
+    .from(appareils)
+    .where(saufId ? and(eq(appareils.numeroInterne, numero), ne(appareils.id, saufId)) : eq(appareils.numeroInterne, numero))
+    .limit(1);
+  return !!a;
+}
 
 function readAppareilForm(formData: FormData) {
   return {
@@ -137,17 +150,22 @@ function readAppareilForm(formData: FormData) {
 // à un Client se fait ensuite via un Projet (voir projet_appareils).
 export async function createAppareil(formData: FormData) {
   await requireUser(ROLES_BUREAU);
+  const retourForm = String(formData.get("retour") ?? "");
+  const retour = retourForm.startsWith("/responsable/") ? retourForm : "/responsable/appareils";
   const parsed = appareilSchema.safeParse(readAppareilForm(formData));
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
+  if (!parsed.success) redirect(avecMessage(retour, "erreur", parsed.error.issues[0]?.message ?? "Données invalides."));
+  if (await numeroDejaPris(parsed.data!.numeroInterne)) {
+    redirect(avecMessage(retour, "erreur", `Le n° interne « ${parsed.data!.numeroInterne} » est déjà utilisé par un autre appareil.`));
+  }
 
   const [created] = await db
     .insert(appareils)
     .values({
-      ...parsed.data,
-      anneeInstallation: parsed.data.anneeInstallation ?? null,
-      charge: parsed.data.charge != null ? String(parsed.data.charge) : null,
-      vitesse: parsed.data.vitesse != null ? String(parsed.data.vitesse) : null,
-      niveaux: parsed.data.niveaux ?? null,
+      ...parsed.data!,
+      anneeInstallation: parsed.data!.anneeInstallation ?? null,
+      charge: parsed.data!.charge != null ? String(parsed.data!.charge) : null,
+      vitesse: parsed.data!.vitesse != null ? String(parsed.data!.vitesse) : null,
+      niveaux: parsed.data!.niveaux ?? null,
     })
     .returning();
   revalidatePath("/responsable/appareils");
@@ -165,7 +183,12 @@ export async function updateAppareil(formData: FormData) {
     ...raw,
     appareilId: formData.get("appareilId"),
   });
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
+  const idForm = String(formData.get("appareilId") ?? "");
+  const retourModif = `/responsable/appareils/${idForm}?tab=modifier`;
+  if (!parsed.success) {
+    if (!z.string().uuid().safeParse(idForm).success) redirect("/responsable/appareils");
+    redirect(avecMessage(retourModif, "erreur", parsed.error.issues[0]?.message ?? "Données invalides."));
+  }
 
   const [existing] = await db
     .select({ siteId: appareils.siteId })
@@ -173,6 +196,9 @@ export async function updateAppareil(formData: FormData) {
     .where(eq(appareils.id, parsed.data.appareilId))
     .limit(1);
   if (!existing) throw new Error("Appareil introuvable.");
+  if (await numeroDejaPris(parsed.data.numeroInterne, parsed.data.appareilId)) {
+    redirect(avecMessage(retourModif, "erreur", `Le n° interne « ${parsed.data.numeroInterne} » est déjà utilisé par un autre appareil.`));
+  }
 
   await db
     .update(appareils)
