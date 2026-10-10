@@ -1,2 +1,34 @@
-=== 2026-10-08 20:25:02 : a696e0b (ops seulement, pas de build)
-STATUT: OK a696e0b
+=== Deploiement 2026-10-10 20:15:02 : a696e0b -> e1d8a3d
+--- migration 0025_mission_prestation.sql
+ALTER TABLE
+ALTER TABLE
+DO
+CREATE INDEX
+--- build
+├ ƒ /responsable/sous-traitance
+├ ƒ /responsable/stock
+├ ƒ /responsable/stock/pieces/[id]
+├ ƒ /responsable/techniciens
+├ ƒ /responsable/techniciens/[id]
+├ ƒ /responsable/techniciens/acces-appareils
+├ ƒ /responsable/utilisateurs
+├ ƒ /technicien
+├ ƒ /technicien/appareils
+├ ƒ /technicien/appareils/[id]
+├ ƒ /technicien/formations
+├ ƒ /technicien/formations/[id]
+├ ƒ /technicien/heures
+├ ƒ /technicien/interventions/[id]
+├ ƒ /technicien/profil
+├ ƒ /technicien/signalements
+├ ƒ /technicien/signalements/[id]
+└ ƒ /technicien/signaler
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+--- curl /responsable/projets : 307
+STATUT: OK e1d8a3d

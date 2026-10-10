@@ -1,0 +1,38 @@
+== commit
+e1d8a3d Phase 29 : mission « à la carte » liée à une prestation (sans appareil)
+== migration
+0025_mission_prestation.sql
+== structure (rôle robus)
+  column_name  | is_nullable 
+---------------+-------------
+ appareil_id   | YES
+ prestation_id | YES
+(2 rows)
+
+interventions_cible_chk
+interventions_prestation_id_fk
+== missions existantes
+ sur_appareil | sur_prestation | total 
+--------------+----------------+-------
+           19 |              0 |    19
+(1 row)
+
+== pages
+/connexion 200
+/responsable/projets 307
+/responsable/interventions 307
+/technicien 307
+/observateur 307
+== vitesse (avec session)
+  416 ms  200  /responsable
+  430 ms  200  /responsable/interventions
+  305 ms  200  /responsable/interventions?vue=projet
+  130 ms  200  /responsable/projets/2379e8c7-7b4f-4188-a9ce-96ae41c34393?tab=missions  [choix Appareil | Prestation présent]
+== pm2
+robus-dashboard online restarts 59
+== erreurs récentes
+⨯ Error: Failed query: update "appareils" set "numero_interne" = $1, "numero_serie" = $2, "marque" = $3, "modele" = $4, "type_appareil" = $5, "annee_installation" = $6, "charge_kg" = $7, "vitesse_ms" = $8, "niveaux" = $9, "type_portes" = $10, "statut" = $11 where "appareils"."id" = $12
+⨯ Error: Failed query: update "appareils" set "numero_interne" = $1, "numero_serie" = $2, "marque" = $3, "modele" = $4, "type_appareil" = $5, "annee_installation" = $6, "charge_kg" = $7, "vitesse_ms" = $8, "niveaux" = $9, "type_portes" = $10, "statut" = $11 where "appareils"."id" = $12
+⨯ Error: Failed query: update "appareils" set "numero_interne" = $1, "numero_serie" = $2, "marque" = $3, "modele" = $4, "type_appareil" = $5, "annee_installation" = $6, "charge_kg" = $7, "vitesse_ms" = $8, "niveaux" = $9, "type_portes" = $10, "statut" = $11 where "appareils"."id" = $12
+Sat Oct 10 20:17:35 UTC 2026
+(code retour 0, 2026-10-10 20:17:35)
