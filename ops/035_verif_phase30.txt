@@ -1,0 +1,19 @@
+== commit
+f2d57c0 Phase 30 : fiche appareil — n° interne jusqu'à 80 caractères et messages clairs
+== migration
+0026_numero_interne_80.sql
+== colonne
+80
+== fiches qui ne passeraient pas les nouveaux contrôles (à corriger à la main si > 0)
+ annee | niveaux | charge | vitesse 
+-------+---------+--------+---------
+     0 |       0 |      0 |       0
+(1 row)
+
+== pages
+/connexion 200
+/responsable/appareils 307
+== pm2
+robus-dashboard online
+Sat Oct 10 20:25:04 UTC 2026
+(code retour 0, 2026-10-10 20:25:04)

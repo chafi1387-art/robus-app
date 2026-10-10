@@ -1,34 +1,3 @@
-=== 2026-10-02 12:43:02 : d141c6e (ops seulement, pas de build)
-STATUT: OK d141c6e
-=== 2026-10-02 12:48:01 : bf0255f (ops seulement, pas de build)
-STATUT: OK bf0255f
-=== Deploiement 2026-10-06 19:38:02 : bf0255f -> ef9c746
---- migration 0020_prestations_contrat.sql
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-ALTER TABLE
-CREATE INDEX
-CREATE TABLE
-CREATE INDEX
-CREATE INDEX
-ALTER TABLE
-ALTER TABLE
-DO
-CREATE INDEX
-CREATE INDEX
-UPDATE 0
---- build
-├ ƒ /responsable/techniciens/acces-appareils
-├ ƒ /responsable/utilisateurs
-├ ƒ /technicien
-├ ƒ /technicien/appareils
 ├ ƒ /technicien/appareils/[id]
 ├ ƒ /technicien/formations
 ├ ƒ /technicien/formations/[id]
@@ -298,3 +267,34 @@ CREATE INDEX
 STATUT: OK e1d8a3d
 === 2026-10-10 20:19:01 : 9d17d0c (ops seulement, pas de build)
 STATUT: OK 9d17d0c
+=== Deploiement 2026-10-10 20:24:02 : 9d17d0c -> f2d57c0
+--- migration 0026_numero_interne_80.sql
+ALTER TABLE
+--- build
+├ ƒ /responsable/sous-traitance
+├ ƒ /responsable/stock
+├ ƒ /responsable/stock/pieces/[id]
+├ ƒ /responsable/techniciens
+├ ƒ /responsable/techniciens/[id]
+├ ƒ /responsable/techniciens/acces-appareils
+├ ƒ /responsable/utilisateurs
+├ ƒ /technicien
+├ ƒ /technicien/appareils
+├ ƒ /technicien/appareils/[id]
+├ ƒ /technicien/formations
+├ ƒ /technicien/formations/[id]
+├ ƒ /technicien/heures
+├ ƒ /technicien/interventions/[id]
+├ ƒ /technicien/profil
+├ ƒ /technicien/signalements
+├ ƒ /technicien/signalements/[id]
+└ ƒ /technicien/signaler
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+--- curl /responsable/projets : 307
+STATUT: OK f2d57c0
