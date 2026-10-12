@@ -267,6 +267,9 @@ export const interventions = pgTable("interventions", {
   priorite: prioriteEnum("priorite").notNull().default("normale"),
   description: text("description"),
   dateProgrammee: timestamp("date_programmee"),
+  // Phase 31 : mission sur plusieurs jours — dernier jour (null = un seul jour).
+  dateFinPrevue: timestamp("date_fin_prevue"),
+  weekendInclus: integer("weekend_inclus").notNull().default(0),
   dateDebut: timestamp("date_debut"),
   dateFin: timestamp("date_fin"),
   // Phase 16 : date de la notification « mission en retard » (une seule fois).

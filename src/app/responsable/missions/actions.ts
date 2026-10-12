@@ -21,6 +21,10 @@ import { envoyerMissionsAuTechnicien } from "@/lib/envoi-mission";
 import { controlerHabilitations, messageManques, nomUtilisateur } from "@/lib/habilitations";
 import { etatDepuisRapport } from "@/lib/etat-appareil";
 import { CIBLE_MISSION } from "@/lib/cible-mission";
+import { libellePlage, lireDatesMultiJours } from "@/lib/mission-jours";
+import { autresMissionsMemesJours, texteConflit } from "@/lib/missions-conflits";
+import { supprimerMission } from "@/lib/suppression";
+import { notifierUtilisateurs } from "@/lib/push";
 
 // Phase 18 : le bureau valide le rapport d'une mission terminée. Le rapport
 // devient visible par les observateurs (droit « rapports ») et n'est plus
@@ -424,4 +428,80 @@ export async function traiterTacheNonConforme(formData: FormData) {
   await journaliser({ entite: "intervention", entiteId: t!.interventionId, action: decision === "nc" ? "checklist_non_conformite" : "checklist_point_traite", utilisateurId: user.id, details: t!.tache.libelle });
   revalidatePath(page(t!.interventionId));
   redirect(avecMessage(retour, "ok", decision === "nc" ? "Non-conformité ouverte — suivez-la dans « Non-conformités »." : "Point marqué comme traité."));
+}
+
+// ==========================================================================
+// Phase 31 — Dates de la mission (plusieurs jours) et suppression
+// ==========================================================================
+
+/** Début, dernier jour et samedi/dimanche d'une mission (bureau). */
+export async function modifierDatesMission(formData: FormData) {
+  const user = await requireUser([...GESTION]);
+  const id = String(formData.get("interventionId") ?? "");
+  if (!z.string().uuid().safeParse(id).success) redirect("/responsable/interventions");
+  const retour = page(id);
+  const [m] = await db
+    .select({ statut: interventions.statut, technicienId: interventions.technicienId, projetId: interventions.projetId, dateProgrammee: interventions.dateProgrammee, dateFinPrevue: interventions.dateFinPrevue, weekendInclus: interventions.weekendInclus })
+    .from(interventions)
+    .where(eq(interventions.id, id))
+    .limit(1);
+  if (!m) redirect(avecMessage("/responsable/interventions", "erreur", "Mission introuvable."));
+  if (["terminee", "validee", "cloturee"].includes(m!.statut)) redirect(avecMessage(retour, "erreur", "Mission terminée : les dates ne changent plus."));
+  const commencee = m!.statut === "en_cours";
+  const texteDebut = String(formData.get("dateProgrammee") ?? "").trim();
+  // Une mission commencée garde son jour de début ; seul le dernier jour change.
+  const debut = commencee || !texteDebut ? m!.dateProgrammee : new Date(texteDebut);
+  if (!debut || Number.isNaN(debut.getTime())) redirect(avecMessage(retour, "erreur", "Indiquez la date de début."));
+  const multi = lireDatesMultiJours(formData, debut);
+  if ("erreur" in multi) redirect(avecMessage(retour, "erreur", multi.erreur));
+  const change =
+    debut!.getTime() !== (m!.dateProgrammee?.getTime() ?? 0) ||
+    (multi.dateFinPrevue?.getTime() ?? 0) !== (m!.dateFinPrevue?.getTime() ?? 0) ||
+    multi.weekendInclus !== m!.weekendInclus;
+  if (!change) redirect(avecMessage(retour, "ok", "Rien n'a changé."));
+  await db
+    .update(interventions)
+    .set({ dateProgrammee: debut!, dateFinPrevue: multi.dateFinPrevue, weekendInclus: multi.weekendInclus, ...(commencee ? {} : { retardNotifieLe: null }) })
+    .where(eq(interventions.id, id));
+  const plage = libellePlage({ dateProgrammee: debut!, ...multi }) ?? "un seul jour";
+  await journaliser({ entite: "intervention", entiteId: id, action: "dates_modifiees", utilisateurId: user.id, details: `Dates : ${plage}` });
+  // Le technicien est prévenu : mission pas commencée -> renvoyée (à ré-accepter) ; commencée -> simple avis.
+  let suite = "";
+  if (m!.technicienId && m!.projetId && !commencee) {
+    await envoyerMissionsAuTechnicien({ projetId: m!.projetId, technicienId: m!.technicienId, interventionIds: [id], message: `Dates modifiées : ${plage}.`, envoyeParId: user.id });
+    suite = " Le technicien a reçu les nouvelles dates.";
+  } else if (m!.technicienId && commencee) {
+    const tech = m!.technicienId;
+    after(() => notifierUtilisateurs([tech], { titre: "📅 Dates de mission modifiées", corps: `Nouvelle période : ${plage}.`, url: `/technicien/interventions/${id}`, tag: `dates-${id}` }).catch(() => {}));
+    suite = " Le technicien est prévenu.";
+  }
+  const avert = m!.technicienId ? texteConflit(await nomUtilisateur(m!.technicienId), await autresMissionsMemesJours({ technicienId: m!.technicienId, missionId: id, dateProgrammee: debut!, ...multi })) : "";
+  revalidatePath("/", "layout");
+  redirect(avecMessage(retour, "ok", `Dates enregistrées (${plage}).${suite}${avert}`));
+}
+
+/** Annuler et supprimer définitivement une mission — administrateur seulement. */
+export async function supprimerMissionAction(formData: FormData) {
+  const user = await requireUser(["administrateur"]);
+  const id = String(formData.get("interventionId") ?? "");
+  if (!z.string().uuid().safeParse(id).success) redirect("/responsable/interventions");
+  const retour = page(id);
+  const motif = String(formData.get("motif") ?? "").trim().slice(0, 300);
+  const precision = String(formData.get("precision") ?? "").trim().slice(0, 300);
+  const motifComplet = [motif, precision].filter(Boolean).join(" — ");
+  if (!motif) redirect(avecMessage(retour, "erreur", "Choisissez le motif de l'annulation."));
+  if (motif === "Autre" && !precision) redirect(avecMessage(retour, "erreur", "Précisez le motif."));
+  if (formData.get("confirmation") !== "on") redirect(avecMessage(retour, "erreur", "Cochez la case de confirmation pour supprimer la mission."));
+  const [m] = await db.select({ projetId: interventions.projetId }).from(interventions).where(eq(interventions.id, id)).limit(1);
+  if (!m) redirect(avecMessage("/responsable/interventions", "erreur", "Mission introuvable (déjà supprimée ?)."));
+  const r = await supprimerMission({ id, motif: motifComplet, userId: user.id });
+  revalidatePath("/", "layout");
+  const dest = m!.projetId ? `/responsable/projets/${m!.projetId}?tab=missions` : "/responsable/interventions";
+  redirect(
+    avecMessage(
+      dest,
+      "ok",
+      `Mission ${r?.numero ?? ""} annulée et supprimée.${r?.avis ? " Le technicien est prévenu." : ""}${r?.nbMvts ? " Pièces remises en stock." : ""}${r?.nbPassages ? " Le passage redevient « à planifier »." : ""}`
+    )
+  );
 }

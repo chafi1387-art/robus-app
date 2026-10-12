@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { progressionMissions } from "@/lib/checklists";
 import { CIBLE_MISSION } from "@/lib/cible-mission";
+import { joursMission } from "@/lib/mission-jours";
 
 // ==========================================================================
 // Phase 27 — Planning des missions (maquette validée le 08/10/2026).
@@ -137,6 +138,9 @@ export type MissionPlanning = {
   priorite: string;
   passage: number;
   dateProgrammee: Date | null;
+  /** Phase 31 : dernier jour d'une mission sur plusieurs jours (null = un jour). */
+  dateFinPrevue: Date | null;
+  weekendInclus: number;
   dateDebut: Date | null;
   dateFin: Date | null;
   envoyeeLe: Date | null;
@@ -172,6 +176,8 @@ const COLONNES = {
   priorite: interventions.priorite,
   passage: interventions.passage,
   dateProgrammee: interventions.dateProgrammee,
+  dateFinPrevue: interventions.dateFinPrevue,
+  weekendInclus: interventions.weekendInclus,
   dateDebut: interventions.dateDebut,
   dateFin: interventions.dateFin,
   envoyeeLe: interventions.envoyeeLe,
@@ -317,7 +323,8 @@ export async function chargerPlanning(params: { vue: Vue; jour: string; technici
 
   const [periodeBrut, ouvertesBrut, techniciens, formations] = await Promise.all([
     requeteMissions()
-      .where(and(gte(interventions.dateProgrammee, de), lt(interventions.dateProgrammee, a), ...filtres))
+      // Phase 31 : une mission sur plusieurs jours est chargée si elle chevauche la période.
+      .where(and(lt(interventions.dateProgrammee, a), sql`coalesce(${interventions.dateFinPrevue}, ${interventions.dateProgrammee}) >= ${de.toISOString()}::timestamp`, ...filtres))
       .orderBy(interventions.dateProgrammee),
     // Missions ouvertes (toutes dates) : compteurs, terrain, à traiter.
     requeteMissions()
@@ -353,7 +360,7 @@ export async function chargerPlanning(params: { vue: Vue; jour: string; technici
     const c = cleJour(d);
     return c >= debut && c <= fin;
   };
-  const periodeFiltree = periodeBrut.filter((m) => dansPeriode(m.dateProgrammee));
+  const periodeFiltree = periodeBrut.filter((m) => joursMission(m).some((c) => c >= debut && c <= fin));
   // Une seule passe d'enrichissement pour les deux listes.
   const tous = new Map<string, (typeof periodeBrut)[number]>();
   for (const m of [...periodeFiltree, ...ouvertesBrut]) tous.set(m.id, m);
@@ -364,7 +371,7 @@ export async function chargerPlanning(params: { vue: Vue; jour: string; technici
   const n = params.maintenant;
   const auj = aujourdhui(n);
   const pasAcceptees = ouvertes.filter((m) => estNonCommencee(m.statut) && m.technicienId && !m.accepteeLe);
-  const duJour = [...tous.values()].filter((m) => m.dateProgrammee && cleJour(m.dateProgrammee) === auj);
+  const duJour = [...tous.values()].filter((m) => joursMission(m).includes(auj));
   const compteurs: Compteurs = {
     enCours: ouvertes.filter((m) => m.statut === "en_cours").length,
     pasAcceptees: pasAcceptees.length,
@@ -457,3 +464,10 @@ export function filtrerParEtat(ms: MissionPlanning[], f: string | null, maintena
   });
 }
 
+
+/** Phase 31 : missions rangées par jour — une mission sur plusieurs jours apparaît chaque jour. */
+export function parJourMissions<T extends Pick<MissionPlanning, "dateProgrammee" | "dateFinPrevue" | "weekendInclus">>(items: T[]) {
+  const m = new Map<string, T[]>();
+  for (const it of items) for (const c of joursMission(it)) m.set(c, [...(m.get(c) ?? []), it]);
+  return m;
+}

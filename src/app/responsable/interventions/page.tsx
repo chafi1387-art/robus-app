@@ -29,11 +29,13 @@ import {
   heureProg,
   libelleJour,
   libelleMois,
+  parJourMissions,
   type FormationPlanning,
   type MissionPlanning,
   type Vue,
 } from "@/lib/planning";
 import { formatDate } from "@/lib/format";
+import { joursMission } from "@/lib/mission-jours";
 import { getDemandesAideOuvertes, getTechniciens, resoudreDemandeAide } from "../actions";
 import { VueProjets } from "./vue-projets";
 
@@ -161,7 +163,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
         <Compteur titre="Aujourd'hui" valeur={k.aujourdhui} sous={k.aujourdhuiTerminees ? `dont ${k.aujourdhuiTerminees} terminée${k.aujourdhuiTerminees > 1 ? "s" : ""}` : "missions du jour"} ton="bleu" href={lien({ vue: "jour", d: null, f: null })} />
         <Compteur
           titre={vue === "jour" ? "Ce jour" : vue === "mois" ? "Ce mois" : "Cette semaine"}
-          valeur={vue === "mois" ? p.periode.filter((m) => m.dateProgrammee && cleJour(m.dateProgrammee).slice(0, 7) === jour.slice(0, 7)).length : k.periode}
+          valeur={vue === "mois" ? p.periode.filter((m) => joursMission(m).some((c) => c.slice(0, 7) === jour.slice(0, 7))).length : k.periode}
           sous={`${k.techniciensPeriode} technicien${k.techniciensPeriode > 1 ? "s" : ""}`}
           ton="neutre"
         />
@@ -320,7 +322,7 @@ function VueSemaine({ p, missions, maintenant, auj, lien, technicienFiltre, reto
     const sans = missions.filter((m) => !m.technicienId);
     lignes.push({ cle: "affecter", nom: "À affecter", sous: sans.length ? "bouton « Affecter » dans À traiter" : "rien à affecter", missions: sans, formations: [], type: "affecter" });
   }
-  const mobileParJour = parJour([...missions].sort(tri), (m) => m.dateProgrammee);
+  const mobileParJour = parJourMissions([...missions].sort(tri));
   const formationsParJour = parJour(p.formations, (x) => x.debut);
 
   return (
@@ -338,7 +340,7 @@ function VueSemaine({ p, missions, maintenant, auj, lien, technicienFiltre, reto
             ))}
           </div>
           {lignes.map((l) => {
-            const ms = parJour([...l.missions].sort(tri), (m) => m.dateProgrammee);
+            const ms = parJourMissions([...l.missions].sort(tri));
             const fs = parJour(l.formations, (x) => x.debut);
             return (
               <div key={l.cle} className={`grid grid-cols-[170px_repeat(7,minmax(0,1fr))] border-b border-line last:border-0 ${l.type === "affecter" ? "bg-[#FFFBF6] min-h-[64px]" : "min-h-[88px]"}`}>
@@ -358,7 +360,7 @@ function VueSemaine({ p, missions, maintenant, auj, lien, technicienFiltre, reto
                       <PuceFormation key={x.id} f={x} />
                     ))}
                     {(ms.get(j) ?? []).map((m) => (
-                      <PuceMission key={m.id} m={m} maintenant={maintenant} />
+                      <PuceMission key={m.id} m={m} maintenant={maintenant} jour={j} />
                     ))}
                   </div>
                 ))}
@@ -388,7 +390,7 @@ function VueSemaine({ p, missions, maintenant, auj, lien, technicienFiltre, reto
                 </div>
               ))}
               {(mobileParJour.get(j) ?? []).map((m) => (
-                <CarteMobile key={m.id} m={m} maintenant={maintenant} retour={retour} />
+                <CarteMobile key={m.id} m={m} maintenant={maintenant} retour={retour} jour={j} />
               ))}
             </div>
           ))}
@@ -414,14 +416,15 @@ function VueJour({
   retour: string;
   nomsTech: Map<string, string>;
 }) {
-  const duJour = missions.filter((m) => m.dateProgrammee && cleJour(m.dateProgrammee) === jour);
+  // Phase 31 : une mission sur plusieurs jours apparaît chaque jour (à son heure de début).
+  const duJour = missions.filter((m) => joursMission(m).includes(jour));
   const fs = formations.filter((x) => cleJour(x.debut) === jour);
   const nb = (pred: (m: MissionPlanning) => boolean) => duJour.filter(pred).length;
   const enCours = nb((m) => m.statut === "en_cours");
   const finies = nb((m) => ["terminee", "validee", "cloturee"].includes(m.statut));
   type Item = { t: number; cle: string; m?: MissionPlanning; f?: FormationPlanning };
   const items: Item[] = [
-    ...duJour.map((m) => ({ t: m.dateProgrammee!.getTime(), cle: m.id, m })),
+    ...duJour.map((m) => ({ t: Date.parse(`${jour}T${m.dateProgrammee!.toISOString().slice(11, 19)}Z`), cle: m.id, m })),
     ...fs.map((x) => ({ t: x.debut.getTime(), cle: `${x.id}-${x.technicienId}`, f: x })),
   ].sort((a, b) => a.t - b.t);
   return (
@@ -437,7 +440,7 @@ function VueJour({
             {heureProg(new Date(it.t))}
           </span>
           {it.m ? (
-            <CarteMission m={it.m} maintenant={maintenant} techniciens={techniciens} retour={retour} />
+            <CarteMission m={it.m} maintenant={maintenant} techniciens={techniciens} retour={retour} jour={jour} />
           ) : (
             <div className={`rounded-2xl px-4 py-3.5 text-sm ${PUCE_FORMATION}`}>
               <Link href={`/responsable/habilitations/sessions/${it.f!.id}`} className="font-bold hover:underline">
@@ -460,7 +463,7 @@ function VueMois({ jour, missions, formations, maintenant, auj, lien }: { jour: 
   const mois = jour.slice(0, 7);
   // Les missions en cours d'abord (visibles même si la case est pleine), puis par heure.
   const tri = [...missions].sort((a, b) => Number(b.statut === "en_cours") - Number(a.statut === "en_cours") || (a.dateProgrammee?.getTime() ?? 0) - (b.dateProgrammee?.getTime() ?? 0));
-  const ms = parJour(tri, (m) => m.dateProgrammee);
+  const ms = parJourMissions(tri);
   const fs = parJour(formations, (x) => x.debut);
   const resume = (j: string) => {
     const l = ms.get(j) ?? [];
@@ -493,7 +496,7 @@ function VueMois({ jour, missions, formations, maintenant, auj, lien }: { jour: 
                 </Link>
                 {f.length > 0 && <span className={`text-[11px] rounded-lg px-[7px] py-[3px] truncate ${PUCE_FORMATION}`}>{f.length > 1 ? `${f.length} formations` : "Formation"}</span>}
                 {l.slice(0, 3).map((m) => (
-                  <PuceMission key={m.id} m={m} maintenant={maintenant} avecTechnicien />
+                  <PuceMission key={m.id} m={m} maintenant={maintenant} avecTechnicien jour={j} />
                 ))}
                 {l.length > 3 && (
                   <Link href={lien({ vue: "jour", d: j })} className="text-[11px] font-bold text-blue px-1 hover:underline">

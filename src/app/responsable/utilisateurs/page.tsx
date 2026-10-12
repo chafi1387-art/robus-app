@@ -2,7 +2,7 @@ import { Card, Btn, Field, Pill, inputClass } from "@/components/ui";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser, Role } from "@/lib/auth-helpers";
-import { createUser, resetUserPassword, toggleUserActive } from "./actions";
+import { createUser, modifierUtilisateur, resetUserPassword, toggleUserActive } from "./actions";
 
 const ROLES_ADMIN_ONLY: Role[] = ["administrateur"];
 
@@ -20,6 +20,7 @@ async function getUsers() {
       id: users.id,
       nom: users.nom,
       email: users.email,
+      telephone: users.telephone,
       role: users.role,
       actif: users.actif,
     })
@@ -72,6 +73,31 @@ export default async function UtilisateursPage() {
                       </Btn>
                     </form>
                   )}
+
+                  {/* Phase 31 : corriger le nom (faute d'orthographe), l'email ou le téléphone. */}
+                  <details className="group w-full sm:w-auto">
+                    <summary className="list-none cursor-pointer inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold font-display bg-transparent border border-line text-ink hover:bg-blue-pale hover:border-blue-pale transition-colors">
+                      Modifier nom / email / téléphone
+                    </summary>
+                    <form action={modifierUtilisateur} className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                      <input type="hidden" name="userId" value={u.id} />
+                      <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Nom et prénom</span>
+                        <input name="nom" required minLength={2} maxLength={160} defaultValue={u.nom} className={inputClass} />
+                      </label>
+                      <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Email (connexion)</span>
+                        <input type="email" name="email" required defaultValue={u.email} className={inputClass} />
+                      </label>
+                      <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Téléphone</span>
+                        <input name="telephone" maxLength={40} defaultValue={u.telephone ?? ""} className={inputClass} />
+                      </label>
+                      <Btn type="submit" variant="primary" className="!px-3 !py-1.5 !text-xs sm:col-span-3 justify-self-start">
+                        Enregistrer
+                      </Btn>
+                    </form>
+                  </details>
 
                   <details className="group">
                     <summary className="list-none cursor-pointer inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold font-display bg-transparent border border-line text-ink hover:bg-blue-pale hover:border-blue-pale transition-colors">

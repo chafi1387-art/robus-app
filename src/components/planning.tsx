@@ -2,9 +2,11 @@ import Link from "next/link";
 import { BadgeEnCours } from "@/components/kit-tableau";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
 import { BadgePriorite } from "@/components/parc";
-import { inputClass } from "@/components/ui";
 import { assignerIntervention, relancerMission } from "@/app/responsable/actions";
 import { libelleRefus } from "@/lib/missions";
+import { Fenetre } from "@/components/fenetre";
+import { ChampsDatesMission, ChoixTechnicien } from "@/components/champs-mission";
+import { libellePlage, rangDuJour } from "@/lib/mission-jours";
 import {
   TYPES_MISSION,
   duree,
@@ -79,19 +81,21 @@ function details(m: MissionPlanning) {
 }
 
 /** Puce d'une mission dans la grille Semaine / Mois. */
-export function PuceMission({ m, maintenant, avecTechnicien = false }: { m: MissionPlanning; maintenant: number; avecTechnicien?: boolean }) {
+export function PuceMission({ m, maintenant, avecTechnicien = false, jour }: { m: MissionPlanning; maintenant: number; avecTechnicien?: boolean; jour?: string }) {
   const e = etatVisuel(m);
   const retard = estEnRetard(m, maintenant);
+  const rang = jour ? rangDuJour(m, jour) : null;
   return (
     <Link
       href={lien(m)}
-      title={`${m.numero} · ${m.client ?? ""} — ${texteEtat(m, maintenant)}`}
+      title={`${m.numero} · ${m.client ?? ""} — ${texteEtat(m, maintenant)}${libellePlage(m) ? ` — ${libellePlage(m)}` : ""}`}
       className={`block text-[11px] leading-snug rounded-lg px-[7px] py-[5px] hover:shadow-sm hover:-translate-y-px transition ${ETATS[e].puce} ${retard ? "ring-2 ring-red/40" : ""}`}
     >
       <span className="block truncate">
         {e === "en_cours" ? "● " : fini(e) ? "✓ " : ""}
-        {heureProg(m.dateProgrammee)} {m.numero}
+        {rang && rang.rang > 1 ? `J${rang.rang}/${rang.total}` : heureProg(m.dateProgrammee)} {m.numero}
       </span>
+      {rang && <span className="block truncate font-normal opacity-90">📅 Jour {rang.rang}/{rang.total}</span>}
       <span className="block truncate opacity-90 font-normal">
         {retard ? "En retard" : e === "acceptee" || fini(e) ? TYPES_MISSION[m.type] ?? m.type : ETATS[e].label}
         {avecTechnicien && m.technicien ? ` · ${m.technicien}` : ""}
@@ -161,36 +165,31 @@ function BadgeArret({ m, maintenant }: { m: MissionPlanning; maintenant: number 
 
 type Tech = { id: string; nom: string };
 
-/** Bouton « Affecter » + petit formulaire (date + technicien) — envoie la mission. */
+/**
+ * Bouton « Affecter » : ouvre une fenêtre (date + technicien en grandes cases)
+ * qui envoie la mission. Phase 31 : fenêtre au-dessus de la page — l'ancien
+ * petit menu était coupé par les cartes et le choix du technicien caché.
+ */
 export function FormAffecter({ m, techniciens, retour, ouvert = false, libelle = "Affecter" }: { m: MissionPlanning; techniciens: Tech[]; retour: string; ouvert?: boolean; libelle?: string }) {
   return (
-    <details className="relative" open={ouvert}>
-      <summary className="list-none cursor-pointer text-[13px] font-bold rounded-[10px] px-3 py-2 bg-orange text-white hover:opacity-90 whitespace-nowrap text-center">{libelle}</summary>
-      <form action={assignerIntervention} className="absolute z-30 left-0 md:left-auto md:right-0 top-full mt-2 w-[min(18rem,calc(100vw-2.5rem))] bg-surface border border-line rounded-xl shadow-lg p-3 flex flex-col gap-2">
+    <Fenetre
+      libelle={libelle}
+      titre={`Affecter la mission ${m.numero}`}
+      sousTitre={[m.client ?? m.projetRef, TYPES_MISSION[m.type] ?? m.type].filter(Boolean).join(" · ")}
+      ouvertAuDepart={ouvert}
+      classeBouton="text-[13px] font-bold rounded-[10px] px-3 py-2 bg-orange text-white hover:opacity-90 whitespace-nowrap text-center"
+    >
+      <form action={assignerIntervention} className="flex flex-col gap-3">
         <input type="hidden" name="interventionId" value={m.id} />
         <input type="hidden" name="retour" value={retour} />
-        <label className="text-xs font-semibold text-ink-soft">
-          Date et heure
-          <input type="datetime-local" name="dateProgrammee" required={!m.dateProgrammee} defaultValue={m.dateProgrammee ? m.dateProgrammee.toISOString().slice(0, 16) : ""} className={`${inputClass} mt-1`} />
-        </label>
-        <label className="text-xs font-semibold text-ink-soft">
-          Technicien
-          <select name="technicienId" required defaultValue={m.technicienId ?? ""} className={`${inputClass} mt-1`}>
-            <option value="" disabled>
-              Choisir…
-            </option>
-            {techniciens.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nom}
-              </option>
-            ))}
-          </select>
-        </label>
-        <BoutonEnvoi type="submit" enCours="Envoi…" className="mt-1 rounded-lg bg-blue text-white font-display font-bold text-sm py-2 hover:bg-blue-light">
-          Affecter et envoyer
+        <ChoixTechnicien techniciens={techniciens} defaut={m.technicienId} />
+        <ChampsDatesMission debut={m.dateProgrammee} finPrevue={m.dateFinPrevue} weekendInclus={m.weekendInclus} debutRequis={!m.dateProgrammee} />
+        <BoutonEnvoi type="submit" enCours="Envoi…" className="mt-1 rounded-xl bg-blue text-white font-display font-bold text-base py-3 hover:bg-blue-light">
+          Affecter et envoyer au technicien
         </BoutonEnvoi>
+        <p className="text-[11px] text-ink-soft text-center">Le technicien reçoit la mission dans l&apos;application, sur son téléphone et par email.</p>
       </form>
-    </details>
+    </Fenetre>
   );
 }
 
@@ -295,7 +294,9 @@ export function LigneTerrain({ m, maintenant }: { m: MissionPlanning; maintenant
 }
 
 /** Carte mission standard (vue Jour, listes) — avec les étapes. */
-export function CarteMission({ m, maintenant, techniciens, retour }: { m: MissionPlanning; maintenant: number; techniciens: Tech[]; retour: string }) {
+export function CarteMission({ m, maintenant, techniciens, retour, jour }: { m: MissionPlanning; maintenant: number; techniciens: Tech[]; retour: string; jour?: string }) {
+  const rang = jour ? rangDuJour(m, jour) : null;
+  const plage = libellePlage(m);
   const e = etatVisuel(m);
   const retard = estEnRetard(m, maintenant);
   const attente = e === "non_vue" || e === "a_accepter" || e === "non_envoyee";
@@ -310,7 +311,9 @@ export function CarteMission({ m, maintenant, techniciens, retour }: { m: Missio
             </Link>
             <span className="truncate">· {m.client ?? m.projetRef ?? "Sans client"}</span>
             <BadgeArret m={m} maintenant={maintenant} />
+            {rang && <span className="text-[10.5px] font-extrabold uppercase rounded-md px-1.5 py-0.5 bg-blue-pale text-navy whitespace-nowrap">Jour {rang.rang}/{rang.total}</span>}
           </div>
+          {plage && <div className="text-xs font-semibold text-blue">📅 {plage}</div>}
           <div className="text-xs text-ink-soft truncate">
             {[
               TYPES_MISSION[m.type] ?? m.type,
@@ -346,7 +349,8 @@ export function CarteMission({ m, maintenant, techniciens, retour }: { m: Missio
 }
 
 /** Carte compacte (téléphone). */
-export function CarteMobile({ m, maintenant, retour }: { m: MissionPlanning; maintenant: number; retour: string }) {
+export function CarteMobile({ m, maintenant, retour, jour }: { m: MissionPlanning; maintenant: number; retour: string; jour?: string }) {
+  const rang = jour ? rangDuJour(m, jour) : null;
   const e = etatVisuel(m);
   const retard = estEnRetard(m, maintenant);
   const attente = e === "non_vue" || e === "a_accepter" || e === "non_envoyee";
@@ -354,7 +358,10 @@ export function CarteMobile({ m, maintenant, retour }: { m: MissionPlanning; mai
     <div className={`bg-surface rounded-2xl p-3.5 flex flex-col gap-1.5 ${ETATS[e].bord} ${fini(e) ? "opacity-85" : ""}`}>
       <Link href={lien(m)} className="flex flex-col gap-1.5">
         <span className="flex justify-between items-center gap-2">
-          <span className={`font-display font-extrabold ${e === "en_cours" ? "text-red" : "text-ink-soft"}`}>{heureProg(m.dateProgrammee) || "—"}</span>
+          <span className={`font-display font-extrabold ${e === "en_cours" ? "text-red" : "text-ink-soft"}`}>
+            {rang && rang.rang > 1 ? `Jour ${rang.rang}/${rang.total}` : heureProg(m.dateProgrammee) || "—"}
+            {rang && rang.rang === 1 ? ` · jour 1/${rang.total}` : ""}
+          </span>
           {attente ? <span className="text-[11px] font-extrabold text-red-ink">{ETATS[e].label}</span> : <BadgeEtat m={m} />}
         </span>
         <span className="text-sm">

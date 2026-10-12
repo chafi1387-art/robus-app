@@ -26,6 +26,8 @@ import path from "node:path";
 import { envoyerEtJournaliserOrdreMission } from "./projets/actions";
 import { controlerHabilitations, controlerHabilitationsSpecs, messageManques, nomUtilisateur } from "@/lib/habilitations";
 import { avecMessage } from "@/lib/url";
+import { lireDatesMultiJours } from "@/lib/mission-jours";
+import { autresMissionsMemesJours, texteConflit } from "@/lib/missions-conflits";
 
 const clientSchema = z.object({
   raisonSociale: z.string().min(2, "Raison sociale requise"),
@@ -401,8 +403,13 @@ export async function createIntervention(formData: FormData) {
 
   // Phase 17 : une mission envoyée a toujours un technicien ET une date.
   if (parsed.data.technicienId && !parsed.data.dateProgrammee) {
-    throw new Error("Choisissez la date et l'heure de la mission avant de l'envoyer au technicien.");
+    redirect(avecMessage(retourErreur, "erreur", "Choisissez la date et l'heure de la mission avant de l'envoyer au technicien."));
   }
+  // Phase 31 : mission sur plusieurs jours (dernier jour facultatif).
+  const debutCreation = parsed.data.dateProgrammee ? new Date(parsed.data.dateProgrammee) : null;
+  if (debutCreation && Number.isNaN(debutCreation.getTime())) redirect(avecMessage(retourErreur, "erreur", "Date de début invalide."));
+  const multi = lireDatesMultiJours(formData, debutCreation);
+  if ("erreur" in multi) redirect(avecMessage(retourErreur, "erreur", multi.erreur));
   // Phase 19 : contrôle de sécurité — habilitations obligatoires en règle.
   if (parsed.data.technicienId) {
     const manques = await controlerHabilitationsSpecs(parsed.data.technicienId, [
@@ -453,7 +460,9 @@ export async function createIntervention(formData: FormData) {
     description: parsed.data.description ?? null,
     technicienId: parsed.data.technicienId ?? null,
     statut: parsed.data.technicienId ? "affectee" : "creee",
-    dateProgrammee: parsed.data.dateProgrammee ? new Date(parsed.data.dateProgrammee) : null,
+    dateProgrammee: debutCreation,
+    dateFinPrevue: multi.dateFinPrevue,
+    weekendInclus: multi.weekendInclus,
   }).returning({ id: interventions.id });
 
   // Phase 23 : checklists choisies (ou la plus adaptée si aucune case cochée).
@@ -478,9 +487,16 @@ export async function createIntervention(formData: FormData) {
   if (appareilExists) revalidatePath(`/responsable/appareils/${appareilExists.id}`);
   revalidatePath(`/responsable/projets/${parsed.data.projetId}`);
   revalidatePath("/responsable/interventions");
+  // Phase 31 : avertissement si le technicien a déjà d'autres missions ces jours-là.
+  let avert = "";
+  if (parsed.data.technicienId) {
+    const c = await autresMissionsMemesJours({ technicienId: parsed.data.technicienId, missionId: creee.id, dateProgrammee: debutCreation, ...multi });
+    avert = texteConflit(await nomUtilisateur(parsed.data.technicienId), c);
+  }
+  const okCreation = `Mission créée${parsed.data.technicienId ? " et envoyée au technicien" : ""}.${avert}`;
   // Phase 13 : création depuis l'onglet Missions d'un Projet -> on y revient.
-  if (retourForm.startsWith(`/responsable/projets/${parsed.data.projetId}`)) redirect(retourForm);
-  redirect(appareilExists ? `/responsable/appareils/${appareilExists.id}` : retourProjet);
+  if (retourForm.startsWith(`/responsable/projets/${parsed.data.projetId}`)) redirect(avecMessage(retourForm, "ok", okCreation));
+  redirect(avecMessage(appareilExists ? `/responsable/appareils/${appareilExists.id}` : retourProjet, "ok", okCreation));
 }
 
 // Statuts d'intervention à partir desquels on considère le travail engagé :
@@ -512,11 +528,22 @@ export async function assignerIntervention(formData: FormData) {
       technicienId: interventions.technicienId,
       projetId: interventions.projetId,
       dateProgrammee: interventions.dateProgrammee,
+      dateFinPrevue: interventions.dateFinPrevue,
+      weekendInclus: interventions.weekendInclus,
     })
     .from(interventions)
     .where(eq(interventions.id, parsed.data.interventionId))
     .limit(1);
   if (!existing) redirect(avecMessage(retour, "erreur", "Mission introuvable."));
+  // Phase 31 : le formulaire « Affecter » peut aussi régler le dernier jour.
+  const nouveauDebut = parsed.data.dateProgrammee ? new Date(parsed.data.dateProgrammee) : existing.dateProgrammee;
+  if (nouveauDebut && Number.isNaN(nouveauDebut.getTime())) redirect(avecMessage(retour, "erreur", "Date invalide."));
+  let multi: { dateFinPrevue: Date | null; weekendInclus: number } = { dateFinPrevue: existing.dateFinPrevue, weekendInclus: existing.weekendInclus };
+  if (formData.has("dateFinPrevue")) {
+    const lu = lireDatesMultiJours(formData, nouveauDebut);
+    if ("erreur" in lu) redirect(avecMessage(retour, "erreur", lu.erreur));
+    multi = lu;
+  }
   // Phase 19 : contrôle des habilitations obligatoires avant l'envoi.
   if (parsed.data.technicienId && parsed.data.technicienId !== existing.technicienId) {
     const manques = await controlerHabilitations(parsed.data.technicienId, [parsed.data.interventionId]);
@@ -541,6 +568,8 @@ export async function assignerIntervention(formData: FormData) {
       ...(parsed.data.technicienId ? {} : REINIT_ENVOI),
       // Phase 16 : une mission reprogrammée pourra de nouveau être signalée en retard.
       ...(parsed.data.dateProgrammee ? { dateProgrammee: new Date(parsed.data.dateProgrammee), retardNotifieLe: null } : {}),
+      dateFinPrevue: multi.dateFinPrevue,
+      weekendInclus: multi.weekendInclus,
     })
     .where(eq(interventions.id, parsed.data.interventionId));
 
@@ -552,8 +581,10 @@ export async function assignerIntervention(formData: FormData) {
   // envoyer — cas des anciennes interventions "Sans projet").
   // Phase 17 : on renvoie aussi si la date change (le technicien doit le savoir).
   const dateChangee =
-    !!parsed.data.dateProgrammee &&
-    new Date(parsed.data.dateProgrammee).getTime() !== (existing.dateProgrammee?.getTime() ?? 0);
+    (!!parsed.data.dateProgrammee &&
+      new Date(parsed.data.dateProgrammee).getTime() !== (existing.dateProgrammee?.getTime() ?? 0)) ||
+    (multi.dateFinPrevue?.getTime() ?? 0) !== (existing.dateFinPrevue?.getTime() ?? 0) ||
+    multi.weekendInclus !== existing.weekendInclus;
   if (
     parsed.data.technicienId &&
     (parsed.data.technicienId !== existing.technicienId || dateChangee) &&
@@ -569,15 +600,18 @@ export async function assignerIntervention(formData: FormData) {
 
   revalidatePath("/", "layout");
   const nom = parsed.data.technicienId ? await nomUtilisateur(parsed.data.technicienId) : null;
+  const avert = parsed.data.technicienId
+    ? texteConflit(nom!, await autresMissionsMemesJours({ technicienId: parsed.data.technicienId, missionId: parsed.data.interventionId, dateProgrammee: nouveauDebut, ...multi }))
+    : "";
   redirect(
     avecMessage(
       retour,
       "ok",
-      nom
+      (nom
         ? existing.projetId
           ? `Mission affectée à ${nom} et envoyée (application, téléphone, email).`
           : `Mission affectée à ${nom}.`
-        : "Mission remise « à affecter »."
+        : "Mission remise « à affecter ».") + avert
     )
   );
 }

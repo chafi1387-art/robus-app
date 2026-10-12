@@ -19,6 +19,7 @@ import { journaliser } from "@/lib/journal";
 import { notifierObservateurs } from "@/lib/observateur";
 import { demandesMissionPlanifiee } from "@/lib/demandes";
 import { CIBLE_MISSION } from "@/lib/cible-mission";
+import { libellePlage } from "@/lib/mission-jours";
 
 // Phase 17 : envoi d'une (ou plusieurs) mission(s) au technicien — logique
 // unique utilisée partout (création, affectation, ajout à un projet,
@@ -37,7 +38,8 @@ const TYPE_LABEL: Record<string, string> = {
 
 function formatCourt(d: Date) {
   return d.toLocaleString("fr-BE", {
-    timeZone: "Europe/Brussels",
+    // Heures programmées : enregistrées telles que saisies (voir src/lib/planning.ts) -> pas de conversion.
+    timeZone: "UTC",
     weekday: "short",
     day: "2-digit",
     month: "2-digit",
@@ -100,6 +102,8 @@ export async function envoyerMissionsAuTechnicien(params: {
             id: interventions.id,
             type: interventions.type,
             dateProgrammee: interventions.dateProgrammee,
+            dateFinPrevue: interventions.dateFinPrevue,
+            weekendInclus: interventions.weekendInclus,
             // Phase 29 : appareil, sinon prestation (mission à la carte).
             numero: CIBLE_MISSION,
             appareilId: interventions.appareilId,
@@ -108,7 +112,7 @@ export async function envoyerMissionsAuTechnicien(params: {
           .leftJoin(appareils, eq(interventions.appareilId, appareils.id))
           .where(filtreMissions)
           .orderBy(interventions.dateProgrammee)
-      : Promise.resolve([] as { id: string; type: string; dateProgrammee: Date | null; numero: string; appareilId: string | null }[]),
+      : Promise.resolve([] as { id: string; type: string; dateProgrammee: Date | null; dateFinPrevue: Date | null; weekendInclus: number; numero: string; appareilId: string | null }[]),
   ]);
 
   const documentsIdsDemandes = [...new Set((params.documentsIds ?? []).filter(Boolean))];
@@ -160,7 +164,12 @@ export async function envoyerMissionsAuTechnicien(params: {
           dateDebutPrevue: premiere?.dateProgrammee ?? contexte.dateDebutPrevue,
           message: params.message,
           documents: documentsResolus.map((d) => ({ titre: d.titre, url: d.urlFichier })),
-          missions: missions.map((m) => ({ date: m.dateProgrammee, appareil: m.numero, type: m.appareilId ? TYPE_LABEL[m.type] ?? m.type : "Prestation" })),
+          missions: missions.map((m) => ({
+            date: m.dateProgrammee,
+            appareil: m.numero,
+            // Phase 31 : mission sur plusieurs jours -> la période est indiquée.
+            type: `${m.appareilId ? TYPE_LABEL[m.type] ?? m.type : "Prestation"}${libellePlage(m) ? ` · ${libellePlage(m)}` : ""}`,
+          })),
         }),
         notifierUtilisateurs([params.technicienId], {
           titre: missions.length > 1 ? `📋 ${missions.length} nouvelles missions` : `📋 Nouvelle mission — ${contexte.reference}`,

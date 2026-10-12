@@ -174,7 +174,7 @@ export async function refuserMission(formData: FormData) {
   await db.update(interventions).set({ vueLe: maintenant }).where(and(eq(interventions.id, interventionId), isNull(interventions.vueLe)));
   const raison = `${libelleRefus(motif)}${commentaire ? ` — ${commentaire}` : ""}`;
   await journaliser({ entite: "intervention", entiteId: interventionId, action: "mission_refusee", utilisateurId: user.id, details: raison });
-  const quand = m!.dateProgrammee ? m!.dateProgrammee.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", dateStyle: "short", timeStyle: "short" }) : "sans date";
+  const quand = m!.dateProgrammee ? m!.dateProgrammee.toLocaleString("fr-BE", { timeZone: "UTC", dateStyle: "short", timeStyle: "short" }) : "sans date";
   after(async () => {
     await notifierBureau({ titre: "⛔ Mission refusée", corps: `${user.name ?? "Le technicien"} · ${m!.numero} (${quand}) — ${raison}`, url: `/responsable/missions/${interventionId}`, tag: `refus-${interventionId}` });
     await envoyerAlerteDemande({
@@ -245,7 +245,12 @@ export async function terminerIntervention(formData: FormData) {
     redirect(avecMessage(`/technicien/interventions/${parsed.data.interventionId}#rapport`, "erreur", (e as Error).message));
   }
   // Phase 25 : seulement les photos du passage en cours (une mission peut repartir après un devis).
-  const [debutPassage] = await db.select({ d: interventions.dateDebut, appareilId: interventions.appareilId }).from(interventions).where(eq(interventions.id, parsed.data.interventionId)).limit(1);
+  const [debutPassage] = await db
+    // Phase 31 : les photos envoyées dès l'acceptation (avant « Commencer ») comptent aussi.
+    .select({ d: sql<Date | null>`least(${interventions.dateDebut}, ${interventions.accepteeLe})`.mapWith(interventions.dateDebut), appareilId: interventions.appareilId })
+    .from(interventions)
+    .where(eq(interventions.id, parsed.data.interventionId))
+    .limit(1);
   // L'état final de l'appareil est demandé seulement s'il y a un appareil.
   const statutFinal = debutPassage?.appareilId ? parsed.data.statutFinalAppareil ?? "en_service" : null;
   const fil = await db
@@ -565,12 +570,18 @@ export async function enregistrerMouvementTechnicien(formData: FormData) {
 // Phase 18 — Fil de mission en direct, corrections du rapport (24 h)
 // ==========================================================================
 
+/** Phase 31 : fil photos / notes ouvert pendant la mission, et dès qu'elle est acceptée. */
+function filOuvert(m: { statut: string; accepteeLe: Date | null }) {
+  return m.statut === "en_cours" || (["creee", "planifiee", "affectee"].includes(m.statut) && !!m.accepteeLe);
+}
+
 async function lireMission(interventionId: string) {
   const [m] = await db
     .select({
       technicienId: interventions.technicienId,
       statut: interventions.statut,
       dateFin: interventions.dateFin,
+      accepteeLe: interventions.accepteeLe,
     })
     .from(interventions)
     .where(eq(interventions.id, interventionId))
@@ -586,7 +597,8 @@ export async function ajouterAuFil(formData: FormData) {
   if (!z.string().uuid().safeParse(interventionId).success) throw new Error("Mission introuvable.");
   await assertOwnIntervention(interventionId, user.id, user.role);
   const m = await lireMission(interventionId);
-  if (m.statut !== "en_cours") throw new Error("Commencez la mission avant d'envoyer des photos.");
+  // Phase 31 : photos et notes possibles dès que la mission est acceptée.
+  if (!filOuvert(m)) throw new Error("Acceptez la mission avant d'envoyer des photos.");
   const texte = String(formData.get("texte") ?? "").trim().slice(0, 1000);
   const retour = `/technicien/interventions/${interventionId}#direct`;
   let photos: string[] = [];
@@ -611,7 +623,7 @@ export async function ajouterPhotoAuFil(interventionId: string, ref: string): Pr
   try {
     await assertOwnIntervention(interventionId, user.id, user.role);
     const m = await lireMission(interventionId);
-    if (m.statut !== "en_cours") return { erreur: "Commencez la mission avant d'envoyer des photos." };
+    if (!filOuvert(m)) return { erreur: "Acceptez la mission avant d'envoyer des photos." };
     const { url } = await lireReference(ref, user.id, ["rapports"]);
     await db.insert(missionJournal).values({ interventionId, auteurId: user.id, texte: null, photos: [url] });
   } catch (e) {

@@ -14,7 +14,8 @@ const base = () => process.env.NEXTAUTH_URL || "https://robuswork.tech";
 export const LIEUX_FORMATION: Record<string, string> = { terrain: "Sur le terrain", bureau: "Au bureau", ecole: "École / organisme" };
 
 export function dateFormation(d: Date) {
-  return d.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+  // Heure programmée (saisie telle quelle, comme les missions) : pas de conversion de fuseau.
+  return d.toLocaleString("fr-BE", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 }
 
 /** Signer sa présence : d'une heure avant le début jusqu'à 24 h après. */

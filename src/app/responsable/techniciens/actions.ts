@@ -9,6 +9,7 @@ import { journaliser } from "@/lib/journal";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
+import { avecMessage } from "@/lib/url";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -111,6 +112,8 @@ export async function createTechnicien(formData: FormData) {
 
 const updateFicheSchema = z.object({
   technicienId: z.string().uuid(),
+  // Phase 31 : correction du nom (administrateur).
+  nom: z.string().trim().min(2, "Le nom doit contenir au moins 2 caractères.").max(160).optional(),
   email: z.string().email("Email invalide").transform((v) => v.trim().toLowerCase()),
   telephone: z.string().optional(),
   dateNaissance: z.string().optional(),
@@ -133,6 +136,7 @@ export async function updateTechnicienFiche(formData: FormData) {
   const siteRattachementId = formData.get("siteRattachementId");
   const parsed = updateFicheSchema.safeParse({
     technicienId: formData.get("technicienId"),
+    nom: user.role === "administrateur" && formData.has("nom") ? formData.get("nom") : undefined,
     email: formData.get("email"),
     telephone: formData.get("telephone") || undefined,
     dateNaissance: formData.get("dateNaissance") || undefined,
@@ -150,14 +154,15 @@ export async function updateTechnicienFiche(formData: FormData) {
     dateSortie: formData.get("dateSortie") || undefined,
     motifSortie: formData.get("motifSortie") || undefined,
   });
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
+  const pageFiche = `/responsable/techniciens/${String(formData.get("technicienId") ?? "")}?tab=modifier`;
+  if (!parsed.success) redirect(avecMessage(pageFiche, "erreur", parsed.error.issues[0]?.message ?? "Données invalides"));
 
   const [existingUser] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, nom: users.nom, email: users.email })
     .from(users)
     .where(eq(users.id, parsed.data.technicienId))
     .limit(1);
-  if (!existingUser) throw new Error("Technicien introuvable.");
+  if (!existingUser) redirect(avecMessage("/responsable/techniciens", "erreur", "Technicien introuvable."));
 
   // Email désormais modifiable — même contrôle d'unicité qu'à la création,
   // en excluant la propre ligne du technicien (pour autoriser un enregistrement
@@ -168,7 +173,7 @@ export async function updateTechnicienFiche(formData: FormData) {
     .where(eq(users.email, parsed.data.email))
     .limit(1);
   if (emailPrisAilleurs && emailPrisAilleurs.id !== parsed.data.technicienId) {
-    throw new Error("Un utilisateur existe déjà avec cet email.");
+    redirect(avecMessage(pageFiche, "erreur", "Un autre compte utilise déjà cet email."));
   }
 
   // Phase 13 : un technicien « sorti des effectifs » ne peut plus se
@@ -176,8 +181,15 @@ export async function updateTechnicienFiche(formData: FormData) {
   const sorti = parsed.data.statutRh === "sorti_effectifs";
   await db
     .update(users)
-    .set({ email: parsed.data.email, telephone: parsed.data.telephone ?? null, actif: sorti ? 0 : 1 })
+    .set({ email: parsed.data.email, telephone: parsed.data.telephone ?? null, actif: sorti ? 0 : 1, ...(parsed.data.nom ? { nom: parsed.data.nom } : {}) })
     .where(eq(users.id, parsed.data.technicienId));
+  const changements = [
+    parsed.data.nom && parsed.data.nom !== existingUser!.nom ? `nom : « ${existingUser!.nom} » → « ${parsed.data.nom} »` : null,
+    parsed.data.email !== existingUser!.email ? `email : ${existingUser!.email} → ${parsed.data.email}` : null,
+  ].filter(Boolean);
+  if (changements.length) {
+    await journaliser({ entite: "utilisateur", entiteId: parsed.data.technicienId, action: "identite_modifiee", utilisateurId: user.id, details: changements.join(" · ") });
+  }
 
   const [existingFiche] = await db
     .select({ id: technicienFiches.id })
@@ -220,8 +232,8 @@ export async function updateTechnicienFiche(formData: FormData) {
     details: sorti ? `Sortie${parsed.data.motifSortie ? ` — ${parsed.data.motifSortie}` : ""} (connexion désactivée)` : null,
   });
 
-  revalidatePath(`/responsable/techniciens/${parsed.data.technicienId}`);
-  revalidatePath("/responsable/techniciens");
+  revalidatePath("/", "layout");
+  redirect(avecMessage(pageFiche, "ok", parsed.data.email !== existingUser!.email ? "Profil enregistré. Attention : le technicien se connecte désormais avec la nouvelle adresse email." : "Profil enregistré."))
 }
 
 const PHOTO_TYPES: Record<string, string> = {

@@ -24,6 +24,7 @@ import { journaliser } from "@/lib/journal";
 import { envoyerMissionsAuTechnicien } from "@/lib/envoi-mission";
 import { controlerHabilitations, messageManques, nomUtilisateur, type Manque } from "@/lib/habilitations";
 import { avecMessage } from "@/lib/url";
+import { supprimerProjet } from "@/lib/suppression";
 import { appliquerGarantie } from "@/lib/projet-garantie";
 import { genererPassages, recalculerRestantes } from "@/lib/garantie-passages";
 import { ajouterAppareilAuContrat, creerContratProjet, renouvelerContrat } from "@/lib/contrats";
@@ -962,4 +963,27 @@ export async function getPiecesForSelect() {
     })
     .from(pieces)
     .orderBy(pieces.nom);
+}
+
+// Phase 31 : annuler et supprimer un projet complet — administrateur seulement.
+export async function supprimerProjetAction(formData: FormData) {
+  const user = await requireUser(["administrateur"]);
+  const id = String(formData.get("projetId") ?? "");
+  if (!z.string().uuid().safeParse(id).success) redirect("/responsable/projets");
+  const retour = `/responsable/projets/${id}`;
+  const motif = String(formData.get("motif") ?? "").trim().slice(0, 300);
+  const precision = String(formData.get("precision") ?? "").trim().slice(0, 300);
+  if (!motif) redirect(avecMessage(retour, "erreur", "Choisissez le motif de l'annulation."));
+  if (motif === "Autre" && !precision) redirect(avecMessage(retour, "erreur", "Précisez le motif."));
+  if (formData.get("confirmation") !== "on") redirect(avecMessage(retour, "erreur", "Cochez la case de confirmation pour supprimer le projet."));
+  const res = await supprimerProjet({ id, motif: [motif, precision].filter(Boolean).join(" — "), userId: user.id, avecAppareils: formData.get("avecAppareils") === "on" });
+  if (!res) redirect(avecMessage("/responsable/projets", "erreur", "Projet introuvable (déjà supprimé ?)."));
+  revalidatePath("/", "layout");
+  redirect(
+    avecMessage(
+      "/responsable/projets",
+      "ok",
+      `Projet ${res!.reference} annulé et supprimé (${res!.nbMissions} mission${res!.nbMissions > 1 ? "s" : ""}${res!.nbApps ? `, ${res!.nbApps} appareil${res!.nbApps > 1 ? "s" : ""}` : ""}).${res!.avis.length || res!.equipe.length ? " Les techniciens sont prévenus." : ""}`
+    )
+  );
 }

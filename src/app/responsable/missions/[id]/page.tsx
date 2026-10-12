@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { db } from "@/db";
 import {
+  garantiePassages,
   appareils,
   clients,
   demandesAide,
@@ -52,7 +53,12 @@ import {
   modifierRapportBureau,
   retirerOuRemplacerPhotoBureau,
   validerRapport,
+  modifierDatesMission,
+  supprimerMissionAction,
 } from "../actions";
+import { ChampsDatesMission } from "@/components/champs-mission";
+import { ZoneSuppression } from "@/components/zone-suppression";
+import { libellePlage } from "@/lib/mission-jours";
 import { BoutonEnvoi } from "@/components/bouton-envoi";
 import { CIBLE_MISSION } from "@/lib/cible-mission";
 
@@ -152,7 +158,12 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
   const valide = ["validee", "cloturee"].includes(m.statut);
   const nonCommencee = (STATUTS_NON_COMMENCES as readonly string[]).includes(m.statut);
   // Phase 21 : signalements liés, disponibilité du technicien ce jour-là, choix pour une réaffectation.
-  const [devisM, passagesM] = await Promise.all([devisDeMission(id), passagesDeMission(id)]);
+  const [devisM, passagesM, lienPassage] = await Promise.all([
+    devisDeMission(id),
+    passagesDeMission(id),
+    db.select({ n: sql<number>`count(*)::int` }).from(garantiePassages).where(eq(garantiePassages.interventionId, id)),
+  ]);
+  const passagesGarantie = Number(lienPassage[0]?.n ?? 0) > 0;
   const [sigs, occupation, techniciensActifs, checklistsM, modelesCl] = await Promise.all([
     signalementsDe({ interventionId: id }),
     m.technicienId && m.dateProgrammee && nonCommencee ? occupationsTechnicien(m.technicienId, m.dateProgrammee, id) : Promise.resolve(null),
@@ -263,6 +274,7 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
           <Info label={enDirect ? "Sur place depuis" : "Commencée"} valeur={m.dateDebut ? (enDirect ? duree(m.dateDebut) : formatDateTime(m.dateDebut)) : "—"} />
           <Info label="Photos" valeur={String(toutesPhotos.length)} />
         </div>
+        {libellePlage(m) && <p className="text-sm font-semibold text-blue mt-3">📅 Mission sur plusieurs jours : {libellePlage(m)}</p>}
         {m.description && <p className="text-sm mt-3 bg-blue-pale/50 rounded-lg px-3 py-2">{m.description}</p>}
         {!m.technicienId && (
           <Link href={`/responsable/interventions?affecter=${m.id}#m-${m.id}`} className="inline-block mt-3 text-sm font-bold text-blue">Affecter un technicien dans le Planning des missions →</Link>
@@ -286,6 +298,29 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
           </div>
         )}
       </Card>
+
+      {/* Phase 31 : dates (début, dernier jour) — y compris mission sur plusieurs jours. */}
+      {gestion && (nonCommencee || m.statut === "en_cours") && (
+        <details className="group rounded-2xl border border-line bg-surface" open={!!libellePlage(m)}>
+          <summary className="list-none cursor-pointer px-5 py-3.5 text-sm font-bold text-navy flex items-center gap-2">
+            📅 Dates de la mission
+            <span className="ml-auto text-xs font-semibold text-blue group-open:hidden">Modifier</span>
+          </summary>
+          <form action={modifierDatesMission} className="px-5 pb-5 flex flex-col gap-3 max-w-xl">
+            <input type="hidden" name="interventionId" value={m.id} />
+            {m.statut === "en_cours" ? (
+              <p className="text-sm text-ink-soft">Mission commencée le {formatDateTime(m.dateDebut)} : vous pouvez prolonger ou raccourcir le dernier jour.</p>
+            ) : null}
+            {m.statut === "en_cours" ? (
+              <ChampsFinSeulement fin={m.dateFinPrevue} weekend={m.weekendInclus} />
+            ) : (
+              <ChampsDatesMission debut={m.dateProgrammee} finPrevue={m.dateFinPrevue} weekendInclus={m.weekendInclus} />
+            )}
+            <Btn className="self-start">Enregistrer les dates</Btn>
+            {m.technicienId && nonCommencee && <p className="text-[11px] text-ink-soft">Le technicien reçoit les nouvelles dates (il devra de nouveau accepter la mission).</p>}
+          </form>
+        </details>
+      )}
 
       {m.refuseeLe && nonCommencee && (
         <Card className="p-5 border-red border-[1.5px]">
@@ -757,6 +792,38 @@ export default async function MissionBureauPage({ params }: { params: Promise<{ 
           {notes.length === 0 && <p className="text-sm text-ink-soft py-1">Aucune note pour l&apos;instant.</p>}
         </div>
       </Card>
+
+      {/* Phase 31 : annuler et supprimer la mission (administrateur). */}
+      {user.role === "administrateur" && (
+        <ZoneSuppression
+          action={supprimerMissionAction}
+          champs={{ interventionId: m.id }}
+          titre="Annuler et supprimer cette mission"
+          bouton="Supprimer définitivement la mission"
+          avertissements={[
+            "La mission disparaît du planning, du projet et de l'application du technicien.",
+            m.technicienId && !["terminee", "validee", "cloturee"].includes(m.statut) ? `${row.technicien ?? "Le technicien"} est prévenu (application, téléphone, email).` : null,
+            rapport ? "Le rapport, les photos, la checklist et les notes de cette mission sont supprimés." : null,
+            piecesSorties.length ? "Les pièces sorties sur cette mission sont remises en stock." : null,
+            passagesGarantie ? "Le passage de garantie / contrat lié redevient « à planifier »." : null,
+          ].filter(Boolean)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ChampsFinSeulement({ fin, weekend }: { fin: Date | null; weekend: number }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-bold uppercase tracking-wide text-ink-soft">Dernier jour (vide = se termine aujourd&apos;hui)</span>
+        <input type="date" name="dateFinPrevue" defaultValue={fin ? fin.toISOString().slice(0, 10) : ""} className={inputClass} />
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="weekendInclus" defaultChecked={!!weekend} className="w-4 h-4" />
+        Travailler aussi le samedi et le dimanche
+      </label>
     </div>
   );
 }

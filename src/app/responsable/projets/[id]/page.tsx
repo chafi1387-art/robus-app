@@ -1,3 +1,6 @@
+import { ChampsDatesMission } from "@/components/champs-mission";
+import { ZoneSuppression } from "@/components/zone-suppression";
+import { apercuSuppressionProjet } from "@/lib/suppression";
 import { FrisePassages } from "@/components/frise-passages";
 import { BasculeContrat } from "@/components/bascule-contrat";
 import { passagesDeGaranties, passagesDePrestations } from "@/lib/garantie-passages";
@@ -53,6 +56,7 @@ import {
   retirerTechnicienProjet,
   supprimerDocument,
   updateProjetInfos,
+  supprimerProjetAction,
 } from "../actions";
 import { createDocument } from "../../documents/actions";
 import { createIntervention } from "../../actions";
@@ -367,6 +371,7 @@ export default async function ProjetDetailPage({
   const [modelesChecklist, progressionChecklists] = tab === "missions" ? await Promise.all([modelesActifs(), progressionMissions(interventionsListe.map((i) => i.id))]) : [[], new Map()];
   // Phase 21 : signalements des techniciens liés au projet (onglets Vue d'ensemble / Missions).
   const signalementsProjet = tab === "missions" || tab === "apercu" ? await signalementsDe({ projetId: id }) : [];
+  const apercuSuppr = tab === "apercu" && user.role === "administrateur" ? await apercuSuppressionProjet(id) : null;
   const journalProjet =
     tab === "historique"
       ? await db
@@ -571,6 +576,29 @@ export default async function ProjetDetailPage({
           </details>
         </div>
       </Card>
+
+      {/* Phase 31 : annuler et supprimer le projet (administrateur). */}
+      {user.role === "administrateur" && apercuSuppr && (
+        <ZoneSuppression
+          action={supprimerProjetAction}
+          champs={{ projetId: projet.id }}
+          titre="Annuler et supprimer ce projet"
+          bouton="Supprimer définitivement le projet"
+          avertissements={[
+            `Le projet ${projet.reference} et ses ${apercuSuppr.missions} mission(s) sont supprimés${apercuSuppr.missionsFinies ? `, dont ${apercuSuppr.missionsFinies} déjà terminée(s) avec leur rapport` : ""}.`,
+            "Garantie, contrats, prestations, devis et documents du projet sont supprimés ; les pièces sorties sont remises en stock.",
+            "Les techniciens de l'équipe sont prévenus (application, téléphone, email).",
+            "Le client et ses appareils restent dans le système (sauf si vous cochez la case ci-dessous).",
+          ]}
+        >
+          {apercuSuppr.appareilsSupprimables > 0 && (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="avecAppareils" className="w-4 h-4 mt-0.5" />
+              Supprimer aussi les {apercuSuppr.appareilsSupprimables} appareil(s) créés pour ce projet (utilisés nulle part ailleurs).
+            </label>
+          )}
+        </ZoneSuppression>
+      )}
         </>
       )}
 
@@ -605,9 +633,7 @@ export default async function ProjetDetailPage({
                       <option value="critique">Critique</option>
                     </select>
                   </Field>
-                  <Field label="Date et heure *">
-                    <input type="datetime-local" name="dateProgrammee" required className={inputClass} />
-                  </Field>
+                  <ChampsDatesMission />
                   <Field label="Technicien">
                     <select name="technicienId" className={inputClass} defaultValue={techniciensAffectes[0]?.id ?? ""}>
                       <option value="">À affecter plus tard</option>

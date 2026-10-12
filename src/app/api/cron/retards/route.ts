@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 
   for (const m of retards) {
     const quand = m.dateProgrammee
-      ? m.dateProgrammee.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", dateStyle: "short", timeStyle: "short" })
+      ? m.dateProgrammee.toLocaleString("fr-BE", { timeZone: "UTC", dateStyle: "short", timeStyle: "short" })
       : "";
     if (m.technicienId) {
       await notifierUtilisateurs([m.technicienId], {
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
     if (m.technicienId) {
       await notifierUtilisateurs([m.technicienId], {
         titre: "📋 Rappel : nouvelle mission à consulter",
-        corps: `${m.numero}${m.dateProgrammee ? ` — prévue le ${m.dateProgrammee.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", dateStyle: "short", timeStyle: "short" })}` : ""}`,
+        corps: `${m.numero}${m.dateProgrammee ? ` — prévue le ${m.dateProgrammee.toLocaleString("fr-BE", { timeZone: "UTC", dateStyle: "short", timeStyle: "short" })}` : ""}`,
         url: `/technicien/interventions/${m.id}`,
         tag: `mission-${m.id}`,
       });

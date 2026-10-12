@@ -1,3 +1,4 @@
+import { libellePlage } from "@/lib/mission-jours";
 import {
   Card,
   Btn,
@@ -289,6 +290,12 @@ export default async function InterventionDetailPage({
             <dt className="text-ink-soft">Programmée</dt>
             <dd className="font-medium">{formatDateTime(intervention.dateProgrammee)}</dd>
           </div>
+          {libellePlage(intervention) && (
+            <div className="flex justify-between gap-3">
+              <dt className="text-ink-soft">Plusieurs jours</dt>
+              <dd className="font-semibold text-blue text-right">{libellePlage(intervention)}</dd>
+            </div>
+          )}
           {intervention.description && (
             <div>
               <dt className="text-ink-soft">Instructions</dt>
@@ -384,12 +391,15 @@ export default async function InterventionDetailPage({
         </form>
       )}
 
-      {peutTerminer && (
+      {/* Phase 31 : photos et notes à tout moment dès que la mission est acceptée (missions sur plusieurs jours). */}
+      {(peutTerminer || (peutCommencer && !!intervention.accepteeLe && intervention.technicienId === user.id)) && (
         <Card className="p-4 border-[1.5px] border-blue/50">
           <h2 className="font-display font-bold text-sm flex items-center gap-2">
             <Camera className="w-4 h-4 text-blue" /> Photos &amp; notes en direct
           </h2>
-          <p className="text-xs text-ink-soft mt-0.5 mb-3">Le bureau les voit tout de suite. Elles seront aussi jointes au rapport.</p>
+          <p className="text-xs text-ink-soft mt-0.5 mb-3">
+            Envoyez-les quand vous voulez{libellePlage(intervention) ? ", chaque jour de la mission" : ""} : le bureau les voit tout de suite. Elles seront aussi jointes au rapport.
+          </p>
           <div id="direct" className="scroll-mt-20" />
           <EnvoiFichiers
             type="photo"

@@ -11,6 +11,7 @@ import { clePubliqueVapid } from "@/lib/push";
 import { requireUser, ROLES_TECHNICIEN } from "@/lib/auth-helpers";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { CIBLE_MISSION } from "@/lib/cible-mission";
+import { joursMission, libellePlage, rangDuJour } from "@/lib/mission-jours";
 
 // Phase 6 : l'Appareil n'est plus rattaché à un Site — l'adresse et le
 // client d'une intervention se dérivent désormais du Projet. On passe donc
@@ -23,6 +24,8 @@ function baseQuery() {
       statut: interventions.statut,
       description: interventions.description,
       dateProgrammee: interventions.dateProgrammee,
+      dateFinPrevue: interventions.dateFinPrevue,
+      weekendInclus: interventions.weekendInclus,
       vueLe: interventions.vueLe,
       accepteeLe: interventions.accepteeLe,
       refuseeLe: interventions.refuseeLe,
@@ -184,7 +187,8 @@ export default async function MesInterventionsPage({
       .where(
         and(
           eq(interventions.technicienId, user.id),
-          lt(interventions.dateProgrammee, aujourdhui),
+          // Phase 31 : une mission sur plusieurs jours n'est en retard qu'après son dernier jour.
+          sql`coalesce(${interventions.dateFinPrevue}, ${interventions.dateProgrammee}) < ${aujourdhui.toISOString()}::timestamp`,
           sql`${interventions.statut} not in ('terminee', 'validee', 'cloturee')`
         )
       )
@@ -193,23 +197,24 @@ export default async function MesInterventionsPage({
       .where(
         and(
           eq(interventions.technicienId, user.id),
-          gte(interventions.dateProgrammee, periodeDebut),
-          lt(interventions.dateProgrammee, periodeFin)
+          lt(interventions.dateProgrammee, periodeFin),
+          // Phase 31 : missions sur plusieurs jours qui chevauchent la période.
+          sql`coalesce(${interventions.dateFinPrevue}, ${interventions.dateProgrammee}) >= ${periodeDebut.toISOString()}::timestamp`
         )
       )
       .orderBy(asc(interventions.dateProgrammee)),
     db
-      .select({ n: sql<number>`count(*)` })
+      .select({ dateProgrammee: interventions.dateProgrammee, dateFinPrevue: interventions.dateFinPrevue, weekendInclus: interventions.weekendInclus })
       .from(interventions)
       .where(
         and(
           eq(interventions.technicienId, user.id),
-          gte(interventions.dateProgrammee, aujourdhui),
           lt(interventions.dateProgrammee, addDays(aujourdhui, 1)),
+          sql`coalesce(${interventions.dateFinPrevue}, ${interventions.dateProgrammee}) >= ${addDays(aujourdhui, -1).toISOString()}::timestamp`,
           sql`${interventions.statut} not in ('cloturee')`
         )
       )
-      .then((r) => Number(r[0]?.n ?? 0)),
+      .then((r) => r.filter((x) => joursMission(x).includes(dayKey(aujourdhui))).length),
     // Phase 21 : missions refusées, en attente de la décision du bureau.
     baseQuery()
       .where(
@@ -228,17 +233,18 @@ export default async function MesInterventionsPage({
     const key = dayKey(f.dateDebut);
     formationsParJour.set(key, [...(formationsParJour.get(key) ?? []), f]);
   }
+  // Phase 31 : une mission sur plusieurs jours apparaît chaque jour.
   const parJour = new Map<string, Row[]>();
   for (const r of periode) {
-    if (!r.dateProgrammee) continue;
-    const key = dayKey(r.dateProgrammee);
-    const liste = parJour.get(key) ?? [];
-    liste.push(r);
-    parJour.set(key, liste);
+    for (const key of joursMission(r)) {
+      const liste = parJour.get(key) ?? [];
+      liste.push(r);
+      parJour.set(key, liste);
+    }
   }
   const jours: { date: Date; rows: Row[] }[] = [];
   if (vue === "jour") {
-    jours.push({ date: refDate, rows: periode });
+    jours.push({ date: refDate, rows: parJour.get(dayKey(refDate)) ?? [] });
   } else {
     const nbJours = vue === "semaine" ? 7 : Math.round((periodeFin.getTime() - periodeDebut.getTime()) / 86400000);
     for (let i = 0; i < nbJours; i++) {
@@ -390,7 +396,7 @@ export default async function MesInterventionsPage({
             {formationsPeriode.map((f) => (
               <FormationCarte key={f.id} f={f} />
             ))}
-            <Section rows={periode} empty={formationsPeriode.length ? "" : "Rien de prévu ce jour-là."} />
+            <Section rows={jours[0]?.rows ?? []} jour={dayKey(refDate)} empty={formationsPeriode.length ? "" : "Rien de prévu ce jour-là."} />
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -403,7 +409,7 @@ export default async function MesInterventionsPage({
                   {(formationsParJour.get(dayKey(date)) ?? []).map((f) => (
                     <FormationCarte key={f.id} f={f} />
                   ))}
-                  <Section rows={rows} empty="" />
+                  <Section rows={rows} jour={dayKey(date)} empty="" />
                 </div>
               </div>
             ))}
@@ -471,19 +477,21 @@ function FormationCarte({ f, enAvant = false }: { f: FormationRow; enAvant?: boo
   );
 }
 
-function Section({ rows, empty }: { rows: Row[]; empty: string }) {
+function Section({ rows, empty, jour }: { rows: Row[]; empty: string; jour?: string }) {
   return (
     <div className="flex flex-col gap-3">
       {rows.map((i) => (
-        <InterventionCard key={i.id} i={i} />
+        <InterventionCard key={i.id} i={i} jour={jour} />
       ))}
       {rows.length === 0 && empty && <p className="text-sm text-ink-soft">{empty}</p>}
     </div>
   );
 }
 
-function InterventionCard({ i, retard = false, nouvelle = false }: { i: Row; retard?: boolean; nouvelle?: boolean }) {
-  const heure = i.dateProgrammee ? (formatDateTime(i.dateProgrammee).split(" ")[1] ?? "—") : "Date à confirmer";
+function InterventionCard({ i, retard = false, nouvelle = false, jour }: { i: Row; retard?: boolean; nouvelle?: boolean; jour?: string }) {
+  const rang = jour ? rangDuJour(i, jour) : null;
+  const plage = libellePlage(i);
+  const heure = rang && rang.rang > 1 ? `Jour ${rang.rang}/${rang.total}` : i.dateProgrammee ? (formatDateTime(i.dateProgrammee).split(" ")[1] ?? "—") : "Date à confirmer";
   const itineraire = i.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(i.adresse)}` : null;
   const action = nouvelle ? "Voir et accepter" : i.refuseeLe && ["creee", "planifiee", "affectee"].includes(i.statut) ? "Voir" : i.statut === "en_cours" ? "Continuer le rapport" : ["terminee", "validee", "cloturee"].includes(i.statut) ? "Voir la mission" : "Ouvrir la mission";
   return (
@@ -508,6 +516,7 @@ function InterventionCard({ i, retard = false, nouvelle = false }: { i: Row; ret
         {i.appareilId ? <TypeInterventionPill type={i.type} /> : <Pill tone="neutral">Prestation</Pill>}
         <span className="font-display font-bold text-[15px]">{i.numeroInterne}</span>
       </div>
+      {plage && <div className="text-[13px] font-semibold text-blue">📅 Plusieurs jours : {plage}</div>}
       <div className="text-[13px] text-ink-soft">
         {i.raisonSociale && i.adresse ? `${i.raisonSociale} — ${i.adresse}` : "Projet non renseigné"}
       </div>

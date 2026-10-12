@@ -73,8 +73,9 @@ export type OrdreDeMissionParams = {
 
 export type ResultatEmail = "ok" | "echec" | "non_configure";
 
+// Heure programmée d'une mission : enregistrée telle que saisie -> affichée sans conversion.
 function formatDateHeure(d: Date) {
-  return d.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("fr-BE", { timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export async function envoyerOrdreDeMission(params: OrdreDeMissionParams): Promise<ResultatEmail> {

@@ -9,6 +9,7 @@ import { journaliser } from "@/lib/journal";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
+import { avecMessage } from "@/lib/url";
 
 const ROLES_ADMIN_ONLY: Role[] = ["administrateur"];
 
@@ -130,4 +131,46 @@ export async function resetUserPassword(formData: FormData) {
   });
 
   revalidatePath("/responsable/utilisateurs");
+}
+
+// Phase 31 : corriger le nom, l'email ou le téléphone d'un compte (administrateur).
+export async function modifierUtilisateur(formData: FormData) {
+  const admin = await requireUser(ROLES_ADMIN_ONLY);
+  const page = "/responsable/utilisateurs";
+  const parsed = z
+    .object({
+      userId: z.string().uuid(),
+      nom: z.string().trim().min(2, "Le nom doit contenir au moins 2 caractères.").max(160),
+      email: z.string().trim().toLowerCase().email("Email invalide"),
+      telephone: z.string().trim().max(40).optional(),
+    })
+    .safeParse({
+      userId: formData.get("userId"),
+      nom: formData.get("nom"),
+      email: formData.get("email"),
+      telephone: formData.get("telephone") || undefined,
+    });
+  if (!parsed.success) redirect(avecMessage(page, "erreur", parsed.error.issues[0]?.message ?? "Données invalides"));
+  const d = parsed.data!;
+  const [avant] = await db.select({ nom: users.nom, email: users.email, telephone: users.telephone }).from(users).where(eq(users.id, d.userId)).limit(1);
+  if (!avant) redirect(avecMessage(page, "erreur", "Compte introuvable."));
+  const [pris] = await db.select({ id: users.id }).from(users).where(eq(users.email, d.email)).limit(1);
+  if (pris && pris.id !== d.userId) redirect(avecMessage(page, "erreur", "Un autre compte utilise déjà cet email."));
+  await db.update(users).set({ nom: d.nom, email: d.email, telephone: d.telephone ?? null }).where(eq(users.id, d.userId));
+  const changements = [
+    d.nom !== avant!.nom ? `nom : « ${avant!.nom} » → « ${d.nom} »` : null,
+    d.email !== avant!.email ? `email : ${avant!.email} → ${d.email}` : null,
+    (d.telephone ?? null) !== (avant!.telephone ?? null) ? "téléphone modifié" : null,
+  ].filter(Boolean);
+  if (changements.length) {
+    await journaliser({ entite: "utilisateur", entiteId: d.userId, action: "identite_modifiee", utilisateurId: admin.id, details: changements.join(" · ") });
+  }
+  revalidatePath("/", "layout");
+  redirect(
+    avecMessage(
+      page,
+      "ok",
+      !changements.length ? "Rien n'a changé." : d.email !== avant!.email ? `${d.nom} : enregistré. La connexion se fait désormais avec ${d.email}.` : `${d.nom} : enregistré.`
+    )
+  );
 }

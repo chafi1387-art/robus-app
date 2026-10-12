@@ -681,8 +681,16 @@ export default async function TechnicienDetailPage({
             <p className="text-xs text-ink-soft mb-3">Passer le statut à « Sorti des effectifs » archive le technicien dans « Anciens » et désactive sa connexion — son historique reste consultable.</p>
             <form action={updateTechnicienFiche} className="flex flex-col gap-3">
               <input type="hidden" name="technicienId" value={userRow.id} />
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Email">
+              {/* Phase 31 : correction du nom (faute d'orthographe…) — administrateur. */}
+              {user.role === "administrateur" ? (
+                <Field label="Nom et prénom">
+                  <input name="nom" required minLength={2} maxLength={160} defaultValue={userRow.nom} className={inputClass} />
+                </Field>
+              ) : (
+                <p className="text-xs text-ink-soft">Nom : <strong>{userRow.nom}</strong> (modifiable par l&apos;administrateur)</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Field label="Email (sert à la connexion)">
                   <input
                     type="email"
                     name="email"

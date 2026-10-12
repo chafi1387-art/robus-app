@@ -53,6 +53,8 @@ export const PARAM_CONTACT_EMAIL = "contact_client_email";
 
 const base = () => process.env.NEXTAUTH_URL || "https://robuswork.tech";
 const fmt = (d: Date) => d.toLocaleString("fr-BE", { timeZone: "Europe/Brussels", dateStyle: "short", timeStyle: "short" });
+// Heure programmée d'une mission (enregistrée telle que saisie) : sans conversion.
+const fmtProgramme = (d: Date) => d.toLocaleString("fr-BE", { timeZone: "UTC", dateStyle: "short", timeStyle: "short" });
 
 /** Emails qui reçoivent les alertes : paramètre, sinon administrateurs + responsables qualité actifs. */
 export async function destinatairesAlertes() {
@@ -288,7 +290,7 @@ export async function demandesMissionPlanifiee(interventionIds: string[]) {
     .where(and(inArray(demandesClient.interventionId, interventionIds), inArray(demandesClient.statut, ["nouvelle", "prise_en_charge", "planifiee"])));
   for (const r of rows) {
     const prenom = r.technicien?.trim().split(/\s+/)[0];
-    await changerStatutDemande(r.id, "planifiee", null, `Intervention planifiée${r.date ? ` le ${fmt(r.date)}` : ""}${prenom ? ` avec ${prenom}` : ""}.`);
+    await changerStatutDemande(r.id, "planifiee", null, `Intervention planifiée${r.date ? ` le ${fmtProgramme(r.date)}` : ""}${prenom ? ` avec ${prenom}` : ""}.`);
   }
 }
 
