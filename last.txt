@@ -1,6 +1,8 @@
-=== Deploiement 2026-10-10 20:24:02 : 9d17d0c -> f2d57c0
---- migration 0026_numero_interne_80.sql
+=== Deploiement 2026-10-12 19:12:02 : f2d57c0 -> 263b0e0
+--- migration 0027_missions_multi_jours.sql
 ALTER TABLE
+ALTER TABLE
+CREATE INDEX
 --- build
 ├ ƒ /responsable/sous-traitance
 ├ ƒ /responsable/stock
@@ -28,4 +30,4 @@ ALTER TABLE
 ƒ  (Dynamic)  server-rendered on demand
 
 --- curl /responsable/projets : 307
-STATUT: OK f2d57c0
+STATUT: OK 263b0e0

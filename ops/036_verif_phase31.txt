@@ -1,0 +1,23 @@
+== commit
+263b0e0 Phase 31 : fenêtre Affecter lisible, annulation/suppression (admin), correction des noms, missions sur plusieurs jours
+== migration
+0027_missions_multi_jours.sql
+== colonnes (rôle robus)
+date_fin_prevue|timestamp without time zone
+weekend_inclus|integer
+25|0
+== pages
+/connexion 200
+/responsable/interventions 307
+/responsable/utilisateurs 307
+/technicien 307
+== erreurs récentes
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+[31m[auth][error][0m UnknownAction: Cannot parse action at /api/auth/sign-in/email. Read more at https://errors.authjs.dev#unknownaction
+== pm2
+robus-dashboard online
+Mon Oct 12 19:14:22 UTC 2026
+(code retour 0, 2026-10-12 19:14:22)
